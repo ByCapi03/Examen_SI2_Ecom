@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { RootStackParamList } from '../../types';
 import { api } from '../../api/api';
+import { enqueue, isNetworkError } from '../../sync/syncService';
 import { colors, radius, spacing, typography } from '../../theme/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CreateReservation'>;
@@ -101,7 +102,28 @@ export const CreateReservationScreen: React.FC<Props> = ({ route, navigation }) 
       ]);
 
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.message || 'Error al crear la reserva');
+      if (isNetworkError(err)) {
+        // Sin conexión: se guarda en SQLite y se sincroniza al recuperar la red
+        try {
+          const op = await enqueue('RESERVATION', {
+            branchId,
+            date: getFormattedDateToSubmit(date),
+            approximateTime: time ? getFormattedTimeToDisplayAndSubmit(time) : undefined,
+            items: [{ variantId, quantity }],
+            clientPlatform: 'mobile',
+          }, `Reserva ${productName} (${sizeName}/${colorName}) x${quantity} — ${branchName}`);
+          Alert.alert(
+            'Reserva guardada sin conexión',
+            `Código ${op.operationId.slice(0, 8).toUpperCase()}. Se enviará automáticamente cuando vuelvas a tener Internet. ` +
+            'Si hay stock, se apartará y podrás pagarla desde "Mis reservas".',
+            [{ text: 'OK', onPress: () => navigation.popToTop() }],
+          );
+        } catch (e: any) {
+          Alert.alert('Error', e?.message || 'No se pudo guardar la reserva sin conexión');
+        }
+      } else {
+        Alert.alert('Error', err.response?.data?.message || 'Error al crear la reserva');
+      }
     } finally {
       setLoading(false);
     }

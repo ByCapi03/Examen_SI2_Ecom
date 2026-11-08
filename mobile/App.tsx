@@ -8,9 +8,11 @@ import { CartProvider } from './src/context/CartContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import { usePushNotifications } from './src/hooks/usePushNotifications';
+import { useAutoSync } from './src/sync/useOfflineSync';
 
 export default function App() {
   usePushNotifications();
+  useAutoSync();
 
   return (
     <SafeAreaProvider>

@@ -2,7 +2,7 @@ import * as SQLite from 'expo-sqlite';
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
 
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 /**
  * Obtiene o inicializa la conexión con la base de datos local SQLite.
@@ -131,6 +131,32 @@ const runMigrations = async (db: SQLite.SQLiteDatabase) => {
       await txn.execAsync(`PRAGMA user_version = ${DB_VERSION};`);
     });
     console.log('[SQLite] Migración a versión 1 completada exitosamente.');
+  }
+
+  if (currentVersion < 2) {
+    await db.withExclusiveTransactionAsync(async (txn) => {
+      // 8. Cola de operaciones offline pendientes de sincronizar (idempotentes por UUID)
+      await txn.execAsync(`
+        CREATE TABLE IF NOT EXISTS offline_operations (
+          operation_id TEXT PRIMARY KEY,
+          tenant_id INTEGER NOT NULL,
+          user_id INTEGER NOT NULL,
+          type TEXT NOT NULL,
+          client_created_at TEXT NOT NULL,
+          payload TEXT NOT NULL,
+          summary TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'PENDIENTE',
+          attempts INTEGER NOT NULL DEFAULT 0,
+          last_error TEXT,
+          result TEXT,
+          conflicts TEXT,
+          synced_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_offline_ops_status ON offline_operations (tenant_id, status);
+      `);
+      await txn.execAsync(`PRAGMA user_version = 2;`);
+    });
+    console.log('[SQLite] Migración a versión 2 (cola offline) completada.');
   }
 };
 

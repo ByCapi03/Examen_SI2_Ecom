@@ -13,6 +13,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { api } from '../../api/api';
 import { ReservationSummary, RootStackParamList } from '../../types';
 import { colors, radius, spacing, typography } from '../../theme/theme';
+import { PendingSyncBanner } from '../../sync/PendingSyncBanner';
 
 type Props = NativeStackScreenProps<RootStackParamList, any>;
 
@@ -124,6 +125,7 @@ export const ReservationsScreen: React.FC<Props> = ({ navigation }) => {
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
+        ListHeaderComponent={<PendingSyncBanner />}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[colors.primary]} />
         }
