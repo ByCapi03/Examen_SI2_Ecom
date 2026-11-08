@@ -18,6 +18,10 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { FirebaseModule } from './common/firebase/firebase.module';
 import { WebsocketModule } from './common/realtime/websocket.module';
+import { TenantSubscriber } from './common/tenancy/tenant.subscriber';
+import { SyncModule } from './modules/sync/sync.module';
+import { AiReportsModule } from './modules/ai-reports/ai-reports.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 @Module({
   imports: [
@@ -35,8 +39,11 @@ import { WebsocketModule } from './common/realtime/websocket.module';
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_DATABASE'),
         autoLoadEntities: true,
-        // SOLO DESARROLLO. En producción utilizar migrations.
-        synchronize: true,
+        subscribers: [TenantSubscriber],
+        // SOLO DESARROLLO. En producción utilizar migrations (DB_SYNCHRONIZE=false).
+        // Las FKs compuestas multitenant están declaradas en las entidades para que
+        // synchronize NO las elimine.
+        synchronize: configService.get<string>('DB_SYNCHRONIZE', 'true') !== 'false',
       }),
       inject: [ConfigService],
     }),
@@ -54,6 +61,9 @@ import { WebsocketModule } from './common/realtime/websocket.module';
     ReportsModule,
     TenantsModule,
     WebsocketModule,
+    SyncModule,
+    AiReportsModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

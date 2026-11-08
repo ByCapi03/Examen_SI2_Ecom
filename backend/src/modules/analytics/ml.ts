@@ -1,0 +1,164 @@
+/**
+ * ALGORITMOS DE MACHINE LEARNING (sin dependencias externas, deterministas)
+ *
+ *  - Aprendizaje SUPERVISADO: regresión lineal por mínimos cuadrados (OLS)
+ *    sobre la serie semanal de unidades vendidas → pronóstico de demanda.
+ *  - Aprendizaje NO SUPERVISADO: K-Means con inicialización k-means++ sobre
+ *    variables RFM estandarizadas → segmentación de clientes.
+ */
+
+// ----------------------------------------------------------------- Regresión
+export interface LinearModel { intercept: number; slope: number; r2: number; residualStd: number }
+
+export function fitLinearRegression(y: number[]): LinearModel {
+  const n = y.length;
+  if (n === 0) return { intercept: 0, slope: 0, r2: 0, residualStd: 0 };
+  if (n === 1) return { intercept: y[0], slope: 0, r2: 0, residualStd: 0 };
+  const xs = y.map((_, i) => i);
+  const meanX = (n - 1) / 2;
+  const meanY = y.reduce((a, b) => a + b, 0) / n;
+  let sxy = 0, sxx = 0;
+  for (let i = 0; i < n; i++) { sxy += (xs[i] - meanX) * (y[i] - meanY); sxx += (xs[i] - meanX) ** 2; }
+  const slope = sxx === 0 ? 0 : sxy / sxx;
+  const intercept = meanY - slope * meanX;
+  let ssRes = 0, ssTot = 0;
+  for (let i = 0; i < n; i++) {
+    const pred = intercept + slope * i;
+    ssRes += (y[i] - pred) ** 2;
+    ssTot += (y[i] - meanY) ** 2;
+  }
+  const r2 = ssTot === 0 ? 1 : 1 - ssRes / ssTot;
+  const residualStd = n > 2 ? Math.sqrt(ssRes / (n - 2)) : 0;
+  return { intercept, slope, r2, residualStd };
+}
+
+export function predict(model: LinearModel, fromIndex: number, horizon: number): number[] {
+  return Array.from({ length: horizon }, (_, h) => Math.max(0, model.intercept + model.slope * (fromIndex + h)));
+}
+
+/** Error absoluto medio en validación "holdout" (últimos `test` puntos). */
+export function holdoutMae(y: number[], test = 2): number | null {
+  if (y.length < test + 3) return null;
+  const train = y.slice(0, y.length - test);
+  const model = fitLinearRegression(train);
+  const preds = predict(model, train.length, test);
+  const actual = y.slice(y.length - test);
+  return preds.reduce((a, p, i) => a + Math.abs(p - actual[i]), 0) / test;
+}
+
+export interface DemandForecast {
+  history: number[];
+  forecast: number[];
+  forecastTotal: number;
+  trend: 'CRECIENTE' | 'ESTABLE' | 'DECRECIENTE';
+  model: LinearModel;
+  mae: number | null;
+  safetyStock: number;
+}
+
+export function forecastDemand(weekly: number[], horizon = 4, serviceZ = 1.65): DemandForecast {
+  const model = fitLinearRegression(weekly);
+  const forecast = predict(model, weekly.length, horizon).map((v) => Number(v.toFixed(2)));
+  const forecastTotal = Number(forecast.reduce((a, b) => a + b, 0).toFixed(2));
+  const mean = weekly.length ? weekly.reduce((a, b) => a + b, 0) / weekly.length : 0;
+  const relSlope = mean > 0 ? model.slope / mean : model.slope;
+  const trend = relSlope > 0.05 ? 'CRECIENTE' : relSlope < -0.05 ? 'DECRECIENTE' : 'ESTABLE';
+  const safetyStock = Math.ceil(serviceZ * model.residualStd * Math.sqrt(horizon));
+  return { history: weekly, forecast, forecastTotal, trend, model, mae: holdoutMae(weekly), safetyStock };
+}
+
+// ------------------------------------------------------------------ K-Means
+/** PRNG determinista (mulberry32) para resultados reproducibles. */
+export function seededRandom(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const dist2 = (a: number[], b: number[]) => a.reduce((s, v, i) => s + (v - b[i]) ** 2, 0);
+
+export function standardize(rows: number[][]): { data: number[][]; mean: number[]; std: number[] } {
+  if (!rows.length) return { data: [], mean: [], std: [] };
+  const d = rows[0].length;
+  const mean = Array.from({ length: d }, (_, j) => rows.reduce((a, r) => a + r[j], 0) / rows.length);
+  const std = Array.from({ length: d }, (_, j) => {
+    const v = rows.reduce((a, r) => a + (r[j] - mean[j]) ** 2, 0) / rows.length;
+    return Math.sqrt(v) || 1;
+  });
+  return { data: rows.map((r) => r.map((v, j) => (v - mean[j]) / std[j])), mean, std };
+}
+
+export interface KMeansResult { centroids: number[][]; labels: number[]; inertia: number; iterations: number }
+
+export function kmeans(data: number[][], k: number, seed = 42, maxIter = 100): KMeansResult {
+  const n = data.length;
+  if (n === 0) return { centroids: [], labels: [], inertia: 0, iterations: 0 };
+  k = Math.max(1, Math.min(k, n));
+  const rand = seededRandom(seed);
+  // Inicialización k-means++
+  const centroids: number[][] = [data[Math.floor(rand() * n)].slice()];
+  while (centroids.length < k) {
+    const d = data.map((p) => Math.min(...centroids.map((c) => dist2(p, c))));
+    const sum = d.reduce((a, b) => a + b, 0);
+    if (sum === 0) { centroids.push(data[Math.floor(rand() * n)].slice()); continue; }
+    let r = rand() * sum, idx = 0;
+    while (idx < n - 1 && (r -= d[idx]) > 0) idx++;
+    centroids.push(data[idx].slice());
+  }
+  let labels = new Array(n).fill(0);
+  let iterations = 0;
+  for (; iterations < maxIter; iterations++) {
+    const next = data.map((p) => {
+      let best = 0, bestD = Infinity;
+      centroids.forEach((c, j) => { const dd = dist2(p, c); if (dd < bestD) { bestD = dd; best = j; } });
+      return best;
+    });
+    const changed = next.some((l, i) => l !== labels[i]);
+    labels = next;
+    for (let j = 0; j < k; j++) {
+      const members = data.filter((_, i) => labels[i] === j);
+      if (members.length) centroids[j] = members[0].map((_, dIdx) => members.reduce((a, m) => a + m[dIdx], 0) / members.length);
+    }
+    if (!changed && iterations > 0) break;
+  }
+  const inertia = data.reduce((a, p, i) => a + dist2(p, centroids[labels[i]]), 0);
+  return { centroids, labels, inertia, iterations };
+}
+
+/** Coeficiente de silueta medio (calidad del agrupamiento, -1..1). */
+export function silhouette(data: number[][], labels: number[]): number | null {
+  const k = new Set(labels).size;
+  if (k < 2 || data.length < 3) return null;
+  const s = data.map((p, i) => {
+    const byCluster = new Map<number, number[]>();
+    data.forEach((q, j) => { if (i !== j) { const arr = byCluster.get(labels[j]) ?? []; arr.push(Math.sqrt(dist2(p, q))); byCluster.set(labels[j], arr); } });
+    const own = byCluster.get(labels[i]);
+    if (!own?.length) return 0;
+    const a = own.reduce((x, y) => x + y, 0) / own.length;
+    let b = Infinity;
+    byCluster.forEach((arr, c) => { if (c !== labels[i]) b = Math.min(b, arr.reduce((x, y) => x + y, 0) / arr.length); });
+    return b === Infinity ? 0 : (b - a) / Math.max(a, b);
+  });
+  return s.reduce((a, b) => a + b, 0) / s.length;
+}
+
+export interface RfmPoint { recencyDays: number; frequency: number; monetary: number }
+
+/** Asigna nombres de negocio a los clusters según su centroide RFM (en escala original). */
+export function labelRfmClusters(centroids: RfmPoint[]): string[] {
+  const names = ['Campeones', 'Clientes leales', 'Potenciales / ocasionales', 'En riesgo de abandono', 'Perdidos', 'Nuevos'];
+  const score = centroids.map((c, i) => ({ i, s: -c.recencyDays / 30 + c.frequency + c.monetary / 100 }));
+  score.sort((a, b) => b.s - a.s);
+  const out = new Array(centroids.length).fill('');
+  score.forEach((x, rank) => {
+    if (rank === 0) out[x.i] = names[0];
+    else if (rank === score.length - 1 && score.length > 2) out[x.i] = centroids[x.i].recencyDays > 90 ? names[4] : names[3];
+    else out[x.i] = names[Math.min(rank, names.length - 1)];
+  });
+  return out;
+}

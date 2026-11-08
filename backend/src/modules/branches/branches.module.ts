@@ -7,10 +7,12 @@ import { CitiesService } from './cities.service';
 
 import { Branch } from './branch.entity';
 import { City } from './city.entity';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Branch, City])
+    TypeOrmModule.forFeature([Branch, City]),
+    AuthModule,
   ],
   controllers: [BranchesController, CitiesController],
   providers: [BranchesService, CitiesService],

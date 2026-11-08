@@ -42,7 +42,7 @@ export class CashSessionsService {
       throw new BadRequestException('El cajero no tiene una sucursal asignada');
     }
 
-    const branch = await this.branchRepository.findOne({ where: { id: user.branchId } });
+    const branch = await this.branchRepository.findOne({ where: { id: user.branchId, tenantId: user.tenantId } });
     if (!branch || !branch.active) {
       throw new BadRequestException('La sucursal asignada no existe o está inactiva');
     }
@@ -194,7 +194,7 @@ export class CashSessionsService {
       throw new UnauthorizedException('No tiene permisos para ver las sesiones de caja');
     }
 
-    let whereClause: any = {};
+    let whereClause: any = { tenantId: user.tenantId };
     if (isEncargado) {
       whereClause.branchId = user.branchId;
     }

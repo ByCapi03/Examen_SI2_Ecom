@@ -22,6 +22,9 @@ export class CashSession {
   id: number;
 
   @Column()
+  tenantId: number;
+
+  @Column()
   branchId: number;
 
   @Column()
@@ -49,7 +52,10 @@ export class CashSession {
   status: CashSessionStatus;
 
   @ManyToOne(() => Branch)
-  @JoinColumn({ name: 'branchId' })
+  @JoinColumn([
+    { name: 'branchId', referencedColumnName: 'id', foreignKeyConstraintName: 'fk_cash_sessions_branch_tenant' },
+    { name: 'tenantId', referencedColumnName: 'tenantId' },
+  ])
   branch: Branch;
 
   @ManyToOne(() => User)

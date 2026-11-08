@@ -1,3 +1,4 @@
+import { getCurrentTenantId } from '../../common/tenancy/tenant-context';
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
@@ -144,7 +145,8 @@ export class CatalogService {
 
     const product = this.productRepository.create({
       ...createProductDto,
-      tenantId: tenantId || (createProductDto as any).tenantId || 1,
+      // El tenant proviene exclusivamente del JWT (nunca del body)
+      tenantId,
     });
     return this.productRepository.save(product);
   }
@@ -171,7 +173,7 @@ export class CatalogService {
       };
     });
   }
-  async findOneProduct(id: number, tenantId?: number) {
+  async findOneProduct(id: number, tenantId: number | undefined = getCurrentTenantId()) {
     const whereClause: any = { id };
     if (tenantId) {
       whereClause.tenantId = tenantId;
@@ -292,7 +294,7 @@ export class CatalogService {
     const existing = await this.variantRepository.findOneBy({ sku: createVariantDto.sku });
     if (existing) throw new ConflictException(`El SKU ${createVariantDto.sku} ya est en uso`);
 
-    const product = await this.productRepository.findOneBy({ id: createVariantDto.productId });
+    const product = await this.productRepository.findOneBy({ id: createVariantDto.productId, tenantId: getCurrentTenantId() });
     if (!product) throw new NotFoundException(`Producto #${createVariantDto.productId} no encontrado`);
     const size = await this.sizeRepository.findOneBy({ id: createVariantDto.sizeId });
     if (!size) throw new NotFoundException(`Talla #${createVariantDto.sizeId} no encontrada`);
@@ -304,13 +306,14 @@ export class CatalogService {
   }
   async findAllVariants() {
     return this.variantRepository.find({
+      where: { product: { tenantId: getCurrentTenantId() } },
       relations: { product: true, size: true, color: true },
       order: { id: 'ASC' }
     });
   }
   async findOneVariant(id: number) {
     const variant = await this.variantRepository.findOne({
-      where: { id },
+      where: { id, product: { tenantId: getCurrentTenantId() } },
       relations: { product: true, size: true, color: true }
     });
     if (!variant) throw new NotFoundException(`Variante #${id} no encontrada`);
@@ -325,7 +328,7 @@ export class CatalogService {
     }
 
     if (updateVariantDto.productId) {
-      const product = await this.productRepository.findOneBy({ id: updateVariantDto.productId });
+      const product = await this.productRepository.findOneBy({ id: updateVariantDto.productId, tenantId: getCurrentTenantId() });
       if (!product) throw new NotFoundException(`Producto #${updateVariantDto.productId} no encontrado`);
     }
     if (updateVariantDto.sizeId) {

@@ -19,8 +19,8 @@ export class AccessController {
   }
 
   @Get(':id')
-  findOneUser(@Param('id') id: string) {
-    return this.accessService.findOneUser(+id);
+  findOneUser(@Param('id') id: string, @Request() req: any) {
+    return this.accessService.findOneUser(+id, req.user);
   }
 
   @Patch(':id')
@@ -34,8 +34,8 @@ export class AccessController {
   }
 
   @Delete(':id')
-  removeUser(@Param('id') id: string) {
-    return this.accessService.removeUser(+id);
+  removeUser(@Param('id') id: string, @Request() req: any) {
+    return this.accessService.removeUser(+id, req.user);
   }
 
   @Post('roles')

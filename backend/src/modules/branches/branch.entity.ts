@@ -1,9 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, OneToMany, Unique } from 'typeorm';
 import { City } from './city.entity';
 import { User } from '../auth/user.entity';
 import { Tenant } from '../tenants/tenant.entity';
 
 @Entity('branches')
+@Unique('uq_branches_tenant_id', ['tenantId', 'id'])
 export class Branch {
   @PrimaryGeneratedColumn()
   id: number;

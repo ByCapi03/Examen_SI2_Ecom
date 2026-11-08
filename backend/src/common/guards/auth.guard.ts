@@ -11,6 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { setAuthenticatedTenant } from '../tenancy/tenant-context';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -45,6 +46,8 @@ export class AuthGuard implements CanActivate {
       // Attach the payload to the request object
       // Payload has: sub, email, roles, branchId, tenantId
       (request as any).user = payload;
+      // Propaga el tenant verificado al contexto de la petición (ORM / servicios)
+      setAuthenticatedTenant(payload.tenantId, payload.sub);
     } catch {
       throw new UnauthorizedException('Token inválido o expirado');
     }

@@ -116,10 +116,11 @@ export class AccessService {
   async findAllUsers(currentUser: any) {
     const isCurrentUserAdmin = currentUser.roles.includes('ADMIN');
     
-    let whereClause: any = {};
+    let whereClause: any = { tenantId: currentUser.tenantId };
     if (!isCurrentUserAdmin) {
       // Only show CAJEROS of the same branch
       whereClause = { 
+        tenantId: currentUser.tenantId,
         branchId: currentUser.branchId,
         userRoles: { role: { name: 'CAJERO' } }
       };
@@ -137,9 +138,9 @@ export class AccessService {
     });
   }
 
-  async findOneUser(id: number) {
+  async findOneUser(id: number, currentUser?: any) {
     const user = await this.userRepository.findOne({
-      where: { id },
+      where: { id, tenantId: currentUser?.tenantId },
       relations: { userRoles: { role: true }, branch: true },
     });
     if (!user) throw new NotFoundException('User not found');
@@ -155,8 +156,8 @@ export class AccessService {
     return `This action updates a #${id} user`;
   }
 
-  async removeUser(id: number) {
-    const user = await this.userRepository.findOneBy({ id });
+  async removeUser(id: number, currentUser?: any) {
+    const user = await this.userRepository.findOneBy({ id, tenantId: currentUser?.tenantId });
     if (!user) throw new NotFoundException('User not found');
     user.active = false;
     await this.userRepository.save(user);

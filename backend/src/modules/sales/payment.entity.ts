@@ -16,6 +16,9 @@ export class Payment {
   @PrimaryGeneratedColumn()
   id: number;
 
+  @Column()
+  tenantId: number;
+
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   amount: number;
 
@@ -46,7 +49,11 @@ export class Payment {
   @Column()
   saleId: number;
 
+  // FK compuesta: un pago solo puede liquidar ventas de su propio tenant
   @ManyToOne(() => Sale, (sale) => sale.payments)
-  @JoinColumn({ name: 'saleId' })
+  @JoinColumn([
+    { name: 'saleId', referencedColumnName: 'id', foreignKeyConstraintName: 'fk_payments_sale_tenant' },
+    { name: 'tenantId', referencedColumnName: 'tenantId' },
+  ])
   sale: Sale;
 }

@@ -43,7 +43,8 @@ export class ReportsService {
     const qb = this.saleRepository.createQueryBuilder('sale')
       .leftJoin('sale.branch', 'branch')
       .leftJoin('sale.payments', 'payment')
-      .where('sale.status IN (:...statuses)', { statuses: effectiveStatuses });
+      .where('sale.status IN (:...statuses)', { statuses: effectiveStatuses })
+      .andWhere('sale.tenantId = :tenantId', { tenantId: user.tenantId });
 
     if (branchId) {
       qb.andWhere('sale.branchId = :branchId', { branchId });
@@ -166,6 +167,7 @@ export class ReportsService {
       .addSelect('SUM(item.quantity)', 'unitsSold')
       .addSelect('SUM(item.subtotal)', 'revenue')
       .where('sale.status IN (:...statuses)', { statuses: effectiveStatuses })
+      .andWhere('sale.tenantId = :tenantId', { tenantId: user.tenantId })
       .groupBy('product.id')
       .addGroupBy('product.name')
       .addGroupBy('product.imageUrl')
@@ -204,7 +206,8 @@ export class ReportsService {
       .leftJoinAndSelect('inv.variant', 'variant')
       .leftJoinAndSelect('variant.product', 'product')
       .leftJoinAndSelect('variant.size', 'size')
-      .leftJoinAndSelect('variant.color', 'color');
+      .leftJoinAndSelect('variant.color', 'color')
+      .where('inv.tenantId = :tenantId', { tenantId: user.tenantId });
 
     if (branchId) {
       qb.andWhere('inv.branchId = :branchId', { branchId });
@@ -264,7 +267,8 @@ export class ReportsService {
     const branchId = this.validateRoleAndGetBranch(user, query.branchId);
 
     const qb = this.reservationRepository.createQueryBuilder('res')
-      .leftJoinAndSelect('res.branch', 'branch');
+      .leftJoinAndSelect('res.branch', 'branch')
+      .where('res.tenantId = :tenantId', { tenantId: user.tenantId });
 
     if (branchId) {
       qb.andWhere('res.branchId = :branchId', { branchId });

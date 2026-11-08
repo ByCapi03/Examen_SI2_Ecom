@@ -8,6 +8,7 @@ import { InventoryMovement } from './inventory-movement.entity';
 
 @Entity('inventory')
 @Unique(['branchId', 'variantId'])
+@Unique('uq_inventory_tenant_id', ['tenantId', 'id'])
 export class Inventory {
   @PrimaryGeneratedColumn()
   id: number;
@@ -37,7 +38,10 @@ export class Inventory {
   variantId: number;
 
   @ManyToOne(() => Branch)
-  @JoinColumn({ name: 'branchId' })
+  @JoinColumn([
+    { name: 'branchId', referencedColumnName: 'id', foreignKeyConstraintName: 'fk_inventory_branch_tenant' },
+    { name: 'tenantId', referencedColumnName: 'tenantId' },
+  ])
   branch: Branch;
 
   @ManyToOne(() => Variant, (variant) => variant.inventories)

@@ -53,6 +53,7 @@ export class DashboardService {
       .select('SUM(sale.total)', 'totalAmount')
       .addSelect('COUNT(sale.id)', 'salesCount')
       .where('sale.status IN (:...statuses)', { statuses: effectiveStatuses })
+      .andWhere('sale.tenantId = :tenantId', { tenantId: user.tenantId })
       .andWhere('sale.date >= :start', { start: startDate })
       .andWhere('sale.date <= :end', { end: endDate });
 
@@ -69,7 +70,8 @@ export class DashboardService {
 
     // 2. Reservations breakdown
     const resQb = this.reservationRepository.createQueryBuilder('res')
-      .where('res.status IN (:...statuses)', { statuses: activeResStatuses });
+      .where('res.status IN (:...statuses)', { statuses: activeResStatuses })
+      .andWhere('res.tenantId = :tenantId', { tenantId: user.tenantId });
 
     if (targetBranchId) {
       resQb.andWhere('res.branchId = :branchId', { branchId: targetBranchId });
@@ -95,7 +97,8 @@ export class DashboardService {
       .innerJoin('userRole.role', 'role')
       .where('role.name = :roleName', { roleName: 'CAJERO' })
       .andWhere('userRole.active = :urActive', { urActive: true })
-      .andWhere('user.active = :active', { active: true });
+      .andWhere('user.active = :active', { active: true })
+      .andWhere('user.tenantId = :tenantId', { tenantId: user.tenantId });
       
     if (targetBranchId) {
       usersQb.andWhere('user.branchId = :branchId', { branchId: targetBranchId });
@@ -105,7 +108,8 @@ export class DashboardService {
 
     // 3. Low Stock Count: (stock - reserved) <= stockMin
     const invQb = this.inventoryRepository.createQueryBuilder('inv')
-      .where('(inv.stock - inv.reserved) <= inv.stockMin');
+      .where('(inv.stock - inv.reserved) <= inv.stockMin')
+      .andWhere('inv.tenantId = :tenantId', { tenantId: user.tenantId });
 
     if (targetBranchId) {
       invQb.andWhere('inv.branchId = :branchId', { branchId: targetBranchId });
@@ -123,6 +127,7 @@ export class DashboardService {
       .addSelect('SUM(sale.total)', 'totalAmount')
       .addSelect('COUNT(sale.id)', 'salesCount')
       .where('sale.status IN (:...statuses)', { statuses: effectiveStatuses })
+      .andWhere('sale.tenantId = :tenantId', { tenantId: user.tenantId })
       .andWhere('sale.date >= :sevenDaysAgo', { sevenDaysAgo })
       .groupBy("TO_CHAR(sale.date, 'YYYY-MM-DD')")
       .orderBy("TO_CHAR(sale.date, 'YYYY-MM-DD')", 'ASC');
@@ -152,6 +157,7 @@ export class DashboardService {
       .select('sale.channel', 'channel')
       .addSelect('SUM(sale.total)', 'totalAmount')
       .where('sale.status IN (:...statuses)', { statuses: effectiveStatuses })
+      .andWhere('sale.tenantId = :tenantId', { tenantId: user.tenantId })
       .groupBy('sale.channel');
 
     if (targetBranchId) {
@@ -183,6 +189,7 @@ export class DashboardService {
       .addSelect('SUM(item.quantity)', 'unitsSold')
       .addSelect('SUM(item.subtotal)', 'revenue')
       .where('sale.status IN (:...statuses)', { statuses: effectiveStatuses })
+      .andWhere('sale.tenantId = :tenantId', { tenantId: user.tenantId })
       .groupBy('product.id')
       .addGroupBy('product.name')
       .addGroupBy('product.imageUrl')
@@ -213,6 +220,7 @@ export class DashboardService {
         .addSelect('SUM(sale.total)', 'totalAmount')
         .addSelect('COUNT(sale.id)', 'salesCount')
         .where('sale.status IN (:...statuses)', { statuses: effectiveStatuses })
+        .andWhere('sale.tenantId = :tenantId', { tenantId: user.tenantId })
         .andWhere('sale.date >= :start', { start: startDate })
         .andWhere('sale.date <= :end', { end: endDate })
         .groupBy('branch.id')
@@ -241,6 +249,7 @@ export class DashboardService {
       .select('season.name', 'seasonName')
       .addSelect('SUM(item.subtotal)', 'revenue')
       .where('sale.status IN (:...statuses)', { statuses: effectiveStatuses })
+      .andWhere('sale.tenantId = :tenantId', { tenantId: user.tenantId })
       .andWhere('season.id IS NOT NULL')
       .andWhere('sale.date >= :start', { start: startDate })
       .andWhere('sale.date <= :end', { end: endDate })
@@ -268,6 +277,7 @@ export class DashboardService {
       .select('collection.name', 'collectionName')
       .addSelect('SUM(item.subtotal)', 'revenue')
       .where('sale.status IN (:...statuses)', { statuses: effectiveStatuses })
+      .andWhere('sale.tenantId = :tenantId', { tenantId: user.tenantId })
       .andWhere('collection.id IS NOT NULL')
       .andWhere('sale.date >= :start', { start: startDate })
       .andWhere('sale.date <= :end', { end: endDate })

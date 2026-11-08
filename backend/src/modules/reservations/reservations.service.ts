@@ -105,7 +105,7 @@ export class ReservationsService implements OnModuleInit {
 
     try {
       // Validar branch
-      const branch = await queryRunner.manager.findOne(Branch, { where: { id: createReservationDto.branchId, active: true } });
+      const branch = await queryRunner.manager.findOne(Branch, { where: { id: createReservationDto.branchId, tenantId: user.tenantId, active: true } });
       if (!branch) throw new NotFoundException(`La sucursal ${createReservationDto.branchId} no existe o no está activa`);
 
       // Crear Entidad Reserva (PENDIENTE esperando pago)
@@ -778,7 +778,7 @@ export class ReservationsService implements OnModuleInit {
       throw new ForbiddenException('No tiene permisos internos para listar reservas');
     }
 
-    let whereClause: any = {};
+    let whereClause: any = { tenantId: user.tenantId };
 
     if (isEncargado || isCajero) {
       whereClause.branchId = user.branchId;
@@ -823,7 +823,7 @@ export class ReservationsService implements OnModuleInit {
     }
 
     const reservation = await this.reservationRepository.findOne({
-      where: { id },
+      where: { id, tenantId: user.tenantId },
       relations: {
         branch: true,
         client: true,

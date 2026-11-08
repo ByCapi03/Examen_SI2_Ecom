@@ -6,8 +6,9 @@
  */
 import {
   Entity, PrimaryGeneratedColumn, Column,
-  ManyToOne, JoinColumn, OneToMany, OneToOne, CreateDateColumn,
+  ManyToOne, JoinColumn, OneToMany, OneToOne, CreateDateColumn, Unique,
 } from 'typeorm';
+import { Tenant } from '../tenants/tenant.entity';
 import { Branch } from '../branches/branch.entity';
 import { Client } from '../clients/client.entity';
 import { User } from '../auth/user.entity';
@@ -18,12 +19,21 @@ import { CashSession } from './cash-session.entity';
 import { SaleChannel, SaleStatus } from './sales.enums';
 
 @Entity('sales')
+@Unique('uq_sales_tenant_id', ['tenantId', 'id'])
 export class Sale {
   @PrimaryGeneratedColumn()
   id: number;
 
   @Column()
   tenantId: number;
+
+  @ManyToOne(() => Tenant, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'tenantId', foreignKeyConstraintName: 'fk_sales_tenant' })
+  tenant: Tenant;
+
+  /** UUID generado en el dispositivo cuando la venta se registró sin conexión (idempotencia). */
+  @Column({ type: 'uuid', nullable: true, unique: true })
+  offlineOperationId: string | null;
 
   @Column({ type: 'enum', enum: SaleChannel })
   channel: SaleChannel;
@@ -55,8 +65,12 @@ export class Sale {
   @Column({ nullable: true })
   cashSessionId: number;
 
+  // FK compuesta: la sucursal DEBE pertenecer al mismo tenant que la venta
   @ManyToOne(() => Branch)
-  @JoinColumn({ name: 'branchId' })
+  @JoinColumn([
+    { name: 'branchId', referencedColumnName: 'id', foreignKeyConstraintName: 'fk_sales_branch_tenant' },
+    { name: 'tenantId', referencedColumnName: 'tenantId' },
+  ])
   branch: Branch;
 
   @ManyToOne(() => Client, (client) => client.sales, { nullable: true })

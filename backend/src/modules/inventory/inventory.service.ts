@@ -33,10 +33,10 @@ export class InventoryService {
       throw new UnauthorizedException('Permisos insuficientes');
     }
 
-    const branch = await this.branchRepository.findOneBy({ id: createInventoryDto.branchId });
+    const branch = await this.branchRepository.findOneBy({ id: createInventoryDto.branchId, tenantId: currentUser.tenantId });
     if (!branch) throw new NotFoundException('Sucursal no encontrada');
     
-    const variant = await this.variantRepository.findOneBy({ id: createInventoryDto.variantId });
+    const variant = await this.variantRepository.findOne({ where: { id: createInventoryDto.variantId, product: { tenantId: currentUser.tenantId } } });
     if (!variant) throw new NotFoundException('Variante no encontrada');
 
     const existing = await this.inventoryRepository.findOneBy({ 
@@ -56,6 +56,7 @@ export class InventoryService {
 
     const inventory = this.inventoryRepository.create({
       ...createInventoryDto,
+      tenantId: currentUser.tenantId,
       stock: 0,
       reserved: 0
     });
@@ -66,9 +67,9 @@ export class InventoryService {
   async findAllInventory(currentUser: any) {
     const isEncargado = currentUser.roles.includes('ENCARGADO');
     
-    let whereClause = {};
+    let whereClause: any = { tenantId: currentUser.tenantId };
     if (isEncargado) {
-      whereClause = { branchId: currentUser.branchId };
+      whereClause = { tenantId: currentUser.tenantId, branchId: currentUser.branchId };
     }
 
     return this.inventoryRepository.find({
@@ -85,7 +86,7 @@ export class InventoryService {
     const isEncargado = currentUser.roles.includes('ENCARGADO');
     
     const inventory = await this.inventoryRepository.findOne({
-      where: { id },
+      where: { id, tenantId: currentUser.tenantId },
       relations: {
         branch: true,
         variant: { product: true, size: true, color: true }

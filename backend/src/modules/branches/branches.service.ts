@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
+import { getActivePlan } from '../../common/tenancy/plan-features';
 import { Branch } from './branch.entity';
 import { City } from './city.entity';
 import { CreateBranchDto, UpdateBranchDto } from './branches.dto';
@@ -12,6 +13,7 @@ export class BranchesService {
     private readonly branchRepository: Repository<Branch>,
     @InjectRepository(City)
     private readonly cityRepository: Repository<City>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(createBranchDto: CreateBranchDto & { tenantId?: number }) {
@@ -20,9 +22,21 @@ export class BranchesService {
       throw new NotFoundException(`City with id ${createBranchDto.cityId} not found`);
     }
 
+    const tenantId = createBranchDto.tenantId!;
+    // Límite de sucursales según el plan contratado
+    const plan = await getActivePlan(this.dataSource, tenantId);
+    if (plan) {
+      const current = await this.branchRepository.count({ where: { tenantId, active: true } });
+      if (current >= plan.maxBranches) {
+        throw new ForbiddenException(
+          `El plan ${plan.name} permite como máximo ${plan.maxBranches} sucursales activas.`,
+        );
+      }
+    }
+
     const branch = this.branchRepository.create({
       ...createBranchDto,
-      tenantId: createBranchDto.tenantId || 1,
+      tenantId,
     });
     return await this.branchRepository.save(branch);
   }

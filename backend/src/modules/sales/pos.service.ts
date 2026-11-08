@@ -4,6 +4,7 @@
  * Se asegura de que el cajero tenga una caja abierta (CashSession) antes de vender, 
  * descuenta el inventario físico y crea al vuelo un cliente nuevo si no existía.
  */
+import { getEffectiveTenantId } from '../../common/tenancy/tenant-context';
 import { Injectable, UnauthorizedException, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, ILike, Or } from 'typeorm';
@@ -53,7 +54,7 @@ export class PosService {
       throw new BadRequestException('El cajero no tiene una sucursal asignada');
     }
 
-    const branch = await this.branchRepository.findOne({ where: { id: user.branchId } });
+    const branch = await this.branchRepository.findOne({ where: { id: user.branchId, tenantId: user.tenantId } });
     if (!branch || !branch.active) {
       throw new BadRequestException('La sucursal asignada no existe o está inactiva');
     }
@@ -137,7 +138,7 @@ export class PosService {
     try {
       // 1. Verify Client if provided
       if (dto.clientId) {
-        const client = await queryRunner.manager.findOne(Client, { where: { id: dto.clientId } });
+        const client = await queryRunner.manager.findOne(Client, { where: { id: dto.clientId, tenantId: getEffectiveTenantId() } });
         if (!client) {
           throw new NotFoundException('Cliente no encontrado');
         }
@@ -174,7 +175,7 @@ export class PosService {
             branchId,
             variantId: item.variantId,
           })
-          .setLock('pessimistic_write')
+          .setLock('pessimistic_write', undefined, ['inv']) // solo bloquea inventario (LEFT JOIN de promociones no admite FOR UPDATE)
           .getOne();
 
         if (!inventory) {
@@ -288,7 +289,7 @@ export class PosService {
     if (!q) {
       // Return recent clients if no search query
       const clients = await this.clientRepository.find({
-        where: { active: true },
+        where: { active: true, tenantId: getEffectiveTenantId() },
         order: { registrationDate: 'DESC' },
         take: 20,
       });
@@ -304,10 +305,10 @@ export class PosService {
 
     const clients = await this.clientRepository.find({
       where: [
-        { name: ILike(`%${q}%`), active: true },
-        { lastName: ILike(`%${q}%`), active: true },
-        { email: ILike(`%${q}%`), active: true },
-        { phone: ILike(`%${q}%`), active: true },
+        { name: ILike(`%${q}%`), active: true, tenantId: getEffectiveTenantId() },
+        { lastName: ILike(`%${q}%`), active: true, tenantId: getEffectiveTenantId() },
+        { email: ILike(`%${q}%`), active: true, tenantId: getEffectiveTenantId() },
+        { phone: ILike(`%${q}%`), active: true, tenantId: getEffectiveTenantId() },
       ],
       take: 20,
     });

@@ -1,6 +1,6 @@
 import {
   Entity, PrimaryGeneratedColumn, Column,
-  ManyToOne, JoinColumn, OneToMany, ManyToMany
+  ManyToOne, JoinColumn, OneToMany, ManyToMany, Unique
 } from 'typeorm';
 import { Category } from './category.entity';
 import { Variant } from './variant.entity';
@@ -14,6 +14,7 @@ export enum ArGarmentType {
 }
 
 @Entity('products')
+@Unique('uq_products_tenant_id', ['tenantId', 'id'])
 export class Product {
   @PrimaryGeneratedColumn()
   id: number;

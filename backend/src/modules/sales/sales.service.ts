@@ -426,7 +426,8 @@ export class SalesService {
       .leftJoinAndSelect('sale.branch', 'branch')
       .leftJoinAndSelect('sale.client', 'client')
       .leftJoinAndSelect('sale.user', 'user')
-      .leftJoinAndSelect('sale.payments', 'payment');
+      .leftJoinAndSelect('sale.payments', 'payment')
+      .where('sale.tenantId = :tenantId', { tenantId: user.tenantId });
 
     // Security: ENCARGADO is strictly scoped to user.branchId
     if (user.roles.includes('ENCARGADO')) {
@@ -493,10 +494,8 @@ export class SalesService {
       throw new ForbiddenException('Acceso denegado');
     }
 
-    const whereClause: any = { id };
-    if (user.tenantId) {
-      whereClause.tenantId = user.tenantId;
-    }
+    // Aislamiento SaaS: el tenantId SIEMPRE proviene del JWT verificado
+    const whereClause: any = { id, tenantId: user.tenantId };
 
     const sale = await this.saleRepository.findOne({
       where: whereClause,

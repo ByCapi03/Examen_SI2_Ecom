@@ -307,6 +307,7 @@ export class AuthService {
         mustChangePassword: false,
         temporaryPasswordExpiresAt: null,
         emailVerified: true,
+        tenantId: client.tenantId,
       } as any);
       const savedUser = await queryRunner.manager.save(user);
 

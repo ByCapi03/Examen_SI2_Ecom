@@ -12,6 +12,9 @@ export class Client {
   id: number;
 
   @Column()
+  tenantId: number;
+
+  @Column()
   name: string;
 
   @Column()
@@ -42,7 +45,10 @@ export class Client {
   activationCodeExpiresAt: Date | null;
 
   @OneToOne(() => User, { nullable: true })
-  @JoinColumn({ name: 'userId' })
+  @JoinColumn([
+    { name: 'userId', referencedColumnName: 'id', foreignKeyConstraintName: 'fk_clients_user_tenant' },
+    { name: 'tenantId', referencedColumnName: 'tenantId' },
+  ])
   user: User;
 
   @OneToMany(() => Reservation, (reservation) => reservation.client)
