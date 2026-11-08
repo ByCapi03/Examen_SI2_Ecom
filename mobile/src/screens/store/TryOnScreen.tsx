@@ -1,0 +1,513 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, Alert, Dimensions, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Camera, CameraView } from 'expo-camera';
+import * as tf from '@tensorflow/tfjs';
+import '@tensorflow/tfjs-react-native';
+import { cameraWithTensors } from '@tensorflow/tfjs-react-native';
+import * as poseDetection from '@tensorflow-models/pose-detection';
+import { RootStackParamList } from '../../types';
+import { api } from '../../api/api';
+import { colors, spacing, typography, radius } from '../../theme/theme';
+
+// Fix for Expo 51+ where Camera.Constants was removed, but tfjs still expects it
+if (!(Camera as any).Constants) {
+  (Camera as any).Constants = {
+    Type: {
+      front: 'front',
+      back: 'back',
+    },
+  };
+}
+
+const TensorCamera = cameraWithTensors(CameraView as any);
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+const SMOOTHING_FACTOR = 0.5;
+
+type Props = NativeStackScreenProps<RootStackParamList, 'TryOn'>;
+
+export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
+  const { variantId } = route.params;
+
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [loadingConfig, setLoadingConfig] = useState(true);
+  const [modelReady, setModelReady] = useState(false);
+  const [productConfig, setProductConfig] = useState<any>(null);
+
+  const [overlayStyles, setOverlayStyles] = useState<any>({});
+
+  const detectorRef = useRef<poseDetection.PoseDetector | null>(null);
+  const isDetecting = useRef(false);
+  const previousKeypoints = useRef<{ [name: string]: any }>({});
+  const unmounted = useRef(false);
+  
+  // Animation frame ref to be able to cancel it
+  const requestAnimationFrameId = useRef<number>(0);
+
+  useEffect(() => {
+    unmounted.current = false;
+    
+    (async () => {
+      try {
+        const { status } = await Camera.requestCameraPermissionsAsync();
+        setHasPermission(status === 'granted');
+
+        if (status !== 'granted') {
+          return;
+        }
+
+        const res = await api.get(`/store/try-on/${variantId}`);
+        setProductConfig(res.data);
+        
+        await tf.ready();
+        
+        const model = poseDetection.SupportedModels.MoveNet;
+        const detectorConfig = {
+          modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
+          enableSmoothing: true,
+        };
+        detectorRef.current = await poseDetection.createDetector(model, detectorConfig);
+        
+        if (!unmounted.current) setModelReady(true);
+      } catch (err) {
+        console.error('TryOn init error:', err);
+        if (!unmounted.current) {
+          Alert.alert('Error', 'No se pudo inicializar la cámara o el modelo de IA.');
+        }
+      } finally {
+        if (!unmounted.current) setLoadingConfig(false);
+      }
+    })();
+
+    return () => {
+      unmounted.current = true;
+      if (requestAnimationFrameId.current) {
+        cancelAnimationFrame(requestAnimationFrameId.current);
+      }
+      if (detectorRef.current) {
+        detectorRef.current.dispose();
+      }
+    };
+  }, [variantId]);
+
+  const handleCameraStream = (images: IterableIterator<tf.Tensor3D>) => {
+    const loop = async () => {
+      if (unmounted.current) return;
+      if (isDetecting.current) {
+        requestAnimationFrameId.current = requestAnimationFrame(loop);
+        return;
+      }
+      
+      const imageTensor = images.next().value;
+      if (!imageTensor) {
+        requestAnimationFrameId.current = requestAnimationFrame(loop);
+        return;
+      }
+
+      try {
+        isDetecting.current = true;
+        if (detectorRef.current) {
+          const poses = await detectorRef.current.estimatePoses(imageTensor as any, {
+            flipHorizontal: true, // front camera
+          });
+          
+          if (poses && poses.length > 0) {
+            updateOverlay(poses[0]);
+          } else {
+            setOverlayStyles({});
+          }
+        }
+      } catch (err) {
+        // ignore occasional tensor errors
+      } finally {
+        tf.dispose(imageTensor);
+        isDetecting.current = false;
+        requestAnimationFrameId.current = requestAnimationFrame(loop);
+      }
+    };
+    loop();
+  };
+
+  const updateOverlay = (pose: poseDetection.Pose) => {
+    if (!pose.keypoints) return;
+
+    // Apply EWMA smoothing
+    const keypoints = pose.keypoints.map(kp => {
+      if (!kp.name) return kp;
+      const prev = previousKeypoints.current[kp.name];
+      if (prev && kp.score && kp.score >= 0.35) {
+        kp.x = prev.x * (1 - SMOOTHING_FACTOR) + kp.x * SMOOTHING_FACTOR;
+        kp.y = prev.y * (1 - SMOOTHING_FACTOR) + kp.y * SMOOTHING_FACTOR;
+      }
+      
+      if (kp.score && kp.score >= 0.35) {
+        previousKeypoints.current[kp.name] = { ...kp };
+      } else {
+        delete previousKeypoints.current[kp.name];
+      }
+      return kp;
+    });
+
+    const findKP = (name: string) => keypoints.find(k => k.name === name);
+
+    const leftShoulder = findKP('left_shoulder');
+    const rightShoulder = findKP('right_shoulder');
+    const leftHip = findKP('left_hip');
+    const rightHip = findKP('right_hip');
+    const leftKnee = findKP('left_knee');
+    const rightKnee = findKP('right_knee');
+    const leftAnkle = findKP('left_ankle');
+    const rightAnkle = findKP('right_ankle');
+
+    const leftElbow = findKP('left_elbow');
+    const rightElbow = findKP('right_elbow');
+
+    const productData = productConfig?.product;
+    const arType = productData?.arType;
+    const isArticulated = productData?.arTorsoUrl && productData?.arLeftSleeveUrl && productData?.arRightSleeveUrl;
+
+    // We need to map tensor coordinates (which depend on camera resolution) to screen coordinates
+    // However, TensorCamera output might not match screen dimensions perfectly, we'll assume it scales to fill
+    // For simplicity, we just use raw tensor coordinates if we configure tensor size to match screen aspect ratio,
+    // or scale them. Let's assume tensor is mapped.
+    
+    // We will use relative ratios based on standard tensor size (e.g. 152x200 or whatever it outputs).
+    // Let's assume keypoints are in Tensor dimensions. 
+    // To be precise, we need the tensor dimensions. We will pass a fixed size to TensorCamera.
+    const tensorWidth = 360;
+    const tensorHeight = Math.floor((360 / SCREEN_W) * SCREEN_H);
+    
+    const scaleX = SCREEN_W / tensorWidth;
+    const scaleY = SCREEN_H / tensorHeight;
+
+    const toScreenX = (x: number) => x * scaleX;
+    const toScreenY = (y: number) => y * scaleY;
+
+    const newStyles: any = {};
+
+    if (arType === 'TOP') {
+      if (leftShoulder?.score && leftShoulder.score > 0.35 && 
+          rightShoulder?.score && rightShoulder.score > 0.35 &&
+          leftHip?.score && leftHip.score > 0.35 && 
+          rightHip?.score && rightHip.score > 0.35) {
+        
+        const shoulderWidth = Math.abs(toScreenX(leftShoulder.x) - toScreenX(rightShoulder.x));
+        const centerX = toScreenX((leftShoulder.x + rightShoulder.x) / 2);
+        const topY = toScreenY(Math.min(leftShoulder.y, rightShoulder.y));
+        const bottomY = toScreenY(Math.max(leftHip.y, rightHip.y));
+
+        const width = shoulderWidth * 2.1; // Padding increased
+        const height = (bottomY - topY) * 1.5;
+
+        if (isArticulated) {
+          newStyles.torso = {
+            opacity: 1,
+            position: 'absolute',
+            left: centerX - width / 2,
+            top: topY - height * 0.1,
+            width,
+            height,
+            zIndex: 999,
+            elevation: 999,
+          };
+
+          const drawSleeve = (shoulder: any, elbow: any, hip: any, isLeft: boolean) => {
+            let ex, ey;
+            if (elbow?.score && elbow.score > 0.35) {
+              ex = toScreenX(elbow.x);
+              ey = toScreenY(elbow.y);
+            } else {
+              const hx = toScreenX(hip.x) - toScreenX(shoulder.x);
+              const hy = toScreenY(hip.y) - toScreenY(shoulder.y);
+              const hlen = Math.hypot(hx, hy) || 1;
+              const sLen = hlen * 0.4;
+              ex = toScreenX(shoulder.x) + (hx / hlen) * sLen;
+              ey = toScreenY(shoulder.y) + (hy / hlen) * sLen;
+            }
+
+            const sx = toScreenX(shoulder.x);
+            const sy = toScreenY(shoulder.y);
+            const dx = ex - sx;
+            const dy = ey - sy;
+            let angle = Math.atan2(dy, dx);
+            const length = Math.hypot(dx, dy);
+
+            const sWidth = length * 1.3;
+            const sHeight = sWidth * 0.4;
+            const overlap = sWidth * 0.15; // 15% overlap on the shoulder
+
+            let leftEdge;
+            let pivotOffsetX;
+
+            if (isLeft) {
+              // Left sleeve: base is on the left edge.
+              leftEdge = sx - overlap;
+              pivotOffsetX = sWidth / 2 - overlap;
+            } else {
+              // Right sleeve: base is on the right edge.
+              angle = angle - Math.PI;
+              leftEdge = sx - sWidth + overlap;
+              pivotOffsetX = -(sWidth / 2 - overlap);
+            }
+
+            return {
+              opacity: 1,
+              position: 'absolute',
+              left: leftEdge,
+              top: sy - sHeight / 2,
+              width: sWidth,
+              height: sHeight,
+              transform: [
+                { translateX: -pivotOffsetX },
+                { rotate: `${angle}rad` },
+                { translateX: pivotOffsetX }
+              ],
+              zIndex: 998,
+              elevation: 998,
+            };
+          };
+
+          newStyles.leftSleeve = drawSleeve(leftShoulder, leftElbow, leftHip, true);
+          newStyles.rightSleeve = drawSleeve(rightShoulder, rightElbow, rightHip, false);
+        } else {
+          newStyles.rigid = {
+            opacity: 1,
+            position: 'absolute',
+            left: centerX - width / 2,
+            top: topY - height * 0.1,
+            width,
+            height,
+            zIndex: 999,
+            elevation: 999,
+          };
+        }
+        setOverlayStyles(newStyles);
+      } else {
+        setOverlayStyles({});
+      }
+    } else if (arType === 'BOTTOM') {
+      if (leftHip?.score && leftHip.score > 0.35 && 
+          rightHip?.score && rightHip.score > 0.35 &&
+          ((leftAnkle?.score && leftAnkle.score > 0.35) || (leftKnee?.score && leftKnee.score > 0.35))) {
+        
+        const hipWidth = Math.abs(toScreenX(leftHip.x) - toScreenX(rightHip.x));
+        const centerX = toScreenX((leftHip.x + rightHip.x) / 2);
+        const topY = toScreenY(Math.min(leftHip.y, rightHip.y));
+        
+        let bottomY = topY + hipWidth * 3; // fallback
+        if (leftAnkle?.score && leftAnkle.score > 0.35 && rightAnkle?.score && rightAnkle.score > 0.35) {
+          bottomY = toScreenY(Math.max(leftAnkle.y, rightAnkle.y));
+        } else if (leftKnee?.score && leftKnee.score > 0.35 && rightKnee?.score && rightKnee.score > 0.35) {
+          bottomY = toScreenY(Math.max(leftKnee.y, rightKnee.y)) + hipWidth * 1.8;
+        }
+
+        const width = hipWidth * 2.3;
+        const height = (bottomY - topY) * 1.2;
+
+        newStyles.rigid = {
+          opacity: 1,
+          position: 'absolute',
+          left: centerX - width / 2,
+          top: topY,
+          width,
+          height,
+          zIndex: 999,
+          elevation: 999,
+        };
+        setOverlayStyles(newStyles);
+      } else {
+        setOverlayStyles({});
+      }
+    } else if (arType === 'DRESS') {
+      if (leftShoulder?.score && leftShoulder.score > 0.35 && 
+          rightShoulder?.score && rightShoulder.score > 0.35 &&
+          leftHip?.score && leftHip.score > 0.35 && 
+          rightHip?.score && rightHip.score > 0.35) {
+        
+        const shoulderWidth = Math.abs(toScreenX(leftShoulder.x) - toScreenX(rightShoulder.x));
+        const centerX = toScreenX((leftShoulder.x + rightShoulder.x) / 2);
+        const topY = toScreenY(Math.min(leftShoulder.y, rightShoulder.y));
+        const torsoHeight = toScreenY(Math.max(leftHip.y, rightHip.y)) - topY;
+        
+        let bottomY = topY + torsoHeight * 2.5; // fallback
+        if (leftKnee?.score && leftKnee.score > 0.35 && rightKnee?.score && rightKnee.score > 0.35) {
+          bottomY = toScreenY(Math.max(leftKnee.y, rightKnee.y));
+        }
+
+        const width = shoulderWidth * 2.1;
+        const height = (bottomY - topY) * 1.25;
+
+        newStyles.rigid = {
+          opacity: 1,
+          position: 'absolute',
+          left: centerX - width / 2,
+          top: topY - height * 0.05,
+          width,
+          height,
+          zIndex: 999,
+          elevation: 999,
+        };
+        setOverlayStyles(newStyles);
+      } else {
+        setOverlayStyles({});
+      }
+    }
+  };
+
+  if (hasPermission === null || loadingConfig) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Iniciando Vestidor Virtual...</Text>
+      </View>
+    );
+  }
+
+  if (hasPermission === false) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.errorText}>No tenemos acceso a la cámara.</Text>
+        <Pressable style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Text style={styles.backBtnText}>Volver</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (!modelReady || !productConfig) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Cargando modelo de IA...</Text>
+      </View>
+    );
+  }
+
+  const tensorWidth = 360;
+  const tensorHeight = Math.floor((360 / SCREEN_W) * SCREEN_H);
+
+  return (
+    <View style={styles.container}>
+      <TensorCamera
+        style={styles.camera}
+        facing="front"
+        type="front"
+        cameraTextureHeight={1920}
+        cameraTextureWidth={1080}
+        resizeHeight={tensorHeight}
+        resizeWidth={tensorWidth}
+        resizeDepth={3}
+        onReady={handleCameraStream}
+        autorender={true}
+        useCustomShadersToResize={false}
+      />
+
+      {overlayStyles.torso && productConfig.product?.arTorsoUrl && (
+        <Image 
+          source={{ uri: productConfig.product.arTorsoUrl }} 
+          style={overlayStyles.torso}
+          resizeMode="contain"
+        />
+      )}
+      {overlayStyles.leftSleeve && productConfig.product?.arLeftSleeveUrl && (
+        <Image 
+          source={{ uri: productConfig.product.arLeftSleeveUrl }} 
+          style={overlayStyles.leftSleeve}
+          resizeMode="contain"
+        />
+      )}
+      {overlayStyles.rightSleeve && productConfig.product?.arRightSleeveUrl && (
+        <Image 
+          source={{ uri: productConfig.product.arRightSleeveUrl }} 
+          style={overlayStyles.rightSleeve}
+          resizeMode="contain"
+        />
+      )}
+      {overlayStyles.rigid && productConfig.product?.arImageUrl && (
+        <Image 
+          source={{ uri: productConfig.product.arImageUrl }} 
+          style={overlayStyles.rigid}
+          resizeMode="contain"
+        />
+      )}
+
+      <SafeAreaView style={styles.overlayControls} edges={['bottom']}>
+        <Pressable style={styles.closeBtn} onPress={() => navigation.goBack()}>
+          <Text style={styles.closeBtnText}>Cerrar Vestidor</Text>
+        </Pressable>
+        <Text style={styles.infoText}>
+          Mostrando: {productConfig.product?.name} ({productConfig.product?.arType})
+        </Text>
+      </SafeAreaView>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: 'black' },
+  centerContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.cream,
+    padding: spacing.xl,
+  },
+  camera: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  loadingText: {
+    ...typography.body,
+    marginTop: spacing.md,
+    color: colors.primary,
+  },
+  errorText: {
+    ...typography.h3,
+    color: colors.danger,
+    marginBottom: spacing.lg,
+    textAlign: 'center',
+  },
+  backBtn: {
+    backgroundColor: colors.primary,
+    padding: spacing.md,
+    borderRadius: radius.sm,
+    width: '100%',
+    alignItems: 'center',
+  },
+  backBtnText: {
+    color: colors.white,
+    fontWeight: 'bold',
+  },
+  overlayControls: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    alignItems: 'center',
+  },
+  closeBtn: {
+    backgroundColor: colors.danger,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: radius.lg,
+    marginBottom: spacing.md,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 5,
+  },
+  closeBtnText: {
+    color: colors.white,
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  infoText: {
+    ...typography.caption,
+    color: 'white',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: spacing.xs,
+    borderRadius: radius.sm,
+  }
+});

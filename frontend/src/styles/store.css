@@ -1,0 +1,235 @@
+/* store.css - Estilos para la tienda pública (ATEMPORAL) */
+
+/* Navbar */
+.store-navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 40px;
+  background-color: var(--atemporal-green);
+  border-bottom: 1px solid var(--atemporal-green-dark);
+  box-shadow: var(--atemporal-shadow);
+}
+
+.store-navbar-logo {
+  font-size: 1.5rem;
+  font-weight: bold;
+  letter-spacing: 2px;
+}
+
+.store-navbar-logo a {
+  text-decoration: none;
+  color: var(--atemporal-cream);
+}
+
+.store-navbar-links {
+  display: flex;
+  gap: 30px;
+}
+
+.store-navbar-links a {
+  text-decoration: none;
+  color: var(--atemporal-beige);
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 0.9rem;
+  transition: color 0.3s;
+}
+
+.store-navbar-links a:hover {
+  color: var(--atemporal-gold);
+}
+
+/* Footer */
+.store-footer {
+  background-color: var(--atemporal-green-dark);
+  color: var(--atemporal-cream);
+  padding: 40px 20px;
+  text-align: center;
+  margin-top: auto;
+}
+
+.store-footer-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.store-footer-logo {
+  font-size: 1.2rem;
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: var(--atemporal-cream);
+}
+
+.store-footer-links {
+  display: flex;
+  gap: 20px;
+  color: var(--atemporal-beige);
+}
+
+.store-footer-links a {
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.3s;
+}
+
+.store-footer-links a:hover {
+  color: var(--atemporal-gold);
+}
+
+.store-footer-copyright {
+  margin: 30px 0 0 0;
+  letter-spacing: 1px;
+  color: var(--atemporal-muted);
+  font-size: 0.85rem;
+}
+
+/* HomePage */
+.home-page {
+  padding: 0 0 60px 0;
+  background-color: var(--atemporal-cream);
+}
+
+/* Hero Section */
+.hero-section {
+  background-color: var(--atemporal-green);
+  padding: 80px 20px;
+  text-align: center;
+  margin-bottom: 60px;
+  border-bottom: 1px solid var(--atemporal-border);
+  color: var(--atemporal-cream);
+}
+
+.hero-content {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.hero-subtitle {
+  font-size: 1rem;
+  color: var(--atemporal-beige);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.hero-title {
+  font-size: 3.5rem;
+  font-weight: bold;
+  margin: 20px 0;
+  color: var(--atemporal-cream);
+  letter-spacing: 1px;
+}
+
+.hero-image-placeholder {
+  width: 100%;
+  height: 400px;
+  background-color: var(--atemporal-green-soft);
+  border-radius: var(--radius-md, 12px);
+  margin: 40px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--atemporal-beige);
+  font-size: 1.2rem;
+}
+
+.hero-text {
+  font-size: 1.2rem;
+  color: var(--atemporal-beige);
+  margin-bottom: 30px;
+}
+
+.btn-primary {
+  padding: 15px 40px;
+  background-color: #222;
+  color: #fff;
+  border: none;
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: background-color 0.3s;
+}
+
+.btn-primary:hover {
+  background-color: #000;
+}
+
+/* Featured Products */
+.featured-section {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.section-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.section-title {
+  font-size: 2rem;
+  color: var(--atemporal-green);
+  letter-spacing: 1px;
+}
+
+.section-divider {
+  width: 60px;
+  height: 3px;
+  background-color: var(--atemporal-gold);
+  margin: 15px auto 0;
+}
+
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 30px;
+}
+
+.product-card {
+  text-align: center;
+  background-color: var(--atemporal-white);
+  border-radius: var(--radius-md, 12px);
+  padding: 20px;
+  box-shadow: var(--atemporal-shadow);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.product-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 30px rgba(16, 36, 33, 0.2);
+}
+
+.product-image-placeholder {
+  height: 300px;
+  background-color: var(--atemporal-cream);
+  border-radius: var(--radius-sm, 6px);
+  margin-bottom: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--atemporal-muted);
+  transition: transform 0.3s ease;
+}
+
+.product-image-placeholder:hover {
+  transform: scale(1.02);
+}
+
+.product-name {
+  font-size: 1.2rem;
+  margin: 0 0 10px 0;
+  color: var(--atemporal-green);
+}
+
+.product-price {
+  font-size: 1.1rem;
+  color: var(--atemporal-gold);
+  margin-bottom: 15px;
+  font-weight: bold;
+}
