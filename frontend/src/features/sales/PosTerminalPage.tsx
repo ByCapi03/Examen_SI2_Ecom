@@ -1,6 +1,9 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/axios';
+import { enqueue, isNetworkError } from '../../offline/syncManager';
+import { cacheGet, cacheSet } from '../../offline/db';
+import { useOffline } from '../../offline/useOffline';
 
 interface PosProduct {
   productId: number;
@@ -40,6 +43,8 @@ export const PosTerminalPage = () => {
   const [paymentMethod, setPaymentMethod] = useState('EFECTIVO');
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const { online, pending } = useOffline();
+  const [fromCache, setFromCache] = useState<string | null>(null);
 
   // Client states
   const [isAnonymousClient, setIsAnonymousClient] = useState(true);
@@ -59,8 +64,11 @@ export const PosTerminalPage = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/pos/products');
+      const res: any = await api.get('/pos/products');
       setProducts(res.data);
+      setFromCache(res.fromCache ? res.savedAt : null);
+      // Sesión de caja vigente: necesaria para asociar ventas offline al arqueo
+      api.get('/cash-sessions/current').catch(() => undefined);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al obtener productos POS');
     } finally {
@@ -159,6 +167,13 @@ export const PosTerminalPage = () => {
     setError('');
     setSuccessMessage('');
 
+    const offlineMode = !navigator.onLine;
+    if (offlineMode) {
+      await registerOfflineSale();
+      setCheckoutLoading(false);
+      return;
+    }
+
     try {
       const payload: any = {
         paymentMethod,
@@ -181,9 +196,57 @@ export const PosTerminalPage = () => {
       setPaymentMethod('EFECTIVO');
       await fetchProducts();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Error al procesar la venta');
+      if (isNetworkError(err)) {
+        // Se perdió la conexión durante el cobro: se guarda en la cola local
+        await registerOfflineSale();
+      } else {
+        setError(err.response?.data?.message || 'Error al procesar la venta');
+      }
     } finally {
       setCheckoutLoading(false);
+    }
+  };
+
+  /**
+   * VENTA OFFLINE: solo efectivo (tarjeta/QR requieren autorización en línea).
+   * Se guarda en IndexedDB con UUID, se descuenta el stock local y se
+   * sincroniza automáticamente al volver la conexión.
+   */
+  const registerOfflineSale = async () => {
+    if (paymentMethod !== 'EFECTIVO') {
+      setError('Sin conexión solo se pueden registrar ventas en EFECTIVO. Tarjeta y QR requieren Internet.');
+      return;
+    }
+    try {
+      const session: any = (await cacheGet('GET /cash-sessions/current'))?.data;
+      const items = cart.map(item => ({
+        variantId: item.product.variantId,
+        quantity: item.quantity,
+        unitPrice: Number((item.product as any).finalPrice ?? item.product.price),
+      }));
+      const op = await enqueue('POS_CASH_SALE', {
+        cashSessionId: session?.id ?? session?.session?.id ?? undefined,
+        clientId: !isAnonymousClient && selectedClient ? selectedClient.id : undefined,
+        items,
+      }, `Venta efectivo Bs ${total.toFixed(2)} — ${items.reduce((a, i) => a + i.quantity, 0)} prenda(s)`);
+
+      // Descontar stock en la copia local para no sobrevender desde esta caja
+      const updated = products
+        .map(p => {
+          const sold = cart.find(c => c.product.variantId === p.variantId)?.quantity ?? 0;
+          return sold ? { ...p, available: p.available - sold } : p;
+        })
+        .filter(p => p.available > 0);
+      setProducts(updated);
+      await cacheSet('GET /pos/products', updated);
+
+      setSuccessMessage(`Venta guardada SIN CONEXIÓN (comprobante local ${op.operationId.slice(0, 8).toUpperCase()}). Total: Bs. ${total.toFixed(2)}. Se sincronizará automáticamente.`);
+      setCart([]);
+      setSelectedClient(null);
+      setIsAnonymousClient(true);
+      setPaymentMethod('EFECTIVO');
+    } catch (e: any) {
+      setError(e?.message || 'No se pudo guardar la venta offline');
     }
   };
 
@@ -212,6 +275,13 @@ export const PosTerminalPage = () => {
           style={{ width: '100%', padding: '10px', marginBottom: '20px', borderRadius: '4px', border: '1px solid #ccc' }}
         />
 
+        {(!online || fromCache) && (
+          <div style={{ padding: '10px', backgroundColor: '#fff3cd', color: '#856404', marginBottom: '15px', borderRadius: '4px' }}>
+            {!online ? 'Modo sin conexión: solo ventas en EFECTIVO. ' : ''}
+            {fromCache ? `Catálogo local guardado el ${new Date(fromCache).toLocaleString()}. ` : ''}
+            {pending.length > 0 ? `${pending.length} venta(s) pendiente(s) de sincronizar.` : ''}
+          </div>
+        )}
         {error && <div style={{ padding: '10px', backgroundColor: '#f8d7da', color: '#721c24', marginBottom: '15px', borderRadius: '4px' }}>{error}</div>}
         {successMessage && <div style={{ padding: '10px', backgroundColor: '#d4edda', color: '#155724', marginBottom: '15px', borderRadius: '4px', fontWeight: 'bold' }}>{successMessage}</div>}
 

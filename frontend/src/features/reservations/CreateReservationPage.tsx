@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { api } from '../../api/axios';
 import { useAuth } from '../auth/AuthContext';
+import { enqueue, isNetworkError } from '../../offline/syncManager';
 import '../../styles/store.css';
 
 export const CreateReservationPage = () => {
@@ -43,6 +44,7 @@ export const CreateReservationPage = () => {
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [offlineNotice, setOfflineNotice] = useState<string | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
 
   const [pendingPayment, setPendingPayment] = useState<any>(null);
@@ -93,6 +95,24 @@ export const CreateReservationPage = () => {
       setShowAuthModal(true);
       return;
     }
+    const saveOffline = async () => {
+      const op = await enqueue('RESERVATION', {
+        branchId, date, approximateTime: approximateTime || undefined,
+        items: [{ variantId, quantity }], clientPlatform: 'web',
+      }, `Reserva ${productName} (${sizeName}/${colorName}) x${quantity} — ${branchName} — ${date}`);
+      sessionStorage.removeItem('pendingReservation');
+      setOfflineNotice(
+        `Sin conexión: tu reserva quedó guardada en este dispositivo (código ${op.operationId.slice(0, 8).toUpperCase()}). ` +
+        'Se enviará automáticamente al recuperar Internet; si hay stock se apartará y podrás pagarla desde "Mis reservas".'
+      );
+    };
+
+    if (!navigator.onLine) {
+      try { await saveOffline(); } catch (e: any) { setError(e?.message || 'No se pudo guardar la reserva offline'); }
+      return;
+    }
+
+    let reservationCreated = false;
     try {
       setLoading(true);
       setError(null);
@@ -105,6 +125,7 @@ export const CreateReservationPage = () => {
         ],
       });
 
+      reservationCreated = true;
       const reservationId = resCreation.data.reservationId;
 
       if (paymentMethod === 'TARJETA') {
@@ -141,7 +162,11 @@ export const CreateReservationPage = () => {
         setPaymentStatus('PENDIENTE');
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Error al crear la reserva');
+      if (isNetworkError(err) && !reservationCreated) {
+        try { await saveOffline(); } catch (e: any) { setError(e?.message || 'No se pudo guardar la reserva offline'); }
+      } else {
+        setError(err.response?.data?.message || 'Error al crear la reserva');
+      }
     } finally {
       setLoading(false);
     }
@@ -170,6 +195,7 @@ export const CreateReservationPage = () => {
         </div>
 
         {error && <div style={{ color: '#721c24', backgroundColor: '#f8d7da', padding: '10px', borderRadius: '4px', marginBottom: '20px' }}>{error}</div>}
+        {offlineNotice && <div style={{ color: '#856404', backgroundColor: '#fff3cd', padding: '10px', borderRadius: '4px', marginBottom: '20px' }}>{offlineNotice}</div>}
 
         <form onSubmit={e => e.preventDefault()}>
           <div style={{ marginBottom: '15px' }}>

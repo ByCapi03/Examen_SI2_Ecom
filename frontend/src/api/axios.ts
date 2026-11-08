@@ -1,8 +1,36 @@
-import axios from 'axios';
+import axios, { type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
+import { cacheGet, cacheSet } from '../offline/db';
 
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000'
 });
+
+/**
+ * Lecturas que se guardan en IndexedDB para seguir operando sin conexión.
+ * Si la red falla, se responde con la última copia local (marcada fromCache).
+ */
+const OFFLINE_CACHEABLE = [
+  '/pos/products',
+  '/pos/clients',
+  '/cash-sessions/current',
+  '/store/products',
+  '/store/availability',
+  '/branches',
+  '/products',
+  '/inventory',
+  '/reservations/my',
+  '/sales/my',
+  '/saas/tenants/me',
+];
+
+const cacheKey = (config: InternalAxiosRequestConfig) => {
+  const params = config.params ? `?${new URLSearchParams(config.params).toString()}` : '';
+  return `GET ${config.url}${params}`;
+};
+
+const isCacheable = (config?: InternalAxiosRequestConfig) =>
+  !!config && (config.method ?? 'get').toLowerCase() === 'get' &&
+  OFFLINE_CACHEABLE.some((p) => (config.url ?? '').startsWith(p));
 
 // Interceptor para inyectar el token
 api.interceptors.request.use((config) => {
@@ -16,12 +44,32 @@ api.interceptors.request.use((config) => {
 });
 
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
+  (response) => {
+    if (isCacheable(response.config)) void cacheSet(cacheKey(response.config), response.data);
+    return response;
+  },
+  async (error) => {
     if (error.response && error.response.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
+      return Promise.reject(error);
+    }
+    // Sin conexión: servir la última copia local si existe
+    if (!error.response && isCacheable(error.config)) {
+      const cached = await cacheGet(cacheKey(error.config));
+      if (cached) {
+        const offlineResponse: AxiosResponse & { fromCache?: boolean; savedAt?: string } = {
+          data: cached.data,
+          status: 200,
+          statusText: 'OK (offline cache)',
+          headers: {},
+          config: error.config,
+          fromCache: true,
+          savedAt: cached.savedAt,
+        };
+        return offlineResponse;
+      }
     }
     return Promise.reject(error);
   }

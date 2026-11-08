@@ -149,16 +149,39 @@ export function silhouette(data: number[][], labels: number[]): number | null {
 
 export interface RfmPoint { recencyDays: number; frequency: number; monetary: number }
 
-/** Asigna nombres de negocio a los clusters según su centroide RFM (en escala original). */
-export function labelRfmClusters(centroids: RfmPoint[]): string[] {
-  const names = ['Campeones', 'Clientes leales', 'Potenciales / ocasionales', 'En riesgo de abandono', 'Perdidos', 'Nuevos'];
-  const score = centroids.map((c, i) => ({ i, s: -c.recencyDays / 30 + c.frequency + c.monetary / 100 }));
-  score.sort((a, b) => b.s - a.s);
-  const out = new Array(centroids.length).fill('');
-  score.forEach((x, rank) => {
-    if (rank === 0) out[x.i] = names[0];
-    else if (rank === score.length - 1 && score.length > 2) out[x.i] = centroids[x.i].recencyDays > 90 ? names[4] : names[3];
-    else out[x.i] = names[Math.min(rank, names.length - 1)];
+/**
+ * Asigna nombres de negocio a cada cluster comparando su centroide RFM con la
+ * media de toda la población (reglas interpretables, no solo el ranking):
+ *  - Perdidos / En riesgo de abandono: recencia muy superior a la media.
+ *  - Nuevos: compraron hace poco y una sola vez.
+ *  - Clusters activos restantes, por valor (frecuencia + gasto − recencia):
+ *    Campeones → Clientes leales → Potenciales → Ocasionales de bajo valor.
+ */
+export function labelRfmClusters(centroids: RfmPoint[], population?: RfmPoint): string[] {
+  const n = centroids.length || 1;
+  const pop = population ?? {
+    recencyDays: centroids.reduce((a, c) => a + c.recencyDays, 0) / n,
+    frequency: centroids.reduce((a, c) => a + c.frequency, 0) / n,
+    monetary: centroids.reduce((a, c) => a + c.monetary, 0) / n,
+  };
+  const value = (c: RfmPoint) => c.frequency / (pop.frequency || 1) + c.monetary / (pop.monetary || 1) - c.recencyDays / ((pop.recencyDays || 1) * 2);
+  const names: string[] = new Array(centroids.length).fill('');
+  const active: number[] = [];
+  centroids.forEach((c, i) => {
+    if (c.recencyDays > Math.max(pop.recencyDays * 2, 120)) names[i] = 'Perdidos';
+    else if (c.recencyDays > Math.max(pop.recencyDays * 1.5, 45)) names[i] = 'En riesgo de abandono';
+    else if (c.frequency <= 1.2 && c.recencyDays <= 30 && centroids.length > 2) names[i] = 'Nuevos';
+    else active.push(i);
   });
-  return out;
+  // Clusters activos: se nombran por valor relativo (mayor valor primero)
+  const ranked = ['Campeones', 'Clientes leales', 'Potenciales', 'Ocasionales de bajo valor'];
+  active.sort((x, y) => value(centroids[y]) - value(centroids[x]))
+    .forEach((idx, rank) => { names[idx] = ranked[Math.min(rank, ranked.length - 1)]; });
+  // Evitar nombres repetidos (p. ej. dos clusters "Potenciales")
+  const seen = new Map<string, number>();
+  return names.map((nm) => {
+    const k = (seen.get(nm) ?? 0) + 1;
+    seen.set(nm, k);
+    return k > 1 ? `${nm} ${k}` : nm;
+  });
 }

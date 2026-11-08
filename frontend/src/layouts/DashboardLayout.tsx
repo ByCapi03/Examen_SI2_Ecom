@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom';
 import { DashboardSidebar } from './DashboardSidebar';
 import { DashboardHeader } from './DashboardHeader';
 import '../styles/dashboard.css';
+import { OfflineStatusBar } from '../components/common/OfflineStatusBar';
 
 export const DashboardLayout = () => {
   return (
@@ -12,6 +13,7 @@ export const DashboardLayout = () => {
         <main style={{ padding: '0 32px 32px 32px' }}>
           <Outlet />
         </main>
+        <OfflineStatusBar />
       </div>
     </div>
   );

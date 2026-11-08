@@ -43,6 +43,9 @@ import { CashSessionsAdminPage } from '../features/sales/CashSessionsAdminPage';
 import { UsersPage } from '../features/dashboard/UsersPage';
 import { ReportsPage } from '../features/reports/ReportsPage';
 import { SuppliersPage } from '../features/suppliers/SuppliersPage';
+import { SyncConflictsPage } from '../features/sync/SyncConflictsPage';
+import { AiReportsPage } from '../features/ai-reports/AiReportsPage';
+import { AnalyticsPage } from '../features/analytics/AnalyticsPage';
 
 export const AppRouter = () => {
   return (
@@ -114,6 +117,9 @@ export const AppRouter = () => {
             <Route path="cash-sessions" element={<CashSessionsAdminPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="suppliers" element={<SuppliersPage />} />
+            <Route path="ai-reports" element={<AiReportsPage />} />
+            <Route path="analytics" element={<AnalyticsPage />} />
+            <Route path="sync-conflicts" element={<SyncConflictsPage />} />
           </Route>
         </Route>
       </Routes>

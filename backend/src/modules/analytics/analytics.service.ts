@@ -126,11 +126,17 @@ export class AnalyticsService {
       frequency: g.length ? g.reduce((a, r) => a + Number(r.frequency), 0) / g.length : 0,
       monetary: g.length ? g.reduce((a, r) => a + Number(r.monetary), 0) / g.length : 0,
     }));
-    const names = labelRfmClusters(centroidsRfm);
+    const population = {
+      recencyDays: rows.reduce((a, r) => a + Number(r.recency), 0) / rows.length,
+      frequency: rows.reduce((a, r) => a + Number(r.frequency), 0) / rows.length,
+      monetary: rows.reduce((a, r) => a + Number(r.monetary), 0) / rows.length,
+    };
+    const names = labelRfmClusters(centroidsRfm, population);
     const actions: Record<string, string> = {
       'Campeones': 'Programa VIP, acceso anticipado a colecciones.',
       'Clientes leales': 'Recompensas por fidelidad y venta cruzada.',
-      'Potenciales / ocasionales': 'Promociones personalizadas para aumentar frecuencia.',
+      'Potenciales': 'Promociones personalizadas para aumentar frecuencia.',
+      'Ocasionales de bajo valor': 'Descuentos por volumen y combos para elevar el ticket.',
       'En riesgo de abandono': 'Campaña de reactivación con descuento limitado.',
       'Perdidos': 'Encuesta de satisfacción y oferta de regreso.',
       'Nuevos': 'Bienvenida y recomendación de productos.',
@@ -143,7 +149,7 @@ export class AnalyticsService {
       avgRecencyDays: Number(centroidsRfm[j].recencyDays.toFixed(1)),
       avgFrequency: Number(centroidsRfm[j].frequency.toFixed(2)),
       avgMonetary: Number(centroidsRfm[j].monetary.toFixed(2)),
-      suggestedAction: actions[names[j]] ?? '',
+      suggestedAction: actions[names[j].replace(/ \d+$/, '')] ?? '',
       clients: g.sort((a, b) => b.monetary - a.monetary).slice(0, 50).map((r) => ({
         id: r.id, name: r.name, email: r.email, recencyDays: Number(r.recency), frequency: Number(r.frequency), monetary: Number(r.monetary),
       })),

@@ -61,6 +61,21 @@ export const DASHBOARD_NAVIGATION: NavItem[] = [
     allowedRoles: [ROL.ADMIN, ROL.ENCARGADO],
   },
   {
+    name: 'Reportes con IA',
+    path: '/dashboard/ai-reports',
+    allowedRoles: [ROL.ADMIN, ROL.ENCARGADO],
+  },
+  {
+    name: 'Analítica predictiva',
+    path: '/dashboard/analytics',
+    allowedRoles: [ROL.ADMIN, ROL.ENCARGADO],
+  },
+  {
+    name: 'Conflictos offline',
+    path: '/dashboard/sync-conflicts',
+    allowedRoles: [ROL.ADMIN, ROL.ENCARGADO],
+  },
+  {
     name: 'Proveedores',
     path: '/dashboard/suppliers',
     allowedRoles: [ROL.ADMIN],

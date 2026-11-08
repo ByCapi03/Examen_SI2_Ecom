@@ -36,11 +36,21 @@ describe('K-Means (no supervisado)', () => {
     expect(data[0][0] + data[1][0]).toBeCloseTo(0);
   });
 
-  it('nombra como Campeones al cluster más reciente, frecuente y de mayor gasto', () => {
+  it('nombra los clusters según reglas RFM interpretables', () => {
     const names = labelRfmClusters([
-      { recencyDays: 200, frequency: 1, monetary: 50 },
-      { recencyDays: 5, frequency: 10, monetary: 2000 },
+      { recencyDays: 200, frequency: 1, monetary: 50 },   // inactivo hace mucho
+      { recencyDays: 5, frequency: 10, monetary: 2000 },  // mejor cliente
+      { recencyDays: 3, frequency: 1, monetary: 120 },    // compró una vez, reciente
+    ], { recencyDays: 60, frequency: 4, monetary: 700 });
+    expect(names).toEqual(['Perdidos', 'Campeones', 'Nuevos']);
+  });
+
+  it('no repite nombres de segmento', () => {
+    const names = labelRfmClusters([
+      { recencyDays: 10, frequency: 2, monetary: 300 },
+      { recencyDays: 12, frequency: 2, monetary: 310 },
+      { recencyDays: 1, frequency: 9, monetary: 3000 },
     ]);
-    expect(names[1]).toBe('Campeones');
+    expect(names).toEqual(['Clientes leales', 'Potenciales', 'Campeones']);
   });
 });

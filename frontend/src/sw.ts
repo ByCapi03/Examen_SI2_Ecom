@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
-import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
-import { registerRoute } from 'workbox-routing';
+import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL } from 'workbox-precaching';
+import { registerRoute, NavigationRoute } from 'workbox-routing';
 import { CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 
@@ -12,6 +12,16 @@ declare let self: ServiceWorkerGlobalScope & {
 // 1. Limpieza de cachés antiguas y precaching de assets estáticos de la app
 cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST || []);
+
+// 1.b Navegación SPA offline: cualquier ruta interna (/dashboard/pos/terminal,
+// /reservations/new, ...) se resuelve con el index.html precacheado.
+try {
+  registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html'), {
+    denylist: [/^\/api\//, /\/firebase-messaging-sw\.js$/],
+  }));
+} catch {
+  // En modo desarrollo index.html puede no estar en el precache
+}
 
 // 2. Caché para Google Fonts (Hojas de estilo)
 registerRoute(
