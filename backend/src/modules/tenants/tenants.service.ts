@@ -89,6 +89,12 @@ export class TenantsService implements OnModuleInit {
     return this.planRepo.find({ order: { priceMonthly: 'ASC' } });
   }
 
+  async findBySlugPublic(slug: string) {
+    const tenant = await this.tenantRepo.findOne({ where: { slug, active: true } });
+    if (!tenant) throw new NotFoundException('Empresa no encontrada');
+    return { name: tenant.name, slug: tenant.slug };
+  }
+
   async findAll() {
     return this.tenantRepo.find({
       relations: { subscription: { plan: true } },

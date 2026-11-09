@@ -40,6 +40,12 @@ export class TenantsController {
     return this.tenantsService.findAllPlans();
   }
 
+  @Get('tenants/by-slug/:slug')
+  @Public()
+  bySlug(@Param('slug') slug: string) {
+    return this.tenantsService.findBySlugPublic(slug);
+  }
+
   @Get('tenants/:id')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('SUPERADMIN')
