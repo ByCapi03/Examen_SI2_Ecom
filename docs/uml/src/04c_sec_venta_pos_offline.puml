@@ -1,0 +1,32 @@
+@startuml 04c_sec_venta_pos_offline
+title Secuencia: venta en efectivo sin conexión y sincronización idempotente
+skinparam shadowing false
+autonumber
+actor Cajero
+participant "PosTerminalPage" as UI <<boundary>>
+participant "IndexedDB (cola)" as Q
+participant "syncManager" as SM
+participant "SyncController" as C
+participant "SyncService" as S
+database PostgreSQL as DB
+Cajero -> UI : COBRAR (EFECTIVO)
+UI -> UI : detectar sin conexión
+UI -> Q : guardar operación {operationId UUID, ítems, caja}
+UI --> Cajero : comprobante local
+... se recupera la conexión ...
+SM -> Q : leer pendientes
+SM -> C : POST /sync/batch
+C -> S : processBatch(ops)
+loop por cada operación
+  S -> DB : ¿existe (tenantId, operationId)?
+  alt ya aplicada
+    S --> SM : resultado previo (idempotencia)
+  else nueva
+    S -> DB : transacción + bloqueo de inventario
+    S -> S : aplicar reglas (stock, precio, caja cerrada)
+    S -> DB : crear venta / conflicto PENDIENTE
+  end
+end
+S --> SM : resultados
+SM -> Q : eliminar aplicadas
+@enduml

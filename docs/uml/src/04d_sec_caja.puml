@@ -1,0 +1,19 @@
+@startuml 04d_sec_caja
+title Secuencia: crear caja y abrir sesión de caja
+skinparam shadowing false
+autonumber
+actor Administrador as AD
+actor Cajero as CA
+participant "CashRegistersController" as CR
+participant "CashSessionsController" as CS
+participant "CashSessionsService" as S
+database PostgreSQL as DB
+AD -> CR : POST /cash-registers {sucursal, nombre}
+CR -> DB : INSERT cash_registers (único por sucursal+nombre)
+CA -> CS : POST /cash-sessions/open {cajaId?, monto inicial}
+CS -> S : openSession(usuario, dto)
+S -> DB : ¿el cajero ya tiene caja abierta?
+S -> DB : elegir caja libre de su sucursal
+S -> DB : INSERT cash_sessions (única caja abierta)
+S --> CA : sesión abierta
+@enduml

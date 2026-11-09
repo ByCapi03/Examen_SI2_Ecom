@@ -1,0 +1,99 @@
+@startuml 05_clases_diseno
+title Diagrama de clases de diseño - multitenencia, tienda pública y operación
+!pragma layout smetana
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+hide empty members
+
+package "common/tenancy" {
+  class TenantContextMiddleware {
+    +use(req, res, next)
+    -resolveSlug(slug)
+  }
+  class TenantSubscriber {
+    +beforeInsert(event)
+  }
+  class "tenant-context" as TC <<módulo>> {
+    +getEffectiveTenantId()
+    +requireTenantId()
+  }
+}
+package "common/guards" {
+  class AuthGuard
+  class TenantGuard
+  class RolesGuard
+  class PlanFeatureGuard
+}
+package "modules" {
+  class AuthService {
+    +login()
+    +registerClient()
+    +activateAccount()
+    +changePassword()
+  }
+  class TenantsService {
+    +createTenant()
+    +verifyEmail()
+    +changePlan()
+    +findBySlugPublic()
+    +updateStoreConfig()
+    +normalizeStoreConfig()
+  }
+  class StoreService {
+    +getPublicProducts()
+    +getPublicProductDetail()
+    +getAvailability()
+    +getTryOnData()
+  }
+  class CashRegistersService
+  class CashSessionsService {
+    +openSession()
+    +closeSession()
+  }
+  class PosService {
+    +createPosSale()
+  }
+  class SalesService {
+    +checkoutWeb()
+    +confirmWebPurchase()
+  }
+  class ReservationsService {
+    +create()
+    +deliver()
+    +payAndDeliver()
+    +confirmStripePayment()
+  }
+  class PaymentGatewayService {
+    +createCheckoutSession()
+  }
+  class SyncService {
+    +processBatch()
+    +resolveConflict()
+  }
+  class AiReportsService
+  class AnalyticsService
+  class AuditService
+  class CatalogService
+  class CatalogPricingService
+  class InventoryService
+  class NotificationsService
+  class CloudinaryService
+  class MailService
+}
+
+TenantContextMiddleware ..> TC : llena el contexto
+TenantSubscriber ..> TC : asigna tenantId al insertar
+AuthGuard --> TC : tenantId del JWT
+TenantGuard ..> AuthGuard
+RolesGuard ..> AuthGuard
+StoreService ..> TC : requireTenantId()
+AuthService ..> TC : requireTenantId()
+AuthService ..> MailService
+TenantsService ..> MailService
+SalesService ..> PaymentGatewayService
+ReservationsService ..> PaymentGatewayService
+ReservationsService ..> NotificationsService
+SyncService ..> CatalogPricingService
+SyncService ..> ReservationsService
+CatalogService ..> CloudinaryService
+@enduml

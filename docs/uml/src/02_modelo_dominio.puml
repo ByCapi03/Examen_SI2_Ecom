@@ -1,0 +1,86 @@
+@startuml 02_modelo_dominio
+title Modelo de dominio (ICONIX) - conceptos del negocio
+!pragma layout smetana
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+hide empty members
+
+class Plan
+class Empresa as "Empresa (Tenant)" {
+  slug
+  nombre
+  configuración de tienda web
+}
+class Suscripcion
+class HistorialSuscripcion
+class Sucursal
+class Ciudad
+class Usuario
+class Rol
+class Cliente
+class Caja
+class SesionCaja as "Sesión de caja"
+class Producto
+class Variante as "Variante (talla/color)"
+class Categoria
+class Temporada
+class Coleccion as "Colección"
+class Promocion as "Promoción"
+class Proveedor
+class Inventario
+class MovimientoInventario
+class Venta
+class ItemVenta
+class Pago
+class Reserva
+class ItemReserva
+class OperacionSync as "Operación offline"
+class ConflictoSync as "Conflicto de sincronización"
+class Notificacion
+class RegistroAuditoria as "Registro de auditoría"
+class ReporteIA as "Reporte IA"
+
+Plan "1" -- "*" Suscripcion
+Empresa "1" -- "1" Suscripcion
+Empresa "1" -- "*" HistorialSuscripcion
+Empresa "1" -- "*" Sucursal
+Sucursal "*" -- "1" Ciudad
+Empresa "1" -- "*" Usuario
+Usuario "*" -- "*" Rol
+Usuario "*" -- "0..1" Sucursal : asignado a
+Empresa "1" -- "*" Cliente
+Cliente "0..1" -- "1" Usuario : cuenta digital
+Sucursal "1" -- "*" Caja
+Caja "1" -- "*" SesionCaja
+Usuario "1" -- "*" SesionCaja : cajero
+Producto "*" -- "1" Categoria
+Producto "*" -- "0..1" Coleccion
+Coleccion "*" -- "0..1" Temporada
+Producto "1" -- "*" Variante
+Promocion "*" -- "*" Producto
+Variante "1" -- "*" Inventario
+Sucursal "1" -- "*" Inventario
+Inventario "1" -- "*" MovimientoInventario
+Proveedor "1" -- "*" MovimientoInventario
+Venta "1" -- "*" ItemVenta
+Venta "1" -- "*" Pago
+Venta "*" -- "0..1" SesionCaja
+Venta "*" -- "0..1" Cliente
+ItemVenta "*" -- "1" Variante
+Reserva "1" -- "*" ItemReserva
+Reserva "*" -- "1" Cliente
+Reserva "*" -- "1" Sucursal
+ItemReserva "*" -- "1" Variante
+Reserva "0..1" -- "*" Pago
+OperacionSync "1" -- "*" ConflictoSync
+Usuario "1" -- "*" Notificacion
+Usuario "1" -- "*" RegistroAuditoria
+Usuario "1" -- "*" ReporteIA
+note bottom of Empresa
+  Aislamiento multitenant: toda entidad
+  operativa pertenece a una Empresa.
+  Catálogos globales: ciudades, categorías,
+  tallas, colores, temporadas, colecciones,
+  promociones y proveedores.
+end note
+@enduml

@@ -1,0 +1,21 @@
+@startuml 03d_robustez_tienda_web
+title Robustez CU-10: personalizar y compartir la tienda web
+!pragma layout smetana
+skinparam shadowing false
+hide empty members
+left to right direction
+actor "Administrador" as ACT
+class "Mi tienda web" as B1 << (B,#B3D9FF) Frontera >>
+class "Tarjeta de enlace compartible" as B2 << (B,#B3D9FF) Frontera >>
+class "Vista previa" as B3 << (B,#B3D9FF) Frontera >>
+class "Guardar configuración de tienda" as C1 << (C,#D5F5B8) Control >>
+class "Normalizar y validar configuración" as C2 << (C,#D5F5B8) Control >>
+class "Empresa (storeConfig)" as E1 << (E,#FFE9A8) Entidad >>
+ACT --> B1
+B1 --> C1
+C1 --> C2
+C2 --> E1
+B1 --> B2
+B1 --> B3
+B3 --> E1
+@enduml

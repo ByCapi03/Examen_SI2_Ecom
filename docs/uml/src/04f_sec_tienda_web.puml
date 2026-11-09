@@ -1,0 +1,23 @@
+@startuml 04f_sec_tienda_web
+title Secuencia: el administrador personaliza su tienda y el cliente la visita
+skinparam shadowing false
+autonumber
+actor Administrador as AD
+actor Cliente as CL
+participant "StoreBuilderPage" as UI <<boundary>>
+participant "TenantsController" as C
+participant "TenantsService" as S
+participant "StoreShell (/t/slug)" as ST <<boundary>>
+database PostgreSQL as DB
+AD -> UI : edita portada, color, contacto, secciones
+UI -> C : PATCH /saas/tenants/me/store (JWT ADMIN)
+C -> S : updateStoreConfig(tenantId, body)
+S -> S : normalizeStoreConfig (sanea y valida)
+S -> DB : UPDATE tenants SET storeConfig
+AD -> CL : comparte el enlace /t/slug
+CL -> ST : abre /t/slug
+ST -> C : GET /saas/tenants/by-slug/:slug
+C -> S : findBySlugPublic
+S --> ST : nombre, sucursales, configuración
+ST --> CL : portada personalizada (o "no disponible" si no está publicada)
+@enduml
