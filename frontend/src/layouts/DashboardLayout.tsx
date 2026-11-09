@@ -4,7 +4,6 @@ import { Menu } from 'lucide-react';
 import { DashboardSidebar } from './DashboardSidebar';
 import { DashboardHeader } from './DashboardHeader';
 import '../styles/dashboard.css';
-import { BranchBanner } from '../features/branches/BranchBanner';
 import { ErrorBoundary } from '../components/common/ErrorBoundary';
 import { OfflineStatusBar } from '../components/common/OfflineStatusBar';
 
@@ -42,7 +41,6 @@ export const DashboardLayout = () => {
         </div>
         <DashboardHeader />
         <main className="dashboard-main" style={{ padding: '0 32px 32px 32px' }}>
-          <BranchBanner />
           <ErrorBoundary key={pathname}>
             <Outlet />
           </ErrorBoundary>

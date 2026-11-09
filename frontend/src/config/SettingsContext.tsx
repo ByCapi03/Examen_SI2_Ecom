@@ -54,7 +54,7 @@ const DICT: Record<Lang, Record<string, string>> = {
   es: {
     'nav.general': 'General', 'nav.operations': 'Operaciones', 'nav.catalog': 'Catálogo',
     'nav.analysis': 'Análisis', 'nav.admin': 'Administración',
-    'nav.dashboard': 'Dashboard', 'nav.myBranch': 'Mi sucursal', 'nav.pos': 'Punto de venta', 'nav.sales': 'Ventas',
+    'nav.dashboard': 'Dashboard', 'nav.pos': 'Punto de venta', 'nav.sales': 'Ventas',
     'nav.reservations': 'Reservas', 'nav.cash': 'Sesiones de caja', 'nav.products': 'Productos',
     'nav.inventory': 'Inventario', 'nav.suppliers': 'Proveedores', 'nav.reports': 'Reportes',
     'nav.aiReports': 'Reportes con IA', 'nav.analytics': 'Analítica ML', 'nav.branches': 'Sucursales',
@@ -82,7 +82,7 @@ const DICT: Record<Lang, Record<string, string>> = {
   en: {
     'nav.general': 'General', 'nav.operations': 'Operations', 'nav.catalog': 'Catalog',
     'nav.analysis': 'Analytics', 'nav.admin': 'Administration',
-    'nav.dashboard': 'Dashboard', 'nav.myBranch': 'My branch', 'nav.pos': 'Point of sale', 'nav.sales': 'Sales',
+    'nav.dashboard': 'Dashboard', 'nav.pos': 'Point of sale', 'nav.sales': 'Sales',
     'nav.reservations': 'Reservations', 'nav.cash': 'Cash sessions', 'nav.products': 'Products',
     'nav.inventory': 'Inventory', 'nav.suppliers': 'Suppliers', 'nav.reports': 'Reports',
     'nav.aiReports': 'AI reports', 'nav.analytics': 'ML analytics', 'nav.branches': 'Branches',

@@ -56,8 +56,8 @@ export class ReservationsController {
   }
 
   @Get()
-  findAll(@Request() req: any, @Query('deliveryQueue') deliveryQueue?: string, @Query('branchId') branchId?: string) {
-    return this.reservationsService.findAll(req.user, deliveryQueue === 'true', branchId);
+  findAll(@Request() req: any, @Query('deliveryQueue') deliveryQueue?: string) {
+    return this.reservationsService.findAll(req.user, deliveryQueue === 'true');
   }
 
   @Get(':id')

@@ -25,7 +25,6 @@ export const DASHBOARD_NAVIGATION: NavGroup[] = [
   {
     key: 'nav.operations',
     items: [
-      { key: 'nav.myBranch', path: '/dashboard/my-branch', allowedRoles: [ROL.ENCARGADO] },
       { key: 'nav.pos', path: '/dashboard/pos', allowedRoles: [ROL.CAJERO] },
       { key: 'nav.sales', path: '/dashboard/sales', allowedRoles: MGMT },
       { key: 'nav.reservations', path: '/dashboard/reservations', allowedRoles: [ROL.ADMIN, ROL.ENCARGADO, ROL.CAJERO] },

@@ -42,11 +42,10 @@ export class CashRegistersService {
     throw error;
   }
 
-  async findAll(actor: any, branchId?: string) {
+  async findAll(actor: any) {
     this.assertManager(actor);
     const where: any = { tenantId: actor.tenantId };
     if (!actor.roles.includes('ADMIN')) where.branchId = actor.branchId;
-    else if (branchId && Number(branchId) > 0) where.branchId = Number(branchId);
 
     const registers = await this.registerRepository.find({ where, relations: { branch: true }, order: { branchId: 'ASC', name: 'ASC' } });
     const open = registers.length

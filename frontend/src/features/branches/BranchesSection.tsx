@@ -1,8 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { LogIn } from 'lucide-react';
 import { api } from '../../api/axios';
-import { useBranchScope } from './BranchScopeContext';
 
 interface City {
   id: number;
@@ -21,8 +18,6 @@ interface Branch {
 }
 
 export const BranchesSection = () => {
-  const navigate = useNavigate();
-  const { scope, enter } = useBranchScope();
   const [cities, setCities] = useState<City[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,11 +68,6 @@ export const BranchesSection = () => {
     } catch (err: any) {
       setError('Error guardando sucursal: ' + (err.response?.data?.message || err.message));
     }
-  };
-
-  const handleEnter = (branch: Branch) => {
-    enter({ id: branch.id, name: branch.name });
-    navigate(`/dashboard/branches/${branch.id}`);
   };
 
   const handleEdit = (branch: Branch) => {
@@ -204,13 +194,7 @@ export const BranchesSection = () => {
         <tbody>
           {branches.map(b => (
             <tr key={b.id}>
-              <td style={{ fontWeight: 700 }}>
-                <button type="button" onClick={() => handleEnter(b)} title="Entrar a la sucursal"
-                  style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', fontWeight: 700, color: 'var(--atemporal-text)', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'var(--atemporal-gold)', textUnderlineOffset: 3 }}>
-                  {b.name}
-                </button>
-                {scope?.id === b.id && <span style={{ marginLeft: 8, fontSize: '0.62rem', fontWeight: 800, padding: '2px 7px', borderRadius: 6, background: 'rgba(22,163,74,0.14)', color: '#15803D' }}>DENTRO</span>}
-              </td>
+              <td style={{ fontWeight: 700 }}>{b.name}</td>
               <td>{b.city?.name || cities.find(c => c.id === b.cityId)?.name || b.cityId}</td>
               <td>{b.address}</td>
               <td>{b.phone}</td>
@@ -221,7 +205,6 @@ export const BranchesSection = () => {
               </td>
               <td>
                 <div className="crud-actions">
-                  <button className="btn-primary" onClick={() => handleEnter(b)}><LogIn size={13} /> Entrar</button>
                   <button className="btn-secondary" onClick={() => handleEdit(b)}>Editar</button>
                   <button className="btn-danger" onClick={() => handleDelete(b.id)}>Eliminar</button>
                 </div>

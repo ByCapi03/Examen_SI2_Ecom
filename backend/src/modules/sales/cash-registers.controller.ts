@@ -2,7 +2,7 @@
  * CASH REGISTERS CONTROLLER
  * /cash-registers: alta, listado, edición y baja de las cajas de una sucursal.
  */
-import { Controller, Get, Post, Patch, Delete, Body, Param, ParseIntPipe, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, ParseIntPipe, Req, UseGuards } from '@nestjs/common';
 import { CashRegistersService } from './cash-registers.service';
 import { CreateCashRegisterDto, UpdateCashRegisterDto } from './sales.dto';
 import { AuthGuard } from '../../common/guards/auth.guard';
@@ -13,8 +13,8 @@ export class CashRegistersController {
   constructor(private readonly cashRegistersService: CashRegistersService) {}
 
   @Get()
-  findAll(@Req() req: any, @Query('branchId') branchId?: string) {
-    return this.cashRegistersService.findAll(req.user, branchId);
+  findAll(@Req() req: any) {
+    return this.cashRegistersService.findAll(req.user);
   }
 
   @Get('available')

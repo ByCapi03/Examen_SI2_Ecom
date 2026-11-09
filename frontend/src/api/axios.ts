@@ -1,6 +1,5 @@
 import axios, { type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 import { cacheGet, cacheSet } from '../offline/db';
-import { readBranchScope } from '../features/branches/branchScope';
 
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000'
@@ -32,26 +31,6 @@ const cacheKey = (config: InternalAxiosRequestConfig) => {
 const isCacheable = (config?: InternalAxiosRequestConfig) =>
   !!config && (config.method ?? 'get').toLowerCase() === 'get' &&
   OFFLINE_CACHEABLE.some((p) => (config.url ?? '').startsWith(p));
-
-/** Lecturas que respetan el filtro `branchId` cuando el ADMIN está dentro de una sucursal. */
-const BRANCH_SCOPED_GET = ['/sales', '/inventory', '/reservations', '/cash-sessions', '/cash-registers', '/users', '/dashboard/metrics', '/reports/'];
-const BRANCH_SCOPE_EXCLUDED = ['/sales/my', '/reservations/my', '/cash-sessions/current', '/cash-registers/available'];
-
-const isAdminUser = () => {
-  try { return !!JSON.parse(localStorage.getItem('user') || 'null')?.roles?.includes('ADMIN'); } catch { return false; }
-};
-
-api.interceptors.request.use((config) => {
-  const url = config.url ?? '';
-  if ((config.method ?? 'get').toLowerCase() === 'get'
-    && BRANCH_SCOPED_GET.some((p) => url.startsWith(p))
-    && !BRANCH_SCOPE_EXCLUDED.some((p) => url.startsWith(p))
-    && !config.params?.branchId && isAdminUser()) {
-    const scope = readBranchScope();
-    if (scope) config.params = { ...(config.params ?? {}), branchId: scope.id };
-  }
-  return config;
-});
 
 // Interceptor para inyectar el token
 api.interceptors.request.use((config) => {

@@ -113,13 +113,10 @@ export class AccessService {
     }
   }
 
-  async findAllUsers(currentUser: any, branchId?: string) {
+  async findAllUsers(currentUser: any) {
     const isCurrentUserAdmin = currentUser.roles.includes('ADMIN');
     
     let whereClause: any = { tenantId: currentUser.tenantId };
-    if (isCurrentUserAdmin && branchId && Number(branchId) > 0) {
-      whereClause.branchId = Number(branchId);
-    }
     if (!isCurrentUserAdmin) {
       // Only show CAJEROS of the same branch
       whereClause = { 

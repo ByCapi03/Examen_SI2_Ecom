@@ -4,7 +4,6 @@ import { Wallet, Unlock, Scale, Building2, UserPlus, Store, ChevronRight, Plus, 
 import { api } from '../../api/axios';
 import { useAuth } from '../auth/AuthContext';
 import { useSettings } from '../../config/SettingsContext';
-import { useBranchScope } from '../branches/BranchScopeContext';
 import { Card, KpiCard, Empty, Skeleton, Modal } from '../../components/dashboard/ui';
 
 export interface CashSession {
@@ -44,15 +43,14 @@ const errMsg = (e: any, fallback: string) => e?.response?.data?.message ?? (e?.r
 /**
  * Cajas de la empresa. Primero se CREA la caja de una sucursal (Caja 1, Caja Principal...) y luego se ABRE
  * un turno sobre ella con un cajero. ADMIN gestiona todas; ENCARGADO las de su sucursal.
- * `branchId` fija la sucursal (panel de sucursal).
  */
-export const CashSessionsView = ({ branchId, embedded = false }: { branchId?: number; embedded?: boolean }) => {
+export const CashSessionsView = () => {
   const { user } = useAuth();
   const { money, locale } = useSettings();
-  const { scope } = useBranchScope();
   const isAdmin = !!user?.roles?.includes('ADMIN');
   const isManager = isAdmin || !!user?.roles?.includes('ENCARGADO');
-  const fixedBranchId = branchId ?? (isAdmin ? scope?.id : user?.branchId ?? undefined) ?? undefined;
+  // El encargado trabaja siempre en su sucursal; el administrador elige la sucursal al crear una caja.
+  const fixedBranchId = isAdmin ? undefined : user?.branchId ?? undefined;
 
   const [sessions, setSessions] = useState<CashSession[]>([]);
   const [registers, setRegisters] = useState<Register[]>([]);
@@ -68,10 +66,9 @@ export const CashSessionsView = ({ branchId, embedded = false }: { branchId?: nu
     setLoading(true);
     setError(null);
     try {
-      const params = branchId ? { branchId } : undefined;
       const [s, r] = await Promise.all([
-        api.get('/cash-sessions', { params }).then((x) => x.data as CashSession[]),
-        isManager ? api.get('/cash-registers', { params }).then((x) => x.data as Register[]) : Promise.resolve([] as Register[]),
+        api.get('/cash-sessions').then((x) => x.data as CashSession[]),
+        isManager ? api.get('/cash-registers').then((x) => x.data as Register[]) : Promise.resolve([] as Register[]),
       ]);
       setSessions(s);
       setRegisters(r);
@@ -80,7 +77,7 @@ export const CashSessionsView = ({ branchId, embedded = false }: { branchId?: nu
     } finally {
       setLoading(false);
     }
-  }, [branchId, isManager]);
+  }, [isManager]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -134,18 +131,16 @@ export const CashSessionsView = ({ branchId, embedded = false }: { branchId?: nu
       )}
       {notice && <div role="status" style={{ background: '#F0FDF4', color: '#15803D', border: '1px solid #BBF7D0', padding: 12, borderRadius: 12, marginBottom: 18 }}>{notice}</div>}
 
-      {!embedded && (
-        <div className="dz-grid dz-kpis" style={{ marginBottom: 18 }}>
-          {loading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} h={110} />) : (
-            <>
-              <KpiCard label="Cajas abiertas ahora" value={String(stats.open)} icon={<Unlock size={16} />} tone="accent" />
-              <KpiCard label="Cajas creadas" value={String(registers.length)} icon={<Landmark size={16} />} />
-              <KpiCard label="Efectivo inicial en cajas abiertas" value={money(stats.openingTotal)} icon={<Wallet size={16} />} />
-              <KpiCard label="Diferencia acumulada" value={money(stats.diffTotal)} icon={<Scale size={16} />} tone={stats.diffTotal < 0 ? 'danger' : 'primary'} />
-            </>
-          )}
-        </div>
-      )}
+      <div className="dz-grid dz-kpis" style={{ marginBottom: 18 }}>
+        {loading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} h={110} />) : (
+          <>
+            <KpiCard label="Cajas abiertas ahora" value={String(stats.open)} icon={<Unlock size={16} />} tone="accent" />
+            <KpiCard label="Cajas creadas" value={String(registers.length)} icon={<Landmark size={16} />} />
+            <KpiCard label="Efectivo inicial en cajas abiertas" value={money(stats.openingTotal)} icon={<Wallet size={16} />} />
+            <KpiCard label="Diferencia acumulada" value={money(stats.diffTotal)} icon={<Scale size={16} />} tone={stats.diffTotal < 0 ? 'danger' : 'primary'} />
+          </>
+        )}
+      </div>
 
       {/* ── 1) CAJAS: se crean primero ── */}
       {isManager && (

@@ -292,7 +292,7 @@ export class CashSessionsService {
     return this.finalizeSession(session, dto.closingAmount, actor.sub);
   }
 
-  async findAll(user: any, branchId?: string) {
+  async findAll(user: any) {
     const isAdmin = user.roles?.includes('ADMIN');
     const isEncargado = user.roles?.includes('ENCARGADO');
 
@@ -303,8 +303,6 @@ export class CashSessionsService {
     let whereClause: any = { tenantId: user.tenantId };
     if (isEncargado) {
       whereClause.branchId = user.branchId;
-    } else if (isAdmin && branchId) {
-      whereClause.branchId = Number(branchId);
     }
 
     const sessions = await this.cashSessionRepository.find({

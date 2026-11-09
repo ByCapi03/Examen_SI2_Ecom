@@ -8,10 +8,10 @@ import { DASHBOARD_NAVIGATION } from '../config/navigation';
 import { useAuth } from '../features/auth/AuthContext';
 import { usePlan } from '../features/saas/PlanContext';
 import { useSettings } from '../config/SettingsContext';
+import { useMyBranchName } from '../features/branches/useMyBranchName';
 
 const ICONS: Record<string, ReactNode> = {
   '/dashboard': <LayoutDashboard size={18} />,
-  '/dashboard/my-branch': <Building2 size={18} />,
   '/dashboard/pos': <Store size={18} />,
   '/dashboard/sales': <ShoppingCart size={18} />,
   '/dashboard/reservations': <Calendar size={18} />,
@@ -32,6 +32,7 @@ export const DashboardSidebar = ({ open = false, onNavigate }: { open?: boolean;
   const { user, logout } = useAuth();
   const { tenant, can } = usePlan();
   const { t, settings } = useSettings();
+  const branchName = useMyBranchName();
   const navigate = useNavigate();
   const compact = settings.compactSidebar;
 
@@ -63,6 +64,11 @@ export const DashboardSidebar = ({ open = false, onNavigate }: { open?: boolean;
           {!compact && tenant && (
             <div style={{ marginTop: 8 }}>
               <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tenant.name}</div>
+              {branchName && (
+                <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.76rem', color: 'rgba(245,242,235,0.75)' }}>
+                  <Building2 size={12} color="var(--atemporal-gold)" /> Sucursal <b style={{ color: '#fff' }}>{branchName}</b>
+                </div>
+              )}
               {tenant.plan && (
                 <span style={{ display: 'inline-block', marginTop: 5, fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '3px 8px', borderRadius: 6, background: 'rgba(201,144,74,0.16)', color: 'var(--atemporal-gold)' }}>
                   {tenant.plan.name}

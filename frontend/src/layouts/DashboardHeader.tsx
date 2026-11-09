@@ -5,6 +5,7 @@ import { Bell } from 'lucide-react';
 import { api } from '../api/axios';
 import { messaging, onMessage } from '../config/firebase';
 import { useFirebaseNotifications } from '../hooks/useFirebaseNotifications';
+import { useMyBranchName } from '../features/branches/useMyBranchName';
 interface Notification {
   id: number;
   type: string;
@@ -23,6 +24,7 @@ export const DashboardHeader = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { permission, requestPermissionAndRegister, isSupported } = useFirebaseNotifications();
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const branchName = useMyBranchName();
 
   const fetchNotifications = async () => {
     try {
@@ -73,8 +75,8 @@ export const DashboardHeader = () => {
   const getDisplayRole = () => {
     if (!user) return 'PERSONAL';
     if (user.roles?.includes('ADMIN')) return 'ADMINISTRADOR';
-    if (user.roles?.includes('ENCARGADO')) return `ENCARGADO - SUCURSAL ${user.branchId || ''}`;
-    if (user.roles?.includes('CAJERO')) return `CAJERO - SUCURSAL ${user.branchId || ''}`;
+    if (user.roles?.includes('ENCARGADO')) return `ENCARGADO${branchName ? ` · ${branchName}` : ''}`.toUpperCase();
+    if (user.roles?.includes('CAJERO')) return `CAJERO${branchName ? ` · ${branchName}` : ''}`.toUpperCase();
     return 'PERSONAL';
   };
 

@@ -1,6 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { SettingsPage } from '../features/settings/SettingsPage';
-import { BranchWorkspacePage } from '../features/branches/BranchWorkspacePage';
 
 // Layouts
 import { StoreLayout } from '../layouts/StoreLayout';
@@ -117,8 +116,6 @@ export const AppRouter = () => {
             <Route path="products" element={<ProductsAdminPage />} />
             <Route path="inventory" element={<InventoryAdminPage />} />
             <Route path="branches" element={<BranchesPage />} />
-            <Route path="branches/:id" element={<BranchWorkspacePage />} />
-            <Route path="my-branch" element={<BranchWorkspacePage own />} />
             <Route path="reservations" element={<ReservationsAdminPage />} />
             <Route path="sales" element={<SalesAdminPage />} />
             <Route path="pos" element={<PosDashboardPage />} />

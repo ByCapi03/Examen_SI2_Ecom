@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Request, UseGuards, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Request, UseGuards } from '@nestjs/common';
 import { InventoryService } from './inventory.service';
 import { CreateInventoryDto, UpdateInventoryDto, RegisterMovementDto } from './inventory.dto';
 import { CreateSupplierDto, UpdateSupplierDto } from './inventory.dto';
@@ -15,8 +15,8 @@ export class InventoryController {
   }
 
   @Get('inventory')
-  findAllInventory(@Request() req: any, @Query('branchId') branchId?: string) { 
-    return this.inventoryService.findAllInventory(req.user, branchId); 
+  findAllInventory(@Request() req: any) { 
+    return this.inventoryService.findAllInventory(req.user); 
   }
 
   @Get('inventory/:id')

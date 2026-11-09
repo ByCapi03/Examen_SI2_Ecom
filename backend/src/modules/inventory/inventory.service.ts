@@ -64,14 +64,12 @@ export class InventoryService {
     return this.inventoryRepository.save(inventory);
   }
 
-  async findAllInventory(currentUser: any, branchId?: string) {
+  async findAllInventory(currentUser: any) {
     const isEncargado = currentUser.roles.includes('ENCARGADO');
     
     let whereClause: any = { tenantId: currentUser.tenantId };
     if (isEncargado) {
       whereClause = { tenantId: currentUser.tenantId, branchId: currentUser.branchId };
-    } else if (branchId && Number(branchId) > 0) {
-      whereClause = { tenantId: currentUser.tenantId, branchId: Number(branchId) };
     }
 
     return this.inventoryRepository.find({

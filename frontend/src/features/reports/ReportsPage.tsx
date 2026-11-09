@@ -5,7 +5,6 @@ import { api } from '../../api/axios';
 import { useAuth } from '../auth/AuthContext';
 import { useSettings } from '../../config/SettingsContext';
 import { usePlan } from '../saas/PlanContext';
-import { useBranchScope } from '../branches/BranchScopeContext';
 import {
   DashStyles, PageHeader, PlanBadge, PlanGate, Card, KpiCard, AreaChart, DonutChart, HBarChart, ColumnChart, StackedBars, Skeleton, Empty, downloadCsv,
 } from '../../components/dashboard/ui';
@@ -35,7 +34,6 @@ const ReportsContent = () => {
   const { user } = useAuth();
   const { t, money, num } = useSettings();
   const { can } = usePlan();
-  const { scope } = useBranchScope();
   const isAdmin = !!user?.roles?.includes('ADMIN');
 
   const [tab, setTab] = useState<Tab>('sales');
@@ -98,7 +96,7 @@ const ReportsContent = () => {
       <div className="dz-card" style={{ padding: 14, marginBottom: 18, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <Field label={t('filters.from')}><input type="date" className="dz-input" value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} /></Field>
         <Field label={t('filters.to')}><input type="date" className="dz-input" value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} /></Field>
-        {isAdmin && !scope && (
+        {isAdmin && (
           <Field label={t('filters.branch')}>
             <select className="dz-input" value={f.branchId} onChange={(e) => setF({ ...f, branchId: e.target.value })}>
               <option value="">{t('filters.all')}</option>

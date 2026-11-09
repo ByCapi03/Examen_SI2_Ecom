@@ -15,7 +15,7 @@ export const BranchesPage = () => {
       <PageHeader
         title="Sucursales"
         subtitle={isAdmin
-          ? 'Administra las ciudades y sucursales. Entra a una sucursal para gestionar sus ventas, inventario, reservas, cajas y personal.'
+          ? 'Administra las ciudades y sucursales de la empresa'
           : 'Administra la información de tu sucursal asignada'}
         badge={<PlanBadge />}
       />
