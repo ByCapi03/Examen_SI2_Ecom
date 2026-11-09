@@ -39,7 +39,9 @@ const ReportsContent = () => {
   const [tab, setTab] = useState<Tab>('sales');
   const [branches, setBranches] = useState<{ id: number; name: string }[]>([]);
   const [f, setF] = useState({ from: '', to: '', branchId: '', channel: '', paymentMethod: '' });
-  const [data, setData] = useState<any>(null);
+  // El resultado se guarda junto a su pestaña: así nunca se pinta una pestaña con datos de otra.
+  const [result, setResult] = useState<{ tab: Tab; data: any } | null>(null);
+  const data = result?.tab === tab ? result.data : null;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,13 +52,14 @@ const ReportsContent = () => {
   useEffect(() => {
     const params: Record<string, string> = {};
     Object.entries(f).forEach(([k, v]) => { if (v) params[k] = v; });
+    let stale = false;
     setLoading(true);
     setError(null);
-    setData(null);
     api.get(`/reports/${tab}`, { params })
-      .then((r) => setData(r.data))
-      .catch((e) => setError(e.response?.data?.message || 'Error al cargar el reporte'))
-      .finally(() => setLoading(false));
+      .then((r) => { if (!stale) setResult({ tab, data: r.data }); })
+      .catch((e) => { if (!stale) setError(e.response?.data?.message || 'Error al cargar el reporte'); })
+      .finally(() => { if (!stale) setLoading(false); });
+    return () => { stale = true; };
   }, [tab, f]);
 
   const moneyC = (v: number) => money(v, { compact: true });
