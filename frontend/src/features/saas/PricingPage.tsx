@@ -42,16 +42,26 @@ const Check = () => (
   </svg>
 );
 
+const STATIC_PLANS: Plan[] = [
+  { id: 1, code: 'BASICO', name: 'Plan Básico', priceMonthly: 0, maxBranches: 1, aiGenerativeReports: false, offlineOperations: true },
+  { id: 2, code: 'STARTER', name: 'Plan Starter', priceMonthly: 29, maxBranches: 3, aiGenerativeReports: false, offlineOperations: true },
+  { id: 3, code: 'PROFESIONAL', name: 'Plan Profesional', priceMonthly: 79, maxBranches: 10, aiGenerativeReports: true, offlineOperations: true },
+  { id: 4, code: 'EMPRESARIAL', name: 'Plan Empresarial', priceMonthly: 199, maxBranches: 99, aiGenerativeReports: true, offlineOperations: true },
+];
+
 export const PricingPage = () => {
   const navigate = useNavigate();
-  const [plans, setPlans] = useState<Plan[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [plans, setPlans] = useState<Plan[]>(STATIC_PLANS);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    api.get('/saas/plans')
-      .then(r => setPlans(r.data))
-      .catch(() => setPlans([]))
-      .finally(() => setLoading(false));
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 4000);
+    api.get('/saas/plans', { signal: ctrl.signal })
+      .then(r => { if (r.data?.length) setPlans(r.data); })
+      .catch(() => { /* mantener fallback estático */ })
+      .finally(() => { clearTimeout(timer); setLoading(false); });
+    return () => { clearTimeout(timer); ctrl.abort(); };
   }, []);
 
   return (

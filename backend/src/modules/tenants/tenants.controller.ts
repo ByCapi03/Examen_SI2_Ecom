@@ -49,7 +49,10 @@ export class TenantsController {
 
   @Post('tenants/register')
   @Public()
-  createTenant(@Body() body: { name: string; slug: string; taxId?: string; planCode?: string }) {
+  createTenant(@Body() body: {
+    name: string; slug: string; taxId?: string; planCode?: string;
+    adminName?: string; adminEmail?: string; adminPassword?: string;
+  }) {
     return this.tenantsService.createTenant(body);
   }
 }

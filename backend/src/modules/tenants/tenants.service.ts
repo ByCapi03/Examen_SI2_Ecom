@@ -1,6 +1,8 @@
-import { Injectable, NotFoundException, ConflictException, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, Logger, OnModuleInit, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
+import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcrypt';
 import { Tenant } from './tenant.entity';
 import { Subscription } from './subscription.entity';
 import { Plan } from './plan.entity';
@@ -15,6 +17,8 @@ export class TenantsService implements OnModuleInit {
     @InjectRepository(Subscription) private subRepo: Repository<Subscription>,
     @InjectRepository(Plan) private planRepo: Repository<Plan>,
     @InjectRepository(SubscriptionHistory) private historyRepo: Repository<SubscriptionHistory>,
+    private readonly dataSource: DataSource,
+    private readonly jwtService: JwtService,
   ) {}
 
   /**
@@ -101,34 +105,76 @@ export class TenantsService implements OnModuleInit {
     return tenant;
   }
 
-  async createTenant(data: { name: string; slug: string; taxId?: string; planCode?: string }) {
+  async createTenant(data: {
+    name: string; slug: string; taxId?: string; planCode?: string;
+    adminName?: string; adminEmail?: string; adminPassword?: string;
+  }) {
     const existing = await this.tenantRepo.findOne({ where: { slug: data.slug } });
-    if (existing) throw new ConflictException(`El slug ${data.slug} ya está registrado`);
+    if (existing) throw new ConflictException(`El slug "${data.slug}" ya está registrado`);
+
+    if (data.adminEmail) {
+      const emailInUse = await this.dataSource.query(`SELECT 1 FROM users WHERE email=$1 LIMIT 1`, [data.adminEmail]);
+      if (emailInUse.length > 0) throw new ConflictException(`El correo "${data.adminEmail}" ya está en uso`);
+    }
 
     const planCode = data.planCode || 'BASICO';
     const plan = await this.planRepo.findOne({ where: { code: planCode } });
     if (!plan) throw new NotFoundException(`Plan ${planCode} no existe`);
 
-    const tenant = this.tenantRepo.create({
-      name: data.name,
-      slug: data.slug,
-      taxId: data.taxId,
-      active: true,
-    });
-    const savedTenant = await this.tenantRepo.save(tenant);
+    const qr = this.dataSource.createQueryRunner();
+    await qr.connect();
+    await qr.startTransaction();
+    try {
+      // 1. Crear tenant
+      const tenant = qr.manager.create(Tenant, { name: data.name, slug: data.slug, taxId: data.taxId, active: true });
+      const savedTenant = await qr.manager.save(tenant);
 
-    const subscription = this.subRepo.create({
-      tenantId: savedTenant.id,
-      planId: plan.id,
-      status: 'ACTIVE',
-      startDate: new Date(),
-    });
-    await this.subRepo.save(subscription);
-    await this.historyRepo.save(this.historyRepo.create({
-      tenantId: savedTenant.id, planId: plan.id, action: 'SUBSCRIBE', notes: 'Alta de tenant',
-    }));
+      // 2. Crear suscripción
+      await qr.manager.save(this.subRepo.create({ tenantId: savedTenant.id, planId: plan.id, status: 'ACTIVE', startDate: new Date() }));
+      await qr.manager.save(this.historyRepo.create({ tenantId: savedTenant.id, planId: plan.id, action: 'SUBSCRIBE', notes: 'Alta de tenant' }));
 
-    return this.findOne(savedTenant.id);
+      let token: string | undefined;
+      let adminUser: any;
+
+      // 3. Crear usuario ADMIN si se proporcionaron credenciales
+      if (data.adminEmail && data.adminPassword && data.adminName) {
+        const passwordHash = await bcrypt.hash(data.adminPassword, 10);
+        const [userRow] = await qr.manager.query(
+          `INSERT INTO users (name, email, "passwordHash", "tenantId", active, "mustChangePassword", "emailVerified")
+           VALUES ($1,$2,$3,$4,true,false,true) RETURNING id`,
+          [data.adminName, data.adminEmail, passwordHash, savedTenant.id],
+        );
+        const userId = userRow.id;
+
+        const [roleRow] = await qr.manager.query(`SELECT id FROM roles WHERE name='ADMIN' LIMIT 1`);
+        if (roleRow) {
+          await qr.manager.query(
+            `INSERT INTO user_roles ("userId","roleId",active) VALUES ($1,$2,true)`,
+            [userId, roleRow.id],
+          );
+        }
+
+        adminUser = { id: userId, email: data.adminEmail, name: data.adminName };
+        token = this.jwtService.sign({
+          sub: userId, email: data.adminEmail, tenantId: savedTenant.id,
+          roles: ['ADMIN'], name: data.adminName,
+        });
+      }
+
+      await qr.commitTransaction();
+
+      return {
+        tenant: { id: savedTenant.id, name: savedTenant.name, slug: savedTenant.slug },
+        plan: { code: plan.code, name: plan.name, priceMonthly: plan.priceMonthly },
+        adminUser,
+        accessToken: token,
+      };
+    } catch (err) {
+      await qr.rollbackTransaction();
+      throw err;
+    } finally {
+      await qr.release();
+    }
   }
 }
 
