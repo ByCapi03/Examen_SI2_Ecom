@@ -135,7 +135,9 @@ async function main() {
         ('STARTER',     'Plan Starter',     29,  3,  false, true),
         ('PROFESIONAL', 'Plan Profesional', 79,  10, true,  true),
         ('EMPRESARIAL', 'Plan Empresarial', 199, 99, true,  true)
-      ON CONFLICT (code) DO NOTHING`);
+      ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, "priceMonthly" = EXCLUDED."priceMonthly",
+        "maxBranches" = EXCLUDED."maxBranches", "aiGenerativeReports" = EXCLUDED."aiGenerativeReports",
+        "offlineOperations" = EXCLUDED."offlineOperations"`);
     await db.query(`INSERT INTO tenants (id, slug, name) VALUES (1, 'fashionstore-central', 'FashionStore S.R.L.')
       ON CONFLICT (id) DO NOTHING`);
     await db.query(`SELECT setval(pg_get_serial_sequence('tenants','id'), GREATEST((SELECT MAX(id) FROM tenants), 1))`);

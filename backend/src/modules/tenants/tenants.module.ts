@@ -6,12 +6,12 @@ import { Subscription } from './subscription.entity';
 import { SubscriptionHistory } from './subscription-history.entity';
 import { TenantsService } from './tenants.service';
 import { TenantsController } from './tenants.controller';
-import { JwtModule } from '@nestjs/jwt';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Tenant, Plan, Subscription, SubscriptionHistory]),
-    JwtModule,
+    AuthModule,
   ],
   controllers: [TenantsController],
   providers: [TenantsService],

@@ -61,4 +61,16 @@ export class TenantsController {
   }) {
     return this.tenantsService.createTenant(body);
   }
+
+  @Post('tenants/verify-email')
+  @Public()
+  verifyEmail(@Body() body: { email: string; code: string }) {
+    return this.tenantsService.verifyEmail(body.email, body.code);
+  }
+
+  @Post('tenants/resend-code')
+  @Public()
+  resendCode(@Body() body: { email: string }) {
+    return this.tenantsService.resendVerificationCode(body.email);
+  }
 }

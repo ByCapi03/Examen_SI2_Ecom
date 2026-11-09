@@ -70,7 +70,7 @@ export const PricingPage = () => {
       {/* Nav */}
       <nav style={{ background: 'var(--atemporal-green, #182D2A)', padding: '14px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Link to="/" style={{ color: 'var(--atemporal-cream, #F5F2EB)', textDecoration: 'none', fontWeight: 700, fontSize: '1.1rem', letterSpacing: 2 }}>
-          ATEMPORAL
+          DRESSED
         </Link>
         <Link to="/login" style={{ color: 'var(--atemporal-beige, #CFC1A5)', textDecoration: 'none', fontSize: '0.85rem' }}>
           Ya tengo cuenta →
@@ -97,7 +97,7 @@ export const PricingPage = () => {
           marginBottom: 20,
           border: '1px solid rgba(201,144,74,0.3)',
         }}>
-          SaaS FashionStore
+          Plataforma DRESSED
         </span>
         <h1 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.8rem)', fontWeight: 800, margin: '0 0 16px', lineHeight: 1.2 }}>
           Elige el plan perfecto<br />para tu negocio
@@ -226,7 +226,7 @@ export const PricingPage = () => {
 
         <p style={{ textAlign: 'center', marginTop: 48, fontSize: '0.85rem', color: '#6b7280' }}>
           Todos los planes incluyen operaciones offline, múltiples usuarios y actualizaciones automáticas.{' '}
-          <a href="mailto:soporte@fashionstore.io" style={{ color: 'var(--atemporal-gold, #C9904A)' }}>
+          <a href="mailto:soporte@dressed.app" style={{ color: 'var(--atemporal-gold, #C9904A)' }}>
             ¿Dudas? Contacta soporte.
           </a>
         </p>

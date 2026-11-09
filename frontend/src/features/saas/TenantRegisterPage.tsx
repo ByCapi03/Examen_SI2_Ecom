@@ -8,7 +8,7 @@ interface Plan {
   priceMonthly: number; maxBranches: number; aiGenerativeReports: boolean;
 }
 
-type Step = 'form' | 'payment' | 'success';
+type Step = 'form' | 'payment' | 'verify' | 'success';
 
 const slugify = (t: string) =>
   t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -75,7 +75,19 @@ export const TenantRegisterPage = () => {
 
   const [result, setResult] = useState<any>(null);
 
+  /* verificación de correo */
+  const [code, setCode] = useState('');
+  const [emailSent, setEmailSent] = useState(true);
+  const [devCode, setDevCode] = useState<string | null>(null);
+  const [cooldown, setCooldown] = useState(0);
+  const [info, setInfo] = useState('');
+
   useEffect(() => { if (!plan) navigate('/pricing'); }, [plan, navigate]);
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
   useEffect(() => { setSlug(slugify(bizName)); }, [bizName]);
 
   if (!plan) return null;
@@ -91,13 +103,13 @@ export const TenantRegisterPage = () => {
         adminName: adminName.trim(), adminEmail: adminEmail.trim(), adminPassword: adminPass,
       });
       setResult(data);
-      setStep('success');
-      /* auto-login si el backend devolvió un token */
-      if (data.accessToken && data.adminUser) {
-        login(data.accessToken, {
-          id: data.adminUser.id, email: data.adminUser.email, name: data.adminUser.name,
-          roles: ['ADMIN'], mustChangePassword: false,
-        });
+      if (data.requiresVerification) {
+        setEmailSent(data.emailSent !== false);
+        setDevCode(data.devCode ?? null);
+        setCooldown(60);
+        setStep('verify');
+      } else {
+        setStep('success');
       }
     } catch (e: any) {
       setErr(e?.response?.data?.message ?? 'No se pudo crear la empresa. Verifica que el slug y el correo no estén en uso.');
@@ -111,6 +123,33 @@ export const TenantRegisterPage = () => {
     if (adminPass.length < 6) { setErr('La contraseña debe tener al menos 6 caracteres.'); return; }
     setErr('');
     if (isFree) doRegister(); else setStep('payment');
+  };
+
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (code.length !== 6) { setErr('Ingresa el código de 6 dígitos.'); return; }
+    setBusy(true); setErr(''); setInfo('');
+    try {
+      const { data } = await api.post('/saas/tenants/verify-email', { email: adminEmail.trim(), code });
+      login(data.accessToken, data.user);
+      setResult((r: any) => ({ ...r, tenant: data.tenant }));
+      setStep('success');
+    } catch (e: any) {
+      setErr(e?.response?.data?.message ?? 'No se pudo verificar el código.');
+    } finally { setBusy(false); }
+  };
+
+  const handleResend = async () => {
+    setErr(''); setInfo('');
+    try {
+      const { data } = await api.post('/saas/tenants/resend-code', { email: adminEmail.trim() });
+      setEmailSent(data.emailSent !== false);
+      setDevCode(data.devCode ?? null);
+      setCooldown(60);
+      setInfo('Te enviamos un nuevo código.');
+    } catch (e: any) {
+      setErr(e?.response?.data?.message ?? 'No se pudo reenviar el código.');
+    }
   };
 
   const handlePayment = (e: React.FormEvent) => {
@@ -176,7 +215,7 @@ export const TenantRegisterPage = () => {
           <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/></svg>
           Cambiar plan
         </Link>
-        <span style={{ color:'#F5F2EB', fontWeight:700, letterSpacing:2, fontSize:'0.95rem' }}>ATEMPORAL</span>
+        <span style={{ color:'#F5F2EB', fontWeight:700, letterSpacing:2, fontSize:'0.95rem' }}>DRESSED</span>
         <div style={{ width:80 }}/>
       </nav>
 
@@ -227,7 +266,7 @@ export const TenantRegisterPage = () => {
                   <div style={{ borderBottom:'1px solid #f0ede8', paddingBottom:16, marginBottom:16 }}>
                     <p style={{ margin:'0 0 12px', fontSize:'0.72rem', textTransform:'uppercase', letterSpacing:'0.09em', color:'#9ca3af', fontWeight:600 }}>Datos de la empresa</p>
                     <Field label="Nombre de la empresa *" value={bizName} onChange={setBizName} placeholder="Ej: Moda Elegante S.R.L."/>
-                    <Field label="Identificador único (slug) *" value={slug} onChange={v => setSlug(slugify(v))} placeholder="mi-empresa" prefix="fashionstore.io/" hint="Solo minúsculas, números y guiones."/>
+                    <Field label="Identificador único (slug) *" value={slug} onChange={v => setSlug(slugify(v))} placeholder="mi-empresa" prefix="dressed.app/" hint="Solo minúsculas, números y guiones."/>
                     <Field label="NIT / Número tributario (opcional)" value={taxId} onChange={setTaxId} placeholder="Número de registro"/>
                   </div>
 
@@ -243,6 +282,47 @@ export const TenantRegisterPage = () => {
                     style={{ width:'100%', padding:'13px 0', border:'none', borderRadius:11, cursor:'pointer', background: Au, color:'#fff', fontWeight:700, fontSize:'0.9rem', opacity: busy ? 0.6 : 1, marginTop:4, letterSpacing:'0.02em' }}
                   >
                     {isFree ? (busy ? 'Creando…' : 'Crear empresa gratis →') : 'Continuar al pago →'}
+                  </button>
+                </form>
+              </>
+            )}
+
+            {/* STEP verify */}
+            {step === 'verify' && (
+              <>
+                <h2 style={{ margin:'0 0 4px', fontSize:'1.25rem', fontWeight:800, color: G }}>Verifica tu correo</h2>
+                <p style={{ margin:'0 0 22px', fontSize:'0.84rem', color:'#6b7280', lineHeight:1.5 }}>
+                  {emailSent
+                    ? <>Enviamos un código de 6 dígitos a <b style={{ color: G }}>{adminEmail}</b>. Es válido por 15 minutos.</>
+                    : <>No pudimos enviar el correo a <b style={{ color: G }}>{adminEmail}</b> (el servidor de correo no está configurado).</>}
+                </p>
+
+                {devCode && (
+                  <div style={{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:9, padding:'9px 13px', marginBottom:16 }}>
+                    <p style={{ margin:0, fontSize:'0.78rem', color:'#92400e' }}>
+                      Modo desarrollo: tu código es <b style={{ fontFamily:'monospace', fontSize:'0.95rem', letterSpacing:3 }}>{devCode}</b>
+                    </p>
+                  </div>
+                )}
+
+                <form onSubmit={handleVerify}>
+                  <label style={{ display:'block', fontSize:'0.8rem', fontWeight:600, color:'#374151', marginBottom:6 }}>Código de verificación</label>
+                  <input
+                    value={code} onChange={e => setCode(e.target.value.replace(/\D/g,'').slice(0,6))}
+                    inputMode="numeric" autoComplete="one-time-code" placeholder="••••••" autoFocus
+                    style={{ width:'100%', boxSizing:'border-box', padding:'14px', border:'1.5px solid #d1d5db', borderRadius:10, fontSize:'1.6rem', fontFamily:'monospace', letterSpacing:'0.5em', textAlign:'center', outline:'none', marginBottom:14 }}
+                  />
+
+                  {info && <div style={{ background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:9, padding:'9px 13px', marginBottom:14 }}><p style={{ margin:0, fontSize:'0.8rem', color:'#15803d' }}>{info}</p></div>}
+                  {err && <div style={{ background:'#fef2f2', border:'1px solid #fecaca', borderRadius:9, padding:'9px 13px', marginBottom:14 }}><p style={{ margin:0, fontSize:'0.8rem', color:'#dc2626' }}>{err}</p></div>}
+
+                  <button type="submit" disabled={busy || code.length !== 6}
+                    style={{ width:'100%', padding:'13px 0', border:'none', borderRadius:11, cursor: code.length === 6 ? 'pointer' : 'not-allowed', background: G, color:'#fff', fontWeight:700, fontSize:'0.9rem', opacity: busy || code.length !== 6 ? 0.55 : 1 }}>
+                    {busy ? 'Verificando…' : 'Verificar y activar cuenta'}
+                  </button>
+                  <button type="button" onClick={handleResend} disabled={cooldown > 0}
+                    style={{ width:'100%', background:'none', border:'none', cursor: cooldown > 0 ? 'default' : 'pointer', color: cooldown > 0 ? '#9ca3af' : Au, fontWeight:600, fontSize:'0.82rem', padding:'12px 0 0' }}>
+                    {cooldown > 0 ? `Reenviar código en ${cooldown}s` : 'Reenviar código'}
                   </button>
                 </form>
               </>

@@ -112,6 +112,13 @@ export class AuthService {
       throw new UnauthorizedException('Correo o contraseña incorrectos');
     }
 
+    if (!user.emailVerified && user.verificationCodeHash) {
+      throw new UnauthorizedException({
+        message: 'Debes verificar tu correo antes de iniciar sesión.',
+        code: 'EMAIL_NOT_VERIFIED',
+      });
+    }
+
     if (user.mustChangePassword && user.temporaryPasswordExpiresAt) {
       if (new Date() > user.temporaryPasswordExpiresAt) {
         throw new UnauthorizedException('La contraseña temporal ha expirado. Solicita una nueva.');

@@ -1,8 +1,10 @@
-import { Injectable, NotFoundException, ConflictException, Logger, OnModuleInit, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, Logger, OnModuleInit, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { randomInt } from 'crypto';
+import { MailService } from '../../common/mail.service';
 import { Tenant } from './tenant.entity';
 import { Subscription } from './subscription.entity';
 import { Plan } from './plan.entity';
@@ -19,6 +21,7 @@ export class TenantsService implements OnModuleInit {
     @InjectRepository(SubscriptionHistory) private historyRepo: Repository<SubscriptionHistory>,
     private readonly dataSource: DataSource,
     private readonly jwtService: JwtService,
+    private readonly mailService: MailService,
   ) {}
 
   /**
@@ -42,6 +45,7 @@ export class TenantsService implements OnModuleInit {
       for (const p of plans) {
         const existing = await this.planRepo.findOne({ where: { code: p.code } });
         if (!existing) await this.planRepo.save(this.planRepo.create(p));
+        else await this.planRepo.update({ code: p.code }, p);
       }
       if ((await this.tenantRepo.count()) === 0) {
         const tenant = await this.tenantRepo.save(
@@ -111,16 +115,41 @@ export class TenantsService implements OnModuleInit {
     return tenant;
   }
 
+  private newCode() {
+    return String(randomInt(0, 1_000_000)).padStart(6, '0');
+  }
+
+  /** Envía el código; si el SMTP no está configurado, en desarrollo lo deja en consola y lo devuelve. */
+  private async deliverCode(email: string, name: string, code: string, tenantName: string) {
+    try {
+      await this.mailService.sendTenantVerificationCode(email, name, code, tenantName);
+      return { emailSent: true as const, devCode: undefined };
+    } catch (err) {
+      const dev = process.env.NODE_ENV !== 'production';
+      this.logger.warn(`No se pudo enviar el correo a ${email}: ${(err as Error).message}`);
+      if (dev) this.logger.warn(`[DEV] Código de verificación para ${email}: ${code}`);
+      return { emailSent: false as const, devCode: dev ? code : undefined };
+    }
+  }
+
   async createTenant(data: {
     name: string; slug: string; taxId?: string; planCode?: string;
     adminName?: string; adminEmail?: string; adminPassword?: string;
   }) {
+    const adminEmail = data.adminEmail?.trim();
+    if (adminEmail) {
+      if (!data.adminName?.trim()) throw new BadRequestException('El nombre del administrador es obligatorio');
+      if (!data.adminPassword || data.adminPassword.length < 6) {
+        throw new BadRequestException('La contraseña debe tener al menos 6 caracteres');
+      }
+    }
+
     const existing = await this.tenantRepo.findOne({ where: { slug: data.slug } });
     if (existing) throw new ConflictException(`El slug "${data.slug}" ya está registrado`);
 
-    if (data.adminEmail) {
-      const emailInUse = await this.dataSource.query(`SELECT 1 FROM users WHERE email=$1 LIMIT 1`, [data.adminEmail]);
-      if (emailInUse.length > 0) throw new ConflictException(`El correo "${data.adminEmail}" ya está en uso`);
+    if (adminEmail) {
+      const emailInUse = await this.dataSource.query(`SELECT 1 FROM users WHERE LOWER(email)=LOWER($1) LIMIT 1`, [adminEmail]);
+      if (emailInUse.length > 0) throw new ConflictException(`El correo "${adminEmail}" ya está en uso`);
     }
 
     const planCode = data.planCode || 'BASICO';
@@ -131,50 +160,44 @@ export class TenantsService implements OnModuleInit {
     await qr.connect();
     await qr.startTransaction();
     try {
-      // 1. Crear tenant
       const tenant = qr.manager.create(Tenant, { name: data.name, slug: data.slug, taxId: data.taxId, active: true });
       const savedTenant = await qr.manager.save(tenant);
 
-      // 2. Crear suscripción
       await qr.manager.save(this.subRepo.create({ tenantId: savedTenant.id, planId: plan.id, status: 'ACTIVE', startDate: new Date() }));
       await qr.manager.save(this.historyRepo.create({ tenantId: savedTenant.id, planId: plan.id, action: 'SUBSCRIBE', notes: 'Alta de tenant' }));
 
-      let token: string | undefined;
-      let adminUser: any;
+      let adminUser: { id: number; email: string; name: string } | undefined;
+      let code: string | undefined;
 
-      // 3. Crear usuario ADMIN si se proporcionaron credenciales
-      if (data.adminEmail && data.adminPassword && data.adminName) {
+      if (adminEmail && data.adminPassword && data.adminName) {
         const passwordHash = await bcrypt.hash(data.adminPassword, 10);
+        code = this.newCode();
+        const codeHash = await bcrypt.hash(code, 10);
         const [userRow] = await qr.manager.query(
-          `INSERT INTO users (name, email, "passwordHash", "tenantId", active, "mustChangePassword", "emailVerified")
-           VALUES ($1,$2,$3,$4,true,false,true) RETURNING id`,
-          [data.adminName, data.adminEmail, passwordHash, savedTenant.id],
+          `INSERT INTO users (name, email, "passwordHash", "tenantId", active, "mustChangePassword", "emailVerified",
+                              "verificationCodeHash", "verificationCodeExpiresAt", "verificationAttempts")
+           VALUES ($1,$2,$3,$4,true,false,false,$5,$6,0) RETURNING id`,
+          [data.adminName.trim(), adminEmail, passwordHash, savedTenant.id, codeHash, new Date(Date.now() + 15 * 60_000)],
         );
-        const userId = userRow.id;
 
         const [roleRow] = await qr.manager.query(`SELECT id FROM roles WHERE name='ADMIN' LIMIT 1`);
-        if (roleRow) {
-          await qr.manager.query(
-            `INSERT INTO user_roles ("userId","roleId",active) VALUES ($1,$2,true)`,
-            [userId, roleRow.id],
-          );
+        if (!roleRow) {
+          throw new InternalServerErrorException('El rol ADMIN no existe en la base de datos. Asegúrese de correr los seeds.');
         }
-
-        adminUser = { id: userId, email: data.adminEmail, name: data.adminName };
-        token = this.jwtService.sign({
-          sub: userId, email: data.adminEmail, tenantId: savedTenant.id,
-          roles: ['ADMIN'], name: data.adminName,
-        });
+        await qr.manager.query(`INSERT INTO user_roles ("userId","roleId",active) VALUES ($1,$2,true)`, [userRow.id, roleRow.id]);
+        adminUser = { id: userRow.id, email: adminEmail, name: data.adminName.trim() };
       }
 
       await qr.commitTransaction();
 
-      return {
+      const base = {
         tenant: { id: savedTenant.id, name: savedTenant.name, slug: savedTenant.slug },
         plan: { code: plan.code, name: plan.name, priceMonthly: plan.priceMonthly },
-        adminUser,
-        accessToken: token,
       };
+      if (!adminUser || !code) return { ...base, requiresVerification: false };
+
+      const delivery = await this.deliverCode(adminUser.email, adminUser.name, code, savedTenant.name);
+      return { ...base, adminUser: { email: adminUser.email, name: adminUser.name }, requiresVerification: true, ...delivery };
     } catch (err) {
       await qr.rollbackTransaction();
       throw err;
@@ -182,5 +205,83 @@ export class TenantsService implements OnModuleInit {
       await qr.release();
     }
   }
-}
 
+  async verifyEmail(emailRaw: string, code: string) {
+    const email = (emailRaw ?? '').trim();
+    if (!email || !/^\d{6}$/.test(code ?? '')) throw new BadRequestException('Ingresa el código de 6 dígitos');
+
+    const [u] = await this.dataSource.query(
+      `SELECT id, name, email, "tenantId", "verificationCodeHash", "verificationCodeExpiresAt", "verificationAttempts"
+         FROM users
+        WHERE LOWER(email)=LOWER($1) AND "emailVerified"=false AND "verificationCodeHash" IS NOT NULL
+        LIMIT 1`,
+      [email],
+    );
+    if (!u) throw new BadRequestException('No hay una verificación pendiente para este correo.');
+    if (new Date() > new Date(u.verificationCodeExpiresAt)) {
+      throw new BadRequestException('El código expiró. Solicita uno nuevo.');
+    }
+    if (u.verificationAttempts >= 5) {
+      throw new BadRequestException('Demasiados intentos fallidos. Solicita un nuevo código.');
+    }
+    if (!(await bcrypt.compare(code, u.verificationCodeHash))) {
+      await this.dataSource.query(`UPDATE users SET "verificationAttempts" = "verificationAttempts" + 1 WHERE id=$1`, [u.id]);
+      throw new BadRequestException('Código incorrecto.');
+    }
+
+    await this.dataSource.query(
+      `UPDATE users SET "emailVerified"=true, "verificationCodeHash"=NULL, "verificationCodeExpiresAt"=NULL, "verificationAttempts"=0 WHERE id=$1`,
+      [u.id],
+    );
+
+    const [info] = await this.dataSource.query(
+      `SELECT t.id, t.name, t.slug, p.name AS "planName"
+         FROM tenants t
+         LEFT JOIN subscriptions s ON s.tenant_id = t.id
+         LEFT JOIN plans p ON p.id = s.plan_id
+        WHERE t.id=$1`,
+      [u.tenantId],
+    );
+
+    this.mailService
+      .sendTenantWelcome(u.email, u.name, info.name, info.slug, info.planName ?? '')
+      .catch((err) => this.logger.warn(`No se pudo enviar el correo de bienvenida: ${err.message}`));
+
+    const accessToken = this.jwtService.sign({
+      sub: u.id, email: u.email, tenantId: u.tenantId, roles: ['ADMIN'], name: u.name,
+    });
+    return {
+      accessToken,
+      user: { id: u.id, email: u.email, name: u.name, roles: ['ADMIN'] },
+      tenant: { id: info.id, name: info.name, slug: info.slug },
+    };
+  }
+
+  async resendVerificationCode(emailRaw: string) {
+    const generic = { message: 'Si existe una verificación pendiente, enviamos un nuevo código.' };
+    const email = (emailRaw ?? '').trim();
+    if (!email) return generic;
+
+    const [u] = await this.dataSource.query(
+      `SELECT u.id, u.name, u.email, u."verificationCodeExpiresAt", t.name AS "tenantName"
+         FROM users u JOIN tenants t ON t.id = u."tenantId"
+        WHERE LOWER(u.email)=LOWER($1) AND u."emailVerified"=false AND u."verificationCodeHash" IS NOT NULL
+        LIMIT 1`,
+      [email],
+    );
+    if (!u) return generic;
+
+    const issuedAt = new Date(u.verificationCodeExpiresAt).getTime() - 15 * 60_000;
+    if (Date.now() - issuedAt < 60_000) {
+      throw new BadRequestException('Espera un minuto antes de pedir otro código.');
+    }
+
+    const code = this.newCode();
+    await this.dataSource.query(
+      `UPDATE users SET "verificationCodeHash"=$2, "verificationCodeExpiresAt"=$3, "verificationAttempts"=0 WHERE id=$1`,
+      [u.id, await bcrypt.hash(code, 10), new Date(Date.now() + 15 * 60_000)],
+    );
+    const delivery = await this.deliverCode(u.email, u.name, code, u.tenantName);
+    return { ...generic, emailSent: delivery.emailSent, devCode: delivery.devCode };
+  }
+}

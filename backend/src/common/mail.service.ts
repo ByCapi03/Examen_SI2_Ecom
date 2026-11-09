@@ -2,6 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 
+const esc = (v: string) =>
+  String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+
 @Injectable()
 export class MailService {
   private transporter: nodemailer.Transporter;
@@ -94,5 +97,42 @@ export class MailService {
       this.logger.error(`Error enviando confirmación de pago a ${email}`, error);
       throw error;
     }
+  }
+
+  private get frontendUrl() {
+    return this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
+  }
+
+  async sendTenantVerificationCode(email: string, name: string, code: string, tenantName: string) {
+    await this.transporter.sendMail({
+      from: `"DRESSED" <${this.configService.get<string>('SMTP_USER')}>`,
+      to: email,
+      subject: 'Verifica tu correo - DRESSED',
+      html: `
+        <h3>Hola ${esc(name)},</h3>
+        <p>Registraste la empresa <strong>${esc(tenantName)}</strong> en DRESSED.</p>
+        <p>Tu código de verificación es:</p>
+        <h2 style="letter-spacing: 8px; font-family: monospace; color: #182D2A;">${esc(code)}</h2>
+        <p>Es válido por <strong>15 minutos</strong>. Si no fuiste tú, ignora este correo.</p>
+      `,
+    });
+    this.logger.log(`Código de verificación de empresa enviado a ${email}`);
+  }
+
+  async sendTenantWelcome(email: string, name: string, tenantName: string, slug: string, planName: string) {
+    const loginUrl = `${this.frontendUrl}/login?tenant=${encodeURIComponent(slug)}`;
+    await this.transporter.sendMail({
+      from: `"DRESSED" <${this.configService.get<string>('SMTP_USER')}>`,
+      to: email,
+      subject: `Bienvenido a DRESSED, ${tenantName}`,
+      html: `
+        <h3>¡Bienvenido, ${esc(name)}!</h3>
+        <p>Tu empresa <strong>${esc(tenantName)}</strong> ya está activa en el <strong>${esc(planName)}</strong>.</p>
+        <p><strong>Identificador:</strong> ${esc(slug)}</p>
+        <p>Siguientes pasos: registra tus sucursales, empleados, productos e inventario desde el panel.</p>
+        <p>Ingresa en: <a href="${loginUrl}">${loginUrl}</a></p>
+      `,
+    });
+    this.logger.log(`Correo de bienvenida enviado a ${email}`);
   }
 }

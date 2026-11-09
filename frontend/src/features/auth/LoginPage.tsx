@@ -38,6 +38,36 @@ export const LoginPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError]       = useState<string | null>(null);
   const [focusedField, setFocusedField] = useState('');
+  const [needsVerify, setNeedsVerify] = useState(false);
+  const [code, setCode] = useState('');
+  const [verifyInfo, setVerifyInfo] = useState<string | null>(null);
+
+  const goAfterLogin = (user: any) => {
+    if (['ADMIN','ENCARGADO','CAJERO'].some(r => user.roles.includes(r))) navigate('/dashboard', { replace:true });
+    else navigate('/account', { replace:true });
+  };
+
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true); setError(null); setVerifyInfo(null);
+    try {
+      const { data } = await api.post('/saas/tenants/verify-email', { email, code });
+      login(data.accessToken, data.user);
+      goAfterLogin(data.user);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'No se pudo verificar el código');
+    } finally { setIsSubmitting(false); }
+  };
+
+  const handleResend = async () => {
+    setError(null); setVerifyInfo(null);
+    try {
+      const { data } = await api.post('/saas/tenants/resend-code', { email });
+      setVerifyInfo(data.devCode ? `Modo desarrollo: tu código es ${data.devCode}` : 'Si existe una verificación pendiente, enviamos un nuevo código a tu correo.');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'No se pudo reenviar el código');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,6 +86,11 @@ export const LoginPage = () => {
         navigate('/account', { replace:true });
       }
     } catch (err: any) {
+      if (err.response?.data?.code === 'EMAIL_NOT_VERIFIED') {
+        setNeedsVerify(true);
+        setError(null);
+        return;
+      }
       setError(err.response?.status === 401
         ? (err.response?.data?.message || 'Correo o contraseña incorrectos')
         : 'Error al intentar iniciar sesión');
@@ -227,6 +262,30 @@ export const LoginPage = () => {
                 <div style={{ background:'#fef2f2', border:'1px solid #fecaca', borderRadius:10, padding:'10px 14px', marginBottom:16 }}>
                   <p style={{ margin:0, fontSize:'0.82rem', color:'#dc2626' }}>{error}</p>
                 </div>
+              )}
+
+              {needsVerify && (
+                <form onSubmit={handleVerify} style={{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:12, padding:14, marginBottom:18 }}>
+                  <p style={{ margin:'0 0 10px', fontSize:'0.82rem', color:'#92400e', lineHeight:1.45 }}>
+                    Tu correo aún no está verificado. Ingresa el código de 6 dígitos que enviamos a <b>{email}</b>.
+                  </p>
+                  <input
+                    value={code} onChange={e => setCode(e.target.value.replace(/\D/g,'').slice(0,6))}
+                    inputMode="numeric" autoComplete="one-time-code" placeholder="••••••"
+                    style={{ width:'100%', boxSizing:'border-box', padding:'10px', border:'1.5px solid #fcd34d', borderRadius:9, fontSize:'1.2rem', fontFamily:'monospace', letterSpacing:'0.4em', textAlign:'center', outline:'none', marginBottom:10 }}
+                  />
+                  {verifyInfo && <p style={{ margin:'0 0 10px', fontSize:'0.78rem', color:'#15803d' }}>{verifyInfo}</p>}
+                  <div style={{ display:'flex', gap:8 }}>
+                    <button type="submit" disabled={isSubmitting || code.length !== 6}
+                      style={{ flex:1, padding:'10px 0', background:'#182D2A', color:'#fff', border:'none', borderRadius:9, fontWeight:700, fontSize:'0.84rem', cursor:'pointer', opacity: code.length === 6 ? 1 : 0.5 }}>
+                      Verificar y entrar
+                    </button>
+                    <button type="button" onClick={handleResend}
+                      style={{ padding:'10px 12px', background:'transparent', color:'#92400e', border:'1.5px solid #fcd34d', borderRadius:9, fontWeight:600, fontSize:'0.8rem', cursor:'pointer' }}>
+                      Reenviar
+                    </button>
+                  </div>
+                </form>
               )}
 
               {/* Form */}
