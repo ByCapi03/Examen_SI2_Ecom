@@ -27,7 +27,7 @@ const ICONS: Record<string, ReactNode> = {
   '/dashboard/settings': <Settings size={18} />,
 };
 
-export const DashboardSidebar = () => {
+export const DashboardSidebar = ({ open = false, onNavigate }: { open?: boolean; onNavigate?: () => void }) => {
   const { user, logout } = useAuth();
   const { tenant, can } = usePlan();
   const { t, settings } = useSettings();
@@ -39,7 +39,7 @@ export const DashboardSidebar = () => {
     .filter((g) => g.items.length > 0);
 
   return (
-    <aside className="dashboard-sidebar" style={{ width: compact ? 78 : 264, padding: '22px 0 16px', height: '100vh', position: 'sticky', top: 0, flexShrink: 0, transition: 'width .2s' }}>
+    <aside className={`dashboard-sidebar${open ? ' open' : ''}`} style={{ width: compact ? 78 : 264, padding: '22px 0 16px', height: '100vh', position: 'sticky', top: 0, flexShrink: 0, transition: 'width .2s' }}>
       <style>{`
         .sb-nav { flex: 1; overflow-y: auto; padding: 0 12px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.12) transparent; }
         .sb-group { margin-bottom: 14px; }
@@ -83,6 +83,7 @@ export const DashboardSidebar = () => {
                     to={item.path}
                     end={item.path === '/dashboard'}
                     title={t(item.key)}
+                    onClick={onNavigate}
                     className={({ isActive }) => `sb-link${isActive ? ' active' : ''}${locked ? ' locked' : ''}`}
                   >
                     {ICONS[item.path]}
@@ -98,7 +99,7 @@ export const DashboardSidebar = () => {
 
         <div style={{ padding: '10px 12px 0', borderTop: '1px solid rgba(245,242,235,0.08)' }}>
           <button
-            onClick={() => { logout(); navigate('/login'); }}
+            onClick={() => { onNavigate?.(); logout(); navigate('/login'); }}
             className="sb-link"
             style={{ width: '100%', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
             title={t('nav.logout')}

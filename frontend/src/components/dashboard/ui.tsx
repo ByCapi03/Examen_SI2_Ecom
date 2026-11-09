@@ -71,7 +71,7 @@ export const PlanBadge = () => {
 export const Card = ({ title, subtitle, actions, children, style }: { title?: string; subtitle?: string; actions?: ReactNode; children: ReactNode; style?: CSSProperties }) => (
   <section className="dz-card" style={style}>
     {(title || actions) && (
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
         <div style={{ minWidth: 0 }}>
           {title && <h3>{title}</h3>}
           {subtitle && <p className="dz-sub">{subtitle}</p>}

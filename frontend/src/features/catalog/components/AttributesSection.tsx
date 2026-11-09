@@ -68,9 +68,9 @@ export const AttributesSection = () => {
   };
 
   const renderTable = (title: string, data: Attribute[], type: string) => (
-    <div className="crud-card" style={{ marginBottom: '20px' }}>
+    <div className="crud-card">
       <h3>{title}</h3>
-      <form onSubmit={(e) => handleSubmit(e, type)} style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+      <form onSubmit={(e) => handleSubmit(e, type)} className="adm-attr-form">
         <input 
           type="text" 
           required 
@@ -78,7 +78,7 @@ export const AttributesSection = () => {
           value={form.type === type ? form.name : ''} 
           onChange={e => setForm({ ...form, type, name: e.target.value })} 
         />
-        <label style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+        <label className="adm-check">
           <input 
             type="checkbox" 
             checked={form.type === type ? form.active : true} 
@@ -90,12 +90,11 @@ export const AttributesSection = () => {
             type="color"
             value={form.type === type ? form.hexCode || '#000000' : '#000000'}
             onChange={e => setForm({ ...form, type, hexCode: e.target.value })}
-            style={{ width: '40px', padding: 0 }}
             title="Código de Color (Hex)"
           />
         )}
         <button type="submit" className="btn-primary">{form.type === type && form.id ? 'Guardar' : 'Crear'}</button>
-        {form.type === type && form.id && (
+        {form.type === type && !!form.id && (
           <button type="button" className="btn-secondary" onClick={() => setForm({ id: 0, name: '', active: true, type, hexCode: '' })}>Cancelar</button>
         )}
       </form>
@@ -112,11 +111,13 @@ export const AttributesSection = () => {
           {data.map(item => (
             <tr key={item.id}>
               <td>{item.id}</td>
-              <td style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <td style={{ fontWeight: 600 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}>
                 {type === 'colors' && item.hexCode && (
-                  <div style={{ width: '15px', height: '15px', backgroundColor: item.hexCode, borderRadius: '50%', border: '1px solid #ccc' }}></div>
+                  <span className="adm-color-dot" style={{ backgroundColor: item.hexCode }} />
                 )}
                 {item.name}
+                </span>
               </td>
               <td>
                 <span className={item.active ? 'badge-active' : 'badge-inactive'}>
@@ -125,21 +126,21 @@ export const AttributesSection = () => {
               </td>
               <td>
                 <div className="crud-actions" style={{ gap: '5px' }}>
-                  <button className="btn-secondary" style={{ padding: '2px 8px', fontSize: '12px' }} onClick={() => handleEdit(item, type)}>Editar</button>
-                  <button className="btn-danger" style={{ padding: '2px 8px', fontSize: '12px' }} onClick={() => handleDelete(item.id, type)}>Eliminar</button>
+                  <button className="btn-secondary" onClick={() => handleEdit(item, type)}>Editar</button>
+                  <button className="btn-danger" onClick={() => handleDelete(item.id, type)}>Eliminar</button>
                 </div>
               </td>
             </tr>
           ))}
-          {data.length === 0 && <tr><td colSpan={4}>No hay registros</td></tr>}
+          {data.length === 0 && <tr><td colSpan={4} className="empty-state">Aún no hay registros. Crea el primero arriba.</td></tr>}
         </tbody>
       </table>
     </div>
   );
 
   return (
-    <div className="attributes-section" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
-      {renderTable('Categoras', categories, 'categories')}
+    <div className="adm-attrs">
+      {renderTable('Categorías', categories, 'categories')}
       {renderTable('Tallas', sizes, 'sizes')}
       {renderTable('Colores', colors, 'colors')}
     </div>
