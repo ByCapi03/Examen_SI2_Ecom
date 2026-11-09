@@ -24,9 +24,9 @@ export class AiReportLog {
   @Column({ type: 'jsonb', nullable: true })
   spec: any;
 
-  /** LLM = interpretado por el modelo generativo; REGLAS = intérprete local. */
-  @Column({ type: 'varchar', length: 10 })
-  engine: 'LLM' | 'REGLAS';
+  /** LLM/LLM_LOCAL = modelo generativo; IA_LOCAL = NB+Reglas; REGLAS = reglas puras (legado). */
+  @Column({ type: 'varchar', length: 15 })
+  engine: 'LLM' | 'LLM_LOCAL' | 'IA_LOCAL' | 'REGLAS';
 
   @Column({ default: 0 })
   rowCount: number;

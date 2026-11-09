@@ -141,7 +141,7 @@ export class StoreService {
 
   async getTryOnData(variantId: number) {
     const variant = await this.variantRepository.findOne({
-      where: { id: variantId, active: true },
+      where: { id: variantId, active: true, tenantId: getEffectiveTenantId() },
       relations: { product: true, size: true, color: true }
     });
 

@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, ConflictException, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, UnauthorizedException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { getCurrentTenantId } from '../../common/tenancy/tenant-context';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 
@@ -36,12 +37,13 @@ export class InventoryService {
     const branch = await this.branchRepository.findOneBy({ id: createInventoryDto.branchId, tenantId: currentUser.tenantId });
     if (!branch) throw new NotFoundException('Sucursal no encontrada');
     
-    const variant = await this.variantRepository.findOne({ where: { id: createInventoryDto.variantId, product: { tenantId: currentUser.tenantId } } });
+    const variant = await this.variantRepository.findOneBy({ id: createInventoryDto.variantId, tenantId: currentUser.tenantId });
     if (!variant) throw new NotFoundException('Variante no encontrada');
 
-    const existing = await this.inventoryRepository.findOneBy({ 
-      branchId: createInventoryDto.branchId, 
-      variantId: createInventoryDto.variantId 
+    const existing = await this.inventoryRepository.findOneBy({
+      tenantId: currentUser.tenantId,
+      branchId: createInventoryDto.branchId,
+      variantId: createInventoryDto.variantId,
     });
 
     if (existing) {
@@ -127,7 +129,7 @@ export class InventoryService {
       throw new ConflictException('No se puede eliminar un inventario que tiene stock o reservas activas');
     }
 
-    const movementsCount = await this.movementRepository.count({ where: { inventoryId: id } });
+    const movementsCount = await this.movementRepository.count({ where: { inventoryId: id, tenantId: currentUser.tenantId } });
     if (movementsCount > 0) {
       throw new ConflictException('No se puede eliminar un inventario que tiene movimientos registrados');
     }
@@ -197,22 +199,29 @@ export class InventoryService {
     }
   }
 
-  // --- SUPPLIER CRUD (Mantenido) ---
+  // --- SUPPLIER CRUD (por empresa) ---
+  private tenant(): number {
+    const tenantId = getCurrentTenantId();
+    if (!tenantId) throw new ForbiddenException('Aislamiento SaaS: tenant no identificado');
+    return tenantId;
+  }
+
   async createSupplier(createSupplierDto: CreateSupplierDto) {
-    const existing = await this.supplierRepository.findOneBy({ nit: createSupplierDto.nit });
+    const tenantId = this.tenant();
+    const existing = await this.supplierRepository.findOneBy({ tenantId, nit: createSupplierDto.nit });
     if (existing) {
       throw new ConflictException(`Ya existe un proveedor con el NIT ${createSupplierDto.nit}`);
     }
-    const supplier = this.supplierRepository.create(createSupplierDto);
+    const supplier = this.supplierRepository.create({ ...createSupplierDto, tenantId });
     return this.supplierRepository.save(supplier);
   }
 
   async findAllSuppliers() {
-    return this.supplierRepository.find({ order: { id: 'ASC' } });
+    return this.supplierRepository.find({ where: { tenantId: this.tenant() }, order: { id: 'ASC' } });
   }
 
   async findOneSupplier(id: number) {
-    const supplier = await this.supplierRepository.findOneBy({ id });
+    const supplier = await this.supplierRepository.findOneBy({ id, tenantId: this.tenant() });
     if (!supplier) {
       throw new NotFoundException(`Proveedor #${id} no encontrado`);
     }
@@ -221,7 +230,11 @@ export class InventoryService {
 
   async updateSupplier(id: number, updateSupplierDto: UpdateSupplierDto) {
     const supplier = await this.findOneSupplier(id);
-    Object.assign(supplier, updateSupplierDto);
+    if (updateSupplierDto.nit && updateSupplierDto.nit !== supplier.nit) {
+      const existing = await this.supplierRepository.findOneBy({ tenantId: supplier.tenantId, nit: updateSupplierDto.nit });
+      if (existing) throw new ConflictException(`Ya existe un proveedor con el NIT ${updateSupplierDto.nit}`);
+    }
+    Object.assign(supplier, updateSupplierDto, { tenantId: supplier.tenantId });
     return this.supplierRepository.save(supplier);
   }
 

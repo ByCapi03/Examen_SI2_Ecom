@@ -1,16 +1,16 @@
 /**
  * AI REPORTS SERVICE — Reportes generativos en lenguaje natural
  *
- * Pipeline (NL → Spec → SQL seguro → Datos reales → Narrativa):
- *   1. Interpretación: un LLM (API compatible con OpenAI configurada por
- *      AI_API_URL / AI_API_KEY / AI_MODEL) traduce la pregunta a un ReportSpec
- *      JSON. Si no hay IA disponible o su salida es inválida, se usa el
- *      intérprete por reglas en español.
+ * Pipeline (NL → Spec → SQL seguro → Datos reales → Narrativa + Insights):
+ *   1. Interpretación (en cascada):
+ *      a) AI_PROVIDER=openai   → LLM via API compatible con OpenAI (AI_API_URL/AI_API_KEY/AI_MODEL)
+ *      b) AI_PROVIDER=ollama   → LLM local via Ollama (AI_API_URL, sin clave)
+ *      c) AI_PROVIDER=local    → motor propio NB+reglas (por defecto)
+ *      Si la opción configurada falla, se cae a 'local' automáticamente.
  *   2. Validación estricta del spec contra listas blancas.
- *   3. SQL parametrizado con tenantId = $1 (del JWT) en transacción READ ONLY
- *      con statement_timeout.
- *   4. Narrativa: el LLM redacta un resumen SOLO con las filas obtenidas; si no
- *      hay IA, se genera un resumen determinista.
+ *   3. SQL parametrizado con tenantId = $1 (del JWT) en transacción READ ONLY.
+ *   4. Narrativa: si LLM disponible → texto generado; si no → plantilla determinista.
+ *   5. Insights automáticos (siempre): total, top/bottom, Pareto, tendencia, outliers.
  */
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -20,6 +20,8 @@ import {
   buildReportQuery, CHARTS, DIMENSION_LABEL, DIMENSIONS, InvalidSpecError, METRIC_LABEL, METRICS, ReportSpec, validateSpec,
 } from './report-spec';
 import { parseQuestion, ParserContext } from './nl-parser';
+import { interpretLocal } from './local-ai/local-engine';
+import { generateInsights } from './local-ai/insights';
 
 const SUGGESTIONS = [
   '¿Cuáles fueron los 5 productos más vendidos este mes?',
@@ -32,6 +34,9 @@ const SUGGESTIONS = [
   'Unidades vendidas por talla en el canal web',
 ];
 
+type Provider = 'local' | 'ollama' | 'openai';
+type EngineLabel = 'LLM' | 'LLM_LOCAL' | 'IA_LOCAL' | 'REGLAS';
+
 @Injectable()
 export class AiReportsService {
   private readonly logger = new Logger(AiReportsService.name);
@@ -42,11 +47,30 @@ export class AiReportsService {
   ) {}
 
   getSuggestions() {
-    return { suggestions: SUGGESTIONS, metrics: METRIC_LABEL, dimensions: DIMENSION_LABEL, llmEnabled: this.llmEnabled() };
+    const provider = this.activeProvider();
+    return {
+      suggestions: SUGGESTIONS,
+      metrics: METRIC_LABEL,
+      dimensions: DIMENSION_LABEL,
+      llmEnabled: provider !== 'local',
+      provider,
+      providerInfo: this.providerInfo(provider),
+    };
   }
 
-  private llmEnabled() {
-    return !!process.env.AI_API_KEY;
+  private activeProvider(): Provider {
+    const env = (process.env.AI_PROVIDER ?? '').toLowerCase() as Provider;
+    if (env === 'ollama') return 'ollama';
+    if (env === 'openai') return 'openai';
+    // retrocompatibilidad: si hay AI_API_KEY y no se configuró AI_PROVIDER → openai
+    if (!env && process.env.AI_API_KEY) return 'openai';
+    return 'local';
+  }
+
+  private providerInfo(provider: Provider): string {
+    if (provider === 'openai') return `OpenAI-compatible (${process.env.AI_MODEL || 'gpt-4o-mini'})`;
+    if (provider === 'ollama') return `Ollama (${process.env.AI_MODEL || 'qwen2.5:3b'}) @ ${process.env.AI_API_URL || 'http://localhost:11434'}`;
+    return 'Motor local NB+Reglas';
   }
 
   async generate(question: string, user: any) {
@@ -57,13 +81,29 @@ export class AiReportsService {
 
     const ctx = await this.loadContext(tenantId, user);
     let spec: ReportSpec;
-    let engine: 'LLM' | 'REGLAS' = 'REGLAS';
+    let engine: EngineLabel = 'IA_LOCAL';
+    let confidence = 1.0;
+    let interpretation: string | undefined;
+
+    const provider = this.activeProvider();
+
     try {
-      const fromLlm = this.llmEnabled() ? await this.interpretWithLlm(q, ctx) : null;
-      if (fromLlm) { spec = fromLlm; engine = 'LLM'; } else spec = parseQuestion(q, ctx);
+      if (provider === 'openai') {
+        const fromLlm = await this.interpretWithOpenAI(q, ctx);
+        spec = fromLlm; engine = 'LLM'; confidence = 1.0;
+      } else if (provider === 'ollama') {
+        const fromOllama = await this.interpretWithOllama(q, ctx);
+        spec = fromOllama; engine = 'LLM_LOCAL'; confidence = 1.0;
+      } else {
+        const result = interpretLocal(q, ctx);
+        spec = result.spec; engine = 'IA_LOCAL'; confidence = result.confidence;
+        interpretation = result.explanation;
+      }
     } catch (err) {
-      this.logger.warn(`Interpretación LLM inválida, usando reglas: ${(err as Error).message}`);
-      spec = parseQuestion(q, ctx);
+      this.logger.warn(`Proveedor ${provider} falló (${(err as Error).message}), usando motor local`);
+      const result = interpretLocal(q, ctx);
+      spec = result.spec; engine = 'IA_LOCAL'; confidence = result.confidence;
+      interpretation = result.explanation;
     }
 
     // Un ENCARGADO solo puede consultar su propia sucursal
@@ -73,7 +113,7 @@ export class AiReportsService {
       if (spec.dimension === 'sucursal') spec.dimension = 'ninguna';
       spec = validateSpec(spec);
     } else if (spec.filters.branchId && !ctx.branches.some((b) => b.id === spec.filters.branchId)) {
-      delete spec.filters.branchId; // sucursal inexistente para este tenant
+      delete spec.filters.branchId;
     }
 
     let rows: { label: string; value: number }[] = [];
@@ -86,17 +126,21 @@ export class AiReportsService {
     }
 
     const narrative = await this.narrate(q, spec, rows, ctx);
+    const insights = generateInsights(spec, rows);
     await this.logRepo.save(this.logRepo.create({ tenantId, userId: user.sub, question: q, spec, engine, rowCount: rows.length }));
 
     const total = rows.reduce((a, r) => a + r.value, 0);
     return {
       question: q,
       engine,
+      confidence,
+      interpretation,
       spec,
       columns: [DIMENSION_LABEL[spec.dimension], METRIC_LABEL[spec.metric]],
       rows,
       total: Number(total.toFixed(2)),
       narrative,
+      insights,
       branchName: spec.filters.branchId ? ctx.branches.find((b) => b.id === spec.filters.branchId)?.name : null,
       generatedAt: new Date().toISOString(),
     };
@@ -144,7 +188,9 @@ export class AiReportsService {
     }
   }
 
-  private async callLlm(messages: { role: string; content: string }[], json: boolean): Promise<string> {
+  // ─── PROVEEDORES LLM ──────────────────────────────────────────────────────
+
+  private async callOpenAI(messages: { role: string; content: string }[], json: boolean): Promise<string> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 20000);
     try {
@@ -167,8 +213,28 @@ export class AiReportsService {
     }
   }
 
-  private async interpretWithLlm(question: string, ctx: ParserContext): Promise<ReportSpec | null> {
-    const system = [
+  private async callOllama(messages: { role: string; content: string }[]): Promise<string> {
+    const url = `${process.env.AI_API_URL || 'http://localhost:11434'}/api/chat`;
+    const model = process.env.AI_MODEL || 'qwen2.5:3b';
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 60000);
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, messages, stream: false, format: 'json' }),
+      });
+      if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`);
+      const data: any = await res.json();
+      return data.message?.content ?? '';
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  private buildInterpretationSystem(ctx: ParserContext): string {
+    return [
       'Eres un analista de datos de una tienda de ropa. Conviertes preguntas en español a una especificación JSON de reporte.',
       'NUNCA escribas SQL. Responde SOLO con un objeto JSON con las claves:',
       `title (string), metric (uno de: ${METRICS.join(', ')}), dimension (uno de: ${DIMENSIONS.join(', ')}),`,
@@ -182,30 +248,44 @@ export class AiReportsService {
       `Sucursales de la empresa: ${JSON.stringify(ctx.branches)}.`,
       `Categorías disponibles: ${JSON.stringify(ctx.categories)}.`,
     ].join('\n');
-    const content = await this.callLlm([
-      { role: 'system', content: system },
-      { role: 'user', content: question },
-    ], true);
-    const parsed = JSON.parse(content);
-    return validateSpec(parsed);
   }
 
+  private async interpretWithOpenAI(question: string, ctx: ParserContext): Promise<ReportSpec> {
+    const content = await this.callOpenAI([
+      { role: 'system', content: this.buildInterpretationSystem(ctx) },
+      { role: 'user', content: question },
+    ], true);
+    return validateSpec(JSON.parse(content));
+  }
+
+  private async interpretWithOllama(question: string, ctx: ParserContext): Promise<ReportSpec> {
+    const systemMsg = this.buildInterpretationSystem(ctx);
+    const content = await this.callOllama([
+      { role: 'system', content: systemMsg },
+      { role: 'user', content: question },
+    ]);
+    // Ollama con format:'json' puede devolver el JSON directamente o envuelto en markdown
+    const clean = content.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
+    return validateSpec(JSON.parse(clean));
+  }
+
+  // ─── NARRATIVA ────────────────────────────────────────────────────────────
+
   private async narrate(question: string, spec: ReportSpec, rows: { label: string; value: number }[], ctx: ParserContext) {
-    if (this.llmEnabled() && rows.length) {
+    const provider = this.activeProvider();
+    if (provider !== 'local' && rows.length) {
       try {
-        const text = await this.callLlm([
-          {
-            role: 'system',
-            content: 'Eres un analista comercial. Redacta en español un resumen ejecutivo de 2 a 4 oraciones basado EXCLUSIVAMENTE en los datos entregados. No inventes cifras. Menciona el valor más alto y, si aplica, una recomendación breve.',
-          },
-          {
-            role: 'user',
-            content: JSON.stringify({ pregunta: question, metrica: METRIC_LABEL[spec.metric], agrupacion: DIMENSION_LABEL[spec.dimension], filtros: spec.filters, datos: rows.slice(0, 30) }),
-          },
-        ], false);
+        const dataPayload = JSON.stringify({ pregunta: question, metrica: METRIC_LABEL[spec.metric], agrupacion: DIMENSION_LABEL[spec.dimension], filtros: spec.filters, datos: rows.slice(0, 30) });
+        const narrativeMessages = [
+          { role: 'system', content: 'Eres un analista comercial. Redacta en español un resumen ejecutivo de 2 a 4 oraciones basado EXCLUSIVAMENTE en los datos entregados. No inventes cifras. Menciona el valor más alto y, si aplica, una recomendación breve.' },
+          { role: 'user', content: dataPayload },
+        ];
+        const text = provider === 'ollama'
+          ? await this.callOllama(narrativeMessages)
+          : await this.callOpenAI(narrativeMessages, false);
         if (text.trim()) return text.trim();
       } catch (err) {
-        this.logger.warn(`No se pudo generar narrativa con IA: ${(err as Error).message}`);
+        this.logger.warn(`No se pudo generar narrativa con ${provider}: ${(err as Error).message}`);
       }
     }
     return this.templateNarrative(spec, rows, ctx);

@@ -1,5 +1,5 @@
 /**
- * BATERÍA E2E — SaaS Multitenant + Operación Offline + Reportes IA + ML
+ * BATERÍA E2E — SaaS Multitenant (incl. catálogos por empresa) + Operación Offline + Reportes IA + ML
  *
  * Requisitos: backend en ejecución (API_URL, por defecto http://localhost:3000)
  * y acceso a la misma base de datos (variables DB_* o backend/.env).
@@ -48,6 +48,7 @@ const API = process.env.API_URL || `http://localhost:${process.env.PORT || 3000}
 const RUN = Date.now().toString(36);
 const PASSWORD = 'Test1234!';
 let passed = 0;
+let cityId;
 let failed = 0;
 
 function check(name, condition, detail) {
@@ -93,9 +94,7 @@ async function main() {
     }
     const roleId = async (name) => (await one(`SELECT id FROM roles WHERE name = $1`, [name])).id;
     const city = await one(`INSERT INTO cities (name, active) VALUES ($1, true) RETURNING id`, [`Ciudad ${RUN}`]);
-    const category = await one(`INSERT INTO categories (name, active) VALUES ($1, true) RETURNING id`, [`Vestidos ${RUN}`]);
-    const size = await one(`INSERT INTO sizes (name, active) VALUES ($1, true) RETURNING id`, [`M-${RUN}`]);
-    const color = await one(`INSERT INTO colors (name, active) VALUES ($1, true) RETURNING id`, [`Negro-${RUN}`]);
+    cityId = city.id;
     const plan = async (code) => (await one(`SELECT id FROM plans WHERE code = $1`, [code])).id;
 
     async function makeTenant(letter, planCode, price) {
@@ -107,10 +106,14 @@ async function main() {
         VALUES ($1, $2, 'Av. Test', '700', true, $3, now()) RETURNING id`, [t.id, `Sucursal Central ${letter}`, city.id]);
       const branch2 = await one(`INSERT INTO branches ("tenantId", name, address, phone, active, "cityId", "createdAt")
         VALUES ($1, $2, 'Av. Test 2', '701', true, $3, now()) RETURNING id`, [t.id, `Sucursal Norte ${letter}`, city.id]);
+      // Catálogos propios de cada empresa (mismo nombre en A y B: es único POR empresa)
+      const category = await one(`INSERT INTO categories ("tenantId", name, active) VALUES ($1, $2, true) RETURNING id`, [t.id, `Vestidos ${RUN}`]);
+      const size = await one(`INSERT INTO sizes ("tenantId", name, active) VALUES ($1, $2, true) RETURNING id`, [t.id, `M-${RUN}`]);
+      const color = await one(`INSERT INTO colors ("tenantId", name, active) VALUES ($1, $2, true) RETURNING id`, [t.id, `Negro-${RUN}`]);
       const product = await one(`INSERT INTO products ("tenantId", name, price, active, "categoryId", colorizable, "arEnabled")
         VALUES ($1, $2, $3, true, $4, false, false) RETURNING id`, [t.id, `Vestido ${letter} ${RUN}`, price, category.id]);
-      const variant = await one(`INSERT INTO variants (sku, active, "productId", "sizeId", "colorId") VALUES ($1, true, $2, $3, $4) RETURNING id`,
-        [`SKU-${letter}-${RUN}`, product.id, size.id, color.id]);
+      const variant = await one(`INSERT INTO variants ("tenantId", sku, active, "productId", "sizeId", "colorId") VALUES ($1, $2, true, $3, $4, $5) RETURNING id`,
+        [t.id, `SKU-${letter}-${RUN}`, product.id, size.id, color.id]);
       const inv = await one(`INSERT INTO inventory ("tenantId", stock, reserved, "stockMin", "branchId", "variantId", "updatedAt")
         VALUES ($1, 5, 0, 1, $2, $3, now()) RETURNING id`, [t.id, branch.id, variant.id]);
       await q(`INSERT INTO inventory ("tenantId", stock, reserved, "stockMin", "branchId", "variantId", "updatedAt")
@@ -138,7 +141,7 @@ async function main() {
       const reservation = await one(`INSERT INTO reservations ("tenantId", status, date, "registrationDate", "clientId", "branchId")
         VALUES ($1, 'CONFIRMADA', current_date + 2, now(), $2, $3) RETURNING id`, [t.id, client.id, branch.id]);
 
-      return { id: t.id, branch: branch.id, branch2: branch2.id, product: product.id, variant: variant.id, inv: inv.id, admin, cajero, clienteUser, client: client.id, session: session.id, sale: sale.id, reservation: reservation.id, price };
+      return { id: t.id, category: category.id, size: size.id, color: color.id, branch: branch.id, branch2: branch2.id, product: product.id, variant: variant.id, inv: inv.id, admin, cajero, clienteUser, client: client.id, session: session.id, sale: sale.id, reservation: reservation.id, price };
     }
 
     const A = await makeTenant('A', 'PROFESIONAL', 100);
@@ -169,7 +172,7 @@ async function main() {
     check('T07 Listado de ventas de A no contiene ventas de B', r.status === 200 && !r.data.some((s) => s.id === B.sale), r.status);
     r = await api('GET', '/inventory', tok.adminB);
     check('T08 Inventario de B no contiene registros de A', r.status === 200 && r.data.every((i) => i.tenantId === B.id), r.status);
-    r = await api('POST', '/products', tok.adminA, { name: `Intruso ${RUN}`, price: 10, categoryId: category.id, tenantId: B.id });
+    r = await api('POST', '/products', tok.adminA, { name: `Intruso ${RUN}`, price: 10, categoryId: A.category, tenantId: B.id });
     check('T09 tenantId enviado en el body se ignora (se usa el del JWT)', r.status === 201 && r.data.tenantId === A.id, r.data);
     if (r.data?.id) await q(`DELETE FROM products WHERE id = $1`, [r.data.id]);
     r = await api('POST', '/branches', tok.adminB, { name: 'Tercera', address: 'x', phone: '1', cityId: city.id });
@@ -252,6 +255,71 @@ async function main() {
     r = await api('PATCH', `/sync/conflicts/${shortfall?.id}/resolve`, tok.adminA, { action: 'AJUSTAR_INVENTARIO', notes: 'Conteo físico confirmado' });
     check('T26 A resuelve el conflicto de faltante (AJUSTAR_INVENTARIO)', r.status === 200 && r.data.status === 'RESUELTO', r.data);
 
+    // ======================================================== CATÁLOGOS POR EMPRESA
+    console.log('\n--- HU: Catálogos propios de cada empresa ---');
+    r = await api('GET', '/categories', tok.adminA);
+    check('T34 A solo ve sus categorías (no la de B aunque se llame igual)', r.status === 200 && r.data.length >= 1 && r.data.every((c) => c.tenantId === A.id) && !r.data.some((c) => c.id === B.category), r.data);
+    const catName = `Abrigos ${RUN}`;
+    const cA = await api('POST', '/categories', tok.adminA, { name: catName });
+    const cB = await api('POST', '/categories', tok.adminB, { name: catName });
+    const cA2 = await api('POST', '/categories', tok.adminA, { name: catName });
+    check('T35 Mismo nombre de categoría permitido en dos empresas; duplicado dentro de A → 409',
+      cA.status === 201 && cB.status === 201 && cA.data.tenantId === A.id && cB.data.tenantId === B.id && cA2.status === 409, { cA: cA.status, cB: cB.status, cA2: cA2.status });
+    r = await api('GET', `/categories/${B.category}`, tok.adminA);
+    check('T36 A no puede leer una categoría de B → 404', r.status === 404, r.status);
+    r = await api('POST', '/products', tok.adminA, { name: `Intruso ${RUN}`, price: 10, categoryId: B.category });
+    check('T37 A no puede crear un producto con la categoría de B → 404', r.status === 404, r);
+    try {
+      await q(`INSERT INTO products ("tenantId", name, price, active, "categoryId", colorizable, "arEnabled") VALUES ($1, 'X', 1, true, $2, false, false)`, [A.id, B.category]);
+      check('T38 PostgreSQL rechaza producto de A con categoría de B', false);
+    } catch (e) { check('T38 PostgreSQL rechaza producto de A con categoría de B (fk_products_category_tenant)', /fk_products_category_tenant/.test(e.message), e.message); }
+
+    const nit = `NIT-${RUN}`;
+    const sA = await api('POST', '/suppliers', tok.adminA, { name: 'Textiles A', nit });
+    const sB = await api('POST', '/suppliers', tok.adminB, { name: 'Textiles B', nit });
+    const listB = await api('GET', '/suppliers', tok.adminB);
+    const getAB = await api('GET', `/suppliers/${sB.data?.id}`, tok.adminA);
+    check('T39 Proveedores por empresa: mismo NIT en A y B, B no ve los de A, A no lee los de B (404)',
+      sA.status === 201 && sB.status === 201 && listB.data.every((x) => x.tenantId === B.id) && getAB.status === 404,
+      { sA: sA.status, sB: sB.status, getAB: getAB.status });
+
+    const vB = await api('POST', '/variants', tok.adminB, { sku: `SKU-A-${RUN}`, productId: B.product, sizeId: B.size, colorId: B.color });
+    const vA = await api('POST', '/variants', tok.adminA, { sku: `SKU-X-${RUN}`, productId: A.product, sizeId: B.size, colorId: A.color });
+    check('T40 SKU único por empresa (B reutiliza el SKU de A) y A no puede usar tallas de B (404)',
+      vB.status === 201 && vB.data.tenantId === B.id && vA.status === 404, { vB: vB.status, vA: vA.status });
+    try {
+      await q(`INSERT INTO variants ("tenantId", sku, active, "productId", "sizeId", "colorId") VALUES ($1, $2, true, $3, $4, $5)`, [A.id, `SKU-Z-${RUN}`, B.product, A.size, A.color]);
+      check('T41 PostgreSQL rechaza variante de A sobre producto de B', false);
+    } catch (e) { check('T41 PostgreSQL rechaza variante de A sobre producto de B (fk_variants_product_tenant)', /fk_variants_product_tenant/.test(e.message), e.message); }
+
+    const seasonA = await api('POST', '/seasons', tok.adminA, { name: `Invierno ${RUN}`, startDate: '2026-06-01', endDate: '2026-08-31' });
+    const colB = await api('POST', '/collections', tok.adminB, { name: 'Robo', seasonId: seasonA.data?.id });
+    const seasonsB = await api('GET', '/seasons', tok.adminB);
+    check('T42 Temporadas por empresa: B no ve ni usa la temporada de A (404)',
+      seasonA.status === 201 && colB.status === 404 && !seasonsB.data.some((x) => x.id === seasonA.data.id), { seasonA: seasonA.status, colB: colB.status });
+
+    const promoBad = await api('POST', '/promotions', tok.adminA, { name: 'Mixta', type: 'PERCENTAGE', value: 10, startDate: '2026-01-01', endDate: '2026-12-31', productIds: [A.product, B.product] });
+    const promoOk = await api('POST', '/promotions', tok.adminA, { name: `Promo ${RUN}`, type: 'PERCENTAGE', value: 10, startDate: '2026-01-01', endDate: '2026-12-31', productIds: [A.product] });
+    const promosB = await api('GET', '/promotions', tok.adminB);
+    check('T43 Promociones: A no puede incluir productos de B (404) y B no ve las promociones de A',
+      promoBad.status === 404 && promoOk.status === 201 && promoOk.data.tenantId === A.id && !promosB.data.some((x) => x.id === promoOk.data.id),
+      { promoBad: promoBad.status, promoOk: promoOk.status });
+
+    r = await api('PATCH', `/sizes/${B.size}`, tok.adminA, { name: 'Hackeada' });
+    const sizeB = await one(`SELECT name FROM sizes WHERE id = $1`, [B.size]);
+    check('T44 A no puede renombrar tallas de B (404) y la talla de B queda intacta', r.status === 404 && sizeB.name === `M-${RUN}`, { status: r.status, sizeB });
+
+    const cityPatch = await api('PATCH', `/cities/${cityId}`, tok.adminA, { name: 'Renombrada' });
+    const cityAnon = await api('POST', '/cities', null, { name: `Anon ${RUN}` });
+    check('T45 Ciudades (catálogo compartido): ADMIN de empresa no edita (403) y anónimo no crea (401)',
+      cityPatch.status === 403 && cityAnon.status === 401, { cityPatch: cityPatch.status, cityAnon: cityAnon.status });
+
+    r = await api('POST', '/inventory/movement', tok.adminA, { inventoryId: A.inv, type: 'ENTRADA', quantity: 3, observation: 'E2E' });
+    const mov = await one(`SELECT "tenantId" FROM inventory_movements WHERE "inventoryId" = $1 ORDER BY id DESC LIMIT 1`, [A.inv]);
+    check('T46 Movimiento de inventario queda registrado con el tenant de A', r.status === 201 && mov?.tenantId === A.id, { status: r.status, mov });
+    r = await api('POST', '/categories', tok.clienteA, { name: `Cliente ${RUN}` });
+    check('T47 Un CLIENTE no puede modificar el catálogo de su empresa → 403', r.status === 403, r.status);
+
     // ======================================================== IA GENERATIVA
     console.log('\n--- HU: Reportes generativos en lenguaje natural ---');
     r = await api('POST', '/ai-reports/query', tok.adminA, { question: '¿Cuáles fueron los 3 vestidos más vendidos este mes?' });
@@ -280,7 +348,12 @@ async function main() {
       await q(`DELETE FROM sync_conflicts WHERE "tenantId" = $1`, [t]).catch(() => {});
       await q(`DELETE FROM offline_sync_operations WHERE "tenantId" = $1`, [t]).catch(() => {});
       await q(`DELETE FROM ai_report_logs WHERE "tenantId" = $1`, [t]).catch(() => {});
-      await q(`DELETE FROM inventory_movements WHERE "inventoryId" IN (SELECT id FROM inventory WHERE "tenantId" = $1)`, [t]).catch(() => {});
+      await q(`DELETE FROM inventory_movements WHERE "tenantId" = $1`, [t]).catch(() => {});
+      await q(`DELETE FROM notifications WHERE "tenantId" = $1`, [t]).catch(() => {});
+      await q(`DELETE FROM notification_devices WHERE "tenantId" = $1`, [t]).catch(() => {});
+      await q(`DELETE FROM product_promotions WHERE "promotionId" IN (SELECT id FROM promotions WHERE "tenantId" = $1)`, [t]).catch(() => {});
+      await q(`DELETE FROM promotions WHERE "tenantId" = $1`, [t]).catch(() => {});
+      await q(`DELETE FROM suppliers WHERE "tenantId" = $1`, [t]).catch(() => {});
       await q(`DELETE FROM payments WHERE "tenantId" = $1`, [t]).catch(() => {});
       await q(`DELETE FROM sale_items WHERE "saleId" IN (SELECT id FROM sales WHERE "tenantId" = $1)`, [t]).catch(() => {});
       await q(`DELETE FROM reservation_items WHERE "reservationId" IN (SELECT id FROM reservations WHERE "tenantId" = $1)`, [t]).catch(() => {});
@@ -288,8 +361,13 @@ async function main() {
       await q(`DELETE FROM reservations WHERE "tenantId" = $1`, [t]).catch(() => {});
       await q(`DELETE FROM cash_sessions WHERE "tenantId" = $1`, [t]).catch(() => {});
       await q(`DELETE FROM inventory WHERE "tenantId" = $1`, [t]).catch(() => {});
-      await q(`DELETE FROM variants WHERE "productId" IN (SELECT id FROM products WHERE "tenantId" = $1)`, [t]).catch(() => {});
+      await q(`DELETE FROM variants WHERE "tenantId" = $1`, [t]).catch(() => {});
       await q(`DELETE FROM products WHERE "tenantId" = $1`, [t]).catch(() => {});
+      await q(`DELETE FROM collections WHERE "tenantId" = $1`, [t]).catch(() => {});
+      await q(`DELETE FROM seasons WHERE "tenantId" = $1`, [t]).catch(() => {});
+      await q(`DELETE FROM categories WHERE "tenantId" = $1`, [t]).catch(() => {});
+      await q(`DELETE FROM sizes WHERE "tenantId" = $1`, [t]).catch(() => {});
+      await q(`DELETE FROM colors WHERE "tenantId" = $1`, [t]).catch(() => {});
       await q(`DELETE FROM clients WHERE "tenantId" = $1`, [t]).catch(() => {});
       await q(`DELETE FROM user_roles WHERE "userId" IN (SELECT id FROM users WHERE "tenantId" = $1)`, [t]).catch(() => {});
       await q(`DELETE FROM users WHERE "tenantId" = $1`, [t]).catch(() => {});
@@ -298,9 +376,6 @@ async function main() {
       await q(`DELETE FROM subscriptions WHERE tenant_id = $1`, [t]).catch(() => {});
       await q(`DELETE FROM tenants WHERE id = $1`, [t]).catch(() => {});
     }
-    await q(`DELETE FROM categories WHERE name LIKE $1`, [`%${RUN}`]).catch(() => {});
-    await q(`DELETE FROM sizes WHERE name LIKE $1`, [`%${RUN}`]).catch(() => {});
-    await q(`DELETE FROM colors WHERE name LIKE $1`, [`%${RUN}`]).catch(() => {});
     await q(`DELETE FROM cities WHERE name LIKE $1`, [`%${RUN}`]).catch(() => {});
     await db.end();
     console.log(`\n=== RESULTADO: ${passed} pruebas aprobadas, ${failed} fallidas ===\n`);

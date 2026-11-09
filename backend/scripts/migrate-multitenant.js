@@ -9,6 +9,11 @@
  *   4. Crea UNIQUE (tenantId, id) y FKs compuestas que impiden, a nivel motor,
  *      relacionar registros de empresas distintas.
  *   5. Crea las tablas de sincronización offline y auditoría de reportes IA.
+ *   6. (Etapa 2b) Catálogos por empresa: categorías, tallas, colores, temporadas,
+ *      colecciones, promociones, proveedores, variantes, movimientos de
+ *      inventario y notificaciones reciben "tenantId". Si un registro de
+ *      catálogo era compartido por varias empresas, se CLONA para cada una y se
+ *      reapuntan sus referencias (ninguna empresa pierde datos).
  *
  * Uso:  node scripts/migrate-multitenant.js     (lee DB_* de .env o del entorno)
  * Puede ejecutarse varias veces: cada paso verifica si ya fue aplicado.
@@ -47,6 +52,58 @@ function requireDbConfig() {
 
 const TENANT_TABLES = ['users', 'branches', 'products', 'sales', 'reservations', 'inventory', 'payments', 'cash_sessions', 'clients'];
 
+/** Tablas hijas cuyo tenant se hereda del padre: [tabla, SQL de backfill]. */
+const DERIVED_TABLES = [
+  ['variants', `UPDATE variants v SET "tenantId" = p."tenantId" FROM products p WHERE p.id = v."productId" AND v."tenantId" IS NULL`],
+  ['inventory_movements', `UPDATE inventory_movements m SET "tenantId" = i."tenantId" FROM inventory i WHERE i.id = m."inventoryId" AND m."tenantId" IS NULL`],
+  ['notifications', `UPDATE notifications n SET "tenantId" = u."tenantId" FROM users u WHERE u.id = n."userId" AND n."tenantId" IS NULL`],
+  ['notification_devices', `UPDATE notification_devices d SET "tenantId" = u."tenantId" FROM users u WHERE u.id = d."userId" AND d."tenantId" IS NULL`],
+];
+
+/**
+ * Catálogos que pasan a ser por empresa. "refs" describe quién los usa:
+ *  - tenants: SQL que devuelve los tenants que usan el registro $1
+ *  - repoint: SQL que reapunta las referencias del tenant $3 del id $2 al id $1
+ * El orden importa: las colecciones se resuelven antes que las temporadas.
+ */
+const SHARED_CATALOGS = [
+  ['categories', [{
+    tenants: `SELECT DISTINCT "tenantId" AS t FROM products WHERE "categoryId" = $1`,
+    repoint: `UPDATE products SET "categoryId" = $1 WHERE "categoryId" = $2 AND "tenantId" = $3`,
+  }]],
+  ['sizes', [{
+    tenants: `SELECT DISTINCT "tenantId" AS t FROM variants WHERE "sizeId" = $1`,
+    repoint: `UPDATE variants SET "sizeId" = $1 WHERE "sizeId" = $2 AND "tenantId" = $3`,
+  }]],
+  ['colors', [{
+    tenants: `SELECT DISTINCT "tenantId" AS t FROM variants WHERE "colorId" = $1`,
+    repoint: `UPDATE variants SET "colorId" = $1 WHERE "colorId" = $2 AND "tenantId" = $3`,
+  }]],
+  ['collections', [{
+    tenants: `SELECT DISTINCT "tenantId" AS t FROM products WHERE "collectionId" = $1`,
+    repoint: `UPDATE products SET "collectionId" = $1 WHERE "collectionId" = $2 AND "tenantId" = $3`,
+  }]],
+  ['seasons', [{
+    tenants: `SELECT DISTINCT "tenantId" AS t FROM collections WHERE "seasonId" = $1`,
+    repoint: `UPDATE collections SET "seasonId" = $1 WHERE "seasonId" = $2 AND "tenantId" = $3`,
+  }]],
+  ['promotions', [{
+    tenants: `SELECT DISTINCT p."tenantId" AS t FROM product_promotions pp JOIN products p ON p.id = pp."productId" WHERE pp."promotionId" = $1`,
+    repoint: `UPDATE product_promotions pp SET "promotionId" = $1 FROM products p
+               WHERE p.id = pp."productId" AND pp."promotionId" = $2 AND p."tenantId" = $3`,
+  }]],
+  ['suppliers', []],
+];
+
+/** UNIQUE globales que pasan a ser por empresa: [tabla, columna, nuevo UNIQUE]. */
+const TENANT_SCOPED_UNIQUES = [
+  ['categories', 'name', 'uq_categories_tenant_name'],
+  ['sizes', 'name', 'uq_sizes_tenant_name'],
+  ['colors', 'name', 'uq_colors_tenant_name'],
+  ['suppliers', 'nit', 'uq_suppliers_tenant_nit'],
+  ['variants', 'sku', 'uq_variants_tenant_sku'],
+];
+
 const UNIQUES = [
   ['branches', 'uq_branches_tenant_id'],
   ['users', 'uq_users_tenant_id'],
@@ -54,6 +111,14 @@ const UNIQUES = [
   ['sales', 'uq_sales_tenant_id'],
   ['reservations', 'uq_reservations_tenant_id'],
   ['inventory', 'uq_inventory_tenant_id'],
+  ['categories', 'uq_categories_tenant_id'],
+  ['sizes', 'uq_sizes_tenant_id'],
+  ['colors', 'uq_colors_tenant_id'],
+  ['seasons', 'uq_seasons_tenant_id'],
+  ['collections', 'uq_collections_tenant_id'],
+  ['promotions', 'uq_promotions_tenant_id'],
+  ['suppliers', 'uq_suppliers_tenant_id'],
+  ['variants', 'uq_variants_tenant_id'],
 ];
 
 const FKS = [
@@ -64,6 +129,14 @@ const FKS = [
   ['cash_sessions', 'fk_cash_sessions_branch_tenant', '("branchId", "tenantId") REFERENCES branches(id, "tenantId")'],
   ['clients', 'fk_clients_user_tenant', '("userId", "tenantId") REFERENCES users(id, "tenantId")'],
   ['sales', 'fk_sales_tenant', '("tenantId") REFERENCES tenants(id) ON DELETE RESTRICT'],
+  ['products', 'fk_products_category_tenant', '("categoryId", "tenantId") REFERENCES categories(id, "tenantId")'],
+  ['variants', 'fk_variants_product_tenant', '("productId", "tenantId") REFERENCES products(id, "tenantId")'],
+  ['variants', 'fk_variants_size_tenant', '("sizeId", "tenantId") REFERENCES sizes(id, "tenantId")'],
+  ['variants', 'fk_variants_color_tenant', '("colorId", "tenantId") REFERENCES colors(id, "tenantId")'],
+  ['inventory', 'fk_inventory_variant_tenant', '("variantId", "tenantId") REFERENCES variants(id, "tenantId")'],
+  ['collections', 'fk_collections_season_tenant', '("seasonId", "tenantId") REFERENCES seasons(id, "tenantId")'],
+  ['inventory_movements', 'fk_movements_inventory_tenant', '("inventoryId", "tenantId") REFERENCES inventory(id, "tenantId")'],
+  ['notifications', 'fk_notifications_user_tenant', '("userId", "tenantId") REFERENCES users(id, "tenantId")'],
 ];
 
 async function tableExists(db, table) {
@@ -78,6 +151,59 @@ async function columnExists(db, table, column) {
 async function constraintExists(db, name) {
   const r = await db.query(`SELECT 1 FROM pg_constraint WHERE conname = $1`, [name]);
   return r.rowCount > 0;
+}
+
+async function columnsOf(db, table) {
+  const r = await db.query(
+    `SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=$1 ORDER BY ordinal_position`, [table]);
+  return r.rows.map((x) => x.column_name);
+}
+
+/** Elimina los UNIQUE de una sola columna (p. ej. categories.name global). */
+async function dropSingleColumnUniques(db, table, column) {
+  const r = await db.query(
+    `SELECT c.conname FROM pg_constraint c
+       JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey)
+      WHERE c.contype = 'u' AND c.conrelid = $1::regclass AND array_length(c.conkey, 1) = 1 AND a.attname = $2`,
+    [table, column]);
+  for (const row of r.rows) await db.query(`ALTER TABLE "${table}" DROP CONSTRAINT "${row.conname}"`);
+  // índices únicos creados fuera de constraints
+  const idx = await db.query(
+    `SELECT i.relname FROM pg_index x JOIN pg_class i ON i.oid = x.indexrelid
+       JOIN pg_attribute a ON a.attrelid = x.indrelid AND a.attnum = ANY(x.indkey)
+      WHERE x.indrelid = $1::regclass AND x.indisunique AND NOT x.indisprimary AND x.indnatts = 1 AND a.attname = $2
+        AND NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conindid = x.indexrelid)`,
+    [table, column]);
+  for (const row of idx.rows) await db.query(`DROP INDEX IF EXISTS "${row.relname}"`);
+  return r.rowCount + idx.rowCount;
+}
+
+/**
+ * Asigna tenant a cada registro de un catálogo antes global. Si varias empresas
+ * lo usan, el original queda para la de menor id y se clona para las demás.
+ */
+async function splitSharedCatalog(db, table, refs, log) {
+  const cols = (await columnsOf(db, table)).filter((c) => c !== 'id' && c !== 'tenantId');
+  const colList = cols.map((c) => `"${c}"`).join(', ');
+  const pending = await db.query(`SELECT id FROM "${table}" WHERE "tenantId" IS NULL ORDER BY id`);
+  let clones = 0;
+  for (const { id } of pending.rows) {
+    const users = new Set();
+    for (const ref of refs) {
+      const r = await db.query(ref.tenants, [id]);
+      r.rows.forEach((x) => x.t != null && users.add(Number(x.t)));
+    }
+    const tenants = [...users].sort((a, b) => a - b);
+    const owner = tenants.length ? tenants[0] : 1;
+    await db.query(`UPDATE "${table}" SET "tenantId" = $1 WHERE id = $2`, [owner, id]);
+    for (const t of tenants.slice(1)) {
+      const copy = await db.query(
+        `INSERT INTO "${table}" ("tenantId", ${colList}) SELECT $1, ${colList} FROM "${table}" WHERE id = $2 RETURNING id`, [t, id]);
+      for (const ref of refs) await db.query(ref.repoint, [copy.rows[0].id, id, t]);
+      clones++;
+    }
+  }
+  log(`${table}: ${pending.rowCount} registros con tenant asignado, ${clones} clonados para otras empresas`);
 }
 
 async function main() {
@@ -141,16 +267,51 @@ async function main() {
       const c = await db.query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE "tenantId" = 1)::int AS t1 FROM "${table}"`);
       log(`${table}: ${c.rows[0].t1}/${c.rows[0].total} registros asignados a tenantId = 1`);
     }
-    // 3. UNIQUE compuestos
+    // 3-4. UNIQUE (tenantId, id) y FKs compuestas: se crean en el paso 6,
+    //      cuando todas las tablas ya tienen "tenantId".
+
+    // 5. Columnas de idempotencia offline
+    for (const table of ['sales', 'reservations']) {
+      if (await tableExists(db, table) && !(await columnExists(db, table, 'offlineOperationId'))) {
+        await db.query(`ALTER TABLE "${table}" ADD COLUMN "offlineOperationId" uuid UNIQUE`);
+        log(`${table}."offlineOperationId"`);
+      }
+    }
+
+    // 6. Catálogos por empresa (Etapa 2b) + UNIQUE/FKs compuestas de todo el modelo
+    for (const [table, backfill] of DERIVED_TABLES) {
+      if (!(await tableExists(db, table))) continue;
+      if (!(await columnExists(db, table, 'tenantId'))) await db.query(`ALTER TABLE "${table}" ADD COLUMN "tenantId" integer`);
+      await db.query(backfill);
+      await db.query(`UPDATE "${table}" SET "tenantId" = 1 WHERE "tenantId" IS NULL`);
+      await db.query(`ALTER TABLE "${table}" ALTER COLUMN "tenantId" SET NOT NULL`);
+      log(`${table}: tenant heredado del registro padre`);
+    }
+    for (const [table, column] of TENANT_SCOPED_UNIQUES) {
+      if (!(await tableExists(db, table))) continue;
+      const n = await dropSingleColumnUniques(db, table, column);
+      if (n) log(`${table}.${column}: UNIQUE global eliminado (pasa a ser único por empresa)`);
+    }
+    for (const [table, refs] of SHARED_CATALOGS) {
+      if (!(await tableExists(db, table))) continue;
+      if (!(await columnExists(db, table, 'tenantId'))) await db.query(`ALTER TABLE "${table}" ADD COLUMN "tenantId" integer`);
+      await splitSharedCatalog(db, table, refs, log);
+      await db.query(`ALTER TABLE "${table}" ALTER COLUMN "tenantId" SET NOT NULL`);
+    }
+    for (const [table, column, name] of TENANT_SCOPED_UNIQUES) {
+      if (!(await tableExists(db, table)) || (await constraintExists(db, name))) continue;
+      await db.query(`ALTER TABLE "${table}" ADD CONSTRAINT ${name} UNIQUE ("tenantId", "${column}")`);
+      log(`UNIQUE ${name}`);
+    }
     for (const [table, name] of UNIQUES) {
       if (!(await tableExists(db, table)) || (await constraintExists(db, name))) continue;
       await db.query(`ALTER TABLE "${table}" ADD CONSTRAINT ${name} UNIQUE ("tenantId", id)`);
       log(`UNIQUE ${name}`);
     }
-
-    // 4. FKs compuestas (se eliminan antes las FKs simples equivalentes)
     for (const [table, name, def] of FKS) {
       if (!(await tableExists(db, table)) || (await constraintExists(db, name))) continue;
+      const refTable = def.match(/REFERENCES (\w+)/)[1];
+      if (!(await tableExists(db, refTable))) continue;
       const col = def.match(/^\("(\w+)"/)[1];
       if (col !== 'tenantId') {
         const old = await db.query(
@@ -162,14 +323,6 @@ async function main() {
       }
       await db.query(`ALTER TABLE "${table}" ADD CONSTRAINT ${name} FOREIGN KEY ${def}`);
       log(`FK compuesta ${name}`);
-    }
-
-    // 5. Columnas de idempotencia offline
-    for (const table of ['sales', 'reservations']) {
-      if (await tableExists(db, table) && !(await columnExists(db, table, 'offlineOperationId'))) {
-        await db.query(`ALTER TABLE "${table}" ADD COLUMN "offlineOperationId" uuid UNIQUE`);
-        log(`${table}."offlineOperationId"`);
-      }
     }
 
     await db.query('COMMIT');

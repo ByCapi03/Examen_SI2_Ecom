@@ -4,6 +4,7 @@
  * de que en /sales/my un cliente vea exclusivamente las compras asociadas a su 
  * clientId y no las del resto del sistema.
  */
+import { getCurrentTenantId } from '../../common/tenancy/tenant-context';
 import { Injectable, NotFoundException, ForbiddenException, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
@@ -139,8 +140,8 @@ export class SalesService {
       const saleItems: SaleItem[] = [];
 
       for (const item of items) {
-        const variant = await queryRunner.manager.findOne(Variant, { 
-          where: { id: item.variantId }, 
+        const variant = await queryRunner.manager.findOne(Variant, {
+          where: { id: item.variantId, ...(getCurrentTenantId() ? { tenantId: getCurrentTenantId() } : {}) },
           relations: { product: { promotions: true } } 
         });
         if (!variant) throw new NotFoundException(`Variante ${item.variantId} no encontrada`);

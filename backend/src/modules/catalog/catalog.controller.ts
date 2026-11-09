@@ -25,6 +25,7 @@ export class CatalogController {
   constructor(private readonly catalogService: CatalogService) {}
 
   @Post('products')
+  @Roles('ADMIN', 'ENCARGADO')
   createProduct(@Body() createProductDto: CreateProductDto, @CurrentTenant() tenantId: number) {
     return this.catalogService.createProduct(createProductDto, tenantId);
   }
@@ -40,14 +41,17 @@ export class CatalogController {
   }
 
   @Patch('products/:id')
+  @Roles('ADMIN', 'ENCARGADO')
   updateProduct(@Param('id') id: string, @Body() updateProductDto: UpdateProductDto, @CurrentTenant() tenantId: number) {
     return this.catalogService.updateProduct(+id, updateProductDto, tenantId);
   }
 
   @Delete('products/:id')
+  @Roles('ADMIN', 'ENCARGADO')
   removeProduct(@Param('id') id: string) { return this.catalogService.removeProduct(+id); }
 
   @Post('products/:id/image')
+  @Roles('ADMIN', 'ENCARGADO')
   @UseInterceptors(FileInterceptor('image'))
   uploadProductImage(
     @Param('id') id: string,
@@ -57,6 +61,7 @@ export class CatalogController {
   }
 
   @Post('products/:id/ar-image')
+  @Roles('ADMIN', 'ENCARGADO')
   @UseInterceptors(FileInterceptor('image'))
   uploadProductArImage(
     @Param('id') id: string,
@@ -66,70 +71,86 @@ export class CatalogController {
   }
 
   @Post('products/:id/ar-torso')
+  @Roles('ADMIN', 'ENCARGADO')
   @UseInterceptors(FileInterceptor('image'))
   uploadProductArTorsoImage(@Param('id') id: string, @UploadedFile() file: any) {
     return this.catalogService.uploadProductArPartImage(+id, file, 'torso');
   }
 
   @Post('products/:id/ar-left-sleeve')
+  @Roles('ADMIN', 'ENCARGADO')
   @UseInterceptors(FileInterceptor('image'))
   uploadProductArLeftSleeveImage(@Param('id') id: string, @UploadedFile() file: any) {
     return this.catalogService.uploadProductArPartImage(+id, file, 'leftSleeve');
   }
 
   @Post('products/:id/ar-right-sleeve')
+  @Roles('ADMIN', 'ENCARGADO')
   @UseInterceptors(FileInterceptor('image'))
   uploadProductArRightSleeveImage(@Param('id') id: string, @UploadedFile() file: any) {
     return this.catalogService.uploadProductArPartImage(+id, file, 'rightSleeve');
   }
 
   @Delete('products/:id/ar-part/:part')
+  @Roles('ADMIN', 'ENCARGADO')
   removeProductArPart(@Param('id') id: string, @Param('part') part: string) {
     return this.catalogService.removeProductArPart(+id, part);
   }
 
   @Post('variants')
+  @Roles('ADMIN', 'ENCARGADO')
   createVariant(@Body() createVariantDto: CreateVariantDto) { return this.catalogService.createVariant(createVariantDto); }
   @Get('variants')
   findAllVariants() { return this.catalogService.findAllVariants(); }
   @Get('variants/:id')
   findOneVariant(@Param('id') id: string) { return this.catalogService.findOneVariant(+id); }
   @Patch('variants/:id')
+  @Roles('ADMIN', 'ENCARGADO')
   updateVariant(@Param('id') id: string, @Body() updateVariantDto: UpdateVariantDto) { return this.catalogService.updateVariant(+id, updateVariantDto); }
   @Delete('variants/:id')
+  @Roles('ADMIN', 'ENCARGADO')
   removeVariant(@Param('id') id: string) { return this.catalogService.removeVariant(+id); }
 
   @Post('categories')
+  @Roles('ADMIN', 'ENCARGADO')
   createCategory(@Body() createCategoryDto: CreateCategoryDto) { return this.catalogService.createCategory(createCategoryDto); }
   @Get('categories')
   findAllCategories() { return this.catalogService.findAllCategories(); }
   @Get('categories/:id')
   findOneCategory(@Param('id') id: string) { return this.catalogService.findOneCategory(+id); }
   @Patch('categories/:id')
+  @Roles('ADMIN', 'ENCARGADO')
   updateCategory(@Param('id') id: string, @Body() updateCategoryDto: UpdateCategoryDto) { return this.catalogService.updateCategory(+id, updateCategoryDto); }
   @Delete('categories/:id')
+  @Roles('ADMIN', 'ENCARGADO')
   removeCategory(@Param('id') id: string) { return this.catalogService.removeCategory(+id); }
 
   @Post('sizes')
+  @Roles('ADMIN', 'ENCARGADO')
   createSize(@Body() createSizeDto: CreateSizeDto) { return this.catalogService.createSize(createSizeDto); }
   @Get('sizes')
   findAllSizes() { return this.catalogService.findAllSizes(); }
   @Get('sizes/:id')
   findOneSize(@Param('id') id: string) { return this.catalogService.findOneSize(+id); }
   @Patch('sizes/:id')
+  @Roles('ADMIN', 'ENCARGADO')
   updateSize(@Param('id') id: string, @Body() updateSizeDto: UpdateSizeDto) { return this.catalogService.updateSize(+id, updateSizeDto); }
   @Delete('sizes/:id')
+  @Roles('ADMIN', 'ENCARGADO')
   removeSize(@Param('id') id: string) { return this.catalogService.removeSize(+id); }
 
   @Post('colors')
+  @Roles('ADMIN', 'ENCARGADO')
   createColor(@Body() createColorDto: CreateColorDto) { return this.catalogService.createColor(createColorDto); }
   @Get('colors')
   findAllColors() { return this.catalogService.findAllColors(); }
   @Get('colors/:id')
   findOneColor(@Param('id') id: string) { return this.catalogService.findOneColor(+id); }
   @Patch('colors/:id')
+  @Roles('ADMIN', 'ENCARGADO')
   updateColor(@Param('id') id: string, @Body() updateColorDto: UpdateColorDto) { return this.catalogService.updateColor(+id, updateColorDto); }
   @Delete('colors/:id')
+  @Roles('ADMIN', 'ENCARGADO')
   removeColor(@Param('id') id: string) { return this.catalogService.removeColor(+id); }
 
   @Post('seasons')

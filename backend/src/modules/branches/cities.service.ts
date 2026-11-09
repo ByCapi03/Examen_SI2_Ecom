@@ -12,6 +12,12 @@ export class CitiesService {
   ) {}
 
   async create(createCityDto: CreateCityDto) {
+    // Catálogo compartido: si otra empresa ya registró la ciudad, se reutiliza
+    const existing = await this.cityRepository
+      .createQueryBuilder('c')
+      .where('LOWER(TRIM(c.name)) = LOWER(TRIM(:name))', { name: createCityDto.name })
+      .getOne();
+    if (existing) return existing;
     const city = this.cityRepository.create(createCityDto);
     return await this.cityRepository.save(city);
   }

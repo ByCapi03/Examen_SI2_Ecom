@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ConflictException, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
+import { seedDefaultCatalog, seedMissingCatalogs } from './default-catalog';
 import { Tenant } from './tenant.entity';
 import { Subscription } from './subscription.entity';
 import { Plan } from './plan.entity';
@@ -15,6 +16,7 @@ export class TenantsService implements OnModuleInit {
     @InjectRepository(Subscription) private subRepo: Repository<Subscription>,
     @InjectRepository(Plan) private planRepo: Repository<Plan>,
     @InjectRepository(SubscriptionHistory) private historyRepo: Repository<SubscriptionHistory>,
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -39,6 +41,8 @@ export class TenantsService implements OnModuleInit {
         await this.subRepo.save(this.subRepo.create({ tenantId: tenant.id, planId: pro.id, status: 'ACTIVE', startDate: new Date() }));
         this.logger.log(`Tenant inicial creado (id=${tenant.id})`);
       }
+      const seeded = await seedMissingCatalogs(this.dataSource);
+      if (seeded.length) this.logger.log(`Catálogo básico (tallas/colores) creado para tenants: ${seeded.join(', ')}`);
     } catch (err) {
       this.logger.error('No se pudo inicializar planes/tenant', err as any);
     }
@@ -119,6 +123,7 @@ export class TenantsService implements OnModuleInit {
     await this.historyRepo.save(this.historyRepo.create({
       tenantId: savedTenant.id, planId: plan.id, action: 'SUBSCRIBE', notes: 'Alta de tenant',
     }));
+    await seedDefaultCatalog(this.dataSource, savedTenant.id);
 
     return this.findOne(savedTenant.id);
   }

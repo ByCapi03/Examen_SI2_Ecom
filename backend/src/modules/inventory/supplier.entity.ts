@@ -1,15 +1,20 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
-import { Product } from '../catalog/product.entity';
+import { Entity, PrimaryGeneratedColumn, Column, Unique } from 'typeorm';
 
+/** Proveedor propio de cada empresa (el NIT es único dentro del tenant). */
 @Entity('suppliers')
+@Unique('uq_suppliers_tenant_id', ['tenantId', 'id'])
+@Unique('uq_suppliers_tenant_nit', ['tenantId', 'nit'])
 export class Supplier {
   @PrimaryGeneratedColumn()
   id: number;
 
   @Column()
+  tenantId: number;
+
+  @Column()
   name: string;
 
-  @Column({ unique: true })
+  @Column()
   nit: string;
 
   @Column({ nullable: true })

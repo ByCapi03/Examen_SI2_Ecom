@@ -1,10 +1,15 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable, Unique } from 'typeorm';
 import { Product } from './product.entity';
 
+/** Promoción propia de cada empresa; solo puede aplicarse a productos del mismo tenant. */
 @Entity('promotions')
+@Unique('uq_promotions_tenant_id', ['tenantId', 'id'])
 export class Promotion {
   @PrimaryGeneratedColumn()
   id: number;
+
+  @Column()
+  tenantId: number;
 
   @Column()
   name: string;

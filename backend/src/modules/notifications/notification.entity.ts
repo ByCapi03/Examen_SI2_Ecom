@@ -4,13 +4,17 @@
  * - Notification: Guarda el historial de notificaciones (push/in-app) para los usuarios.
  * - NotificationDevice: Guarda los tokens de los dispositivos (FCM) de cada usuario para poder enviarles push notifications.
  */
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { User } from '../auth/user.entity';
 
 @Entity('notifications')
 export class Notification {
   @PrimaryGeneratedColumn()
   id: number;
+
+  @Index()
+  @Column()
+  tenantId: number;
 
   @Column()
   userId: number;
@@ -33,8 +37,12 @@ export class Notification {
   @CreateDateColumn()
   createdAt: Date;
 
+  // FK compuesta: el destinatario DEBE pertenecer al mismo tenant que la notificación
   @ManyToOne(() => User)
-  @JoinColumn({ name: 'userId' })
+  @JoinColumn([
+    { name: 'userId', referencedColumnName: 'id', foreignKeyConstraintName: 'fk_notifications_user_tenant' },
+    { name: 'tenantId', referencedColumnName: 'tenantId' },
+  ])
   user: User;
 }
 
@@ -42,6 +50,10 @@ export class Notification {
 export class NotificationDevice {
   @PrimaryGeneratedColumn()
   id: number;
+
+  @Index()
+  @Column()
+  tenantId: number;
 
   @Column()
   userId: number;

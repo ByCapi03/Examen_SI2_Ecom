@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../api/axios';
+import { useAuth } from '../auth/AuthContext';
 
 export interface City {
   id: number;
@@ -8,6 +9,9 @@ export interface City {
 }
 
 export const CitiesSection = () => {
+  // Las ciudades son un catálogo compartido entre empresas: solo el SUPERADMIN edita/elimina
+  const { user } = useAuth();
+  const canManage = !!user?.roles.includes('SUPERADMIN');
   const [cities, setCities] = useState<City[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,6 +89,11 @@ export const CitiesSection = () => {
       </div>
 
       {error && <div className="error-message">{error}</div>}
+      {!canManage && (
+        <p style={{ margin: "0 0 12px", color: "#6b7280", fontSize: 14 }}>
+          Catálogo compartido por todas las empresas: puede agregar ciudades, pero solo el administrador de la plataforma puede editarlas o eliminarlas.
+        </p>
+      )}
 
       {showForm && (
         <form onSubmit={handleSubmit} className="crud-form">
@@ -140,10 +149,12 @@ export const CitiesSection = () => {
                 </span>
               </td>
               <td>
-                <div className="crud-actions">
-                  <button className="btn-action" onClick={() => handleEdit(c)}>Editar</button>
-                  <button className="btn-danger" onClick={() => handleDelete(c.id)}>Eliminar</button>
-                </div>
+                {canManage ? (
+                  <div className="crud-actions">
+                    <button className="btn-action" onClick={() => handleEdit(c)}>Editar</button>
+                    <button className="btn-danger" onClick={() => handleDelete(c.id)}>Eliminar</button>
+                  </div>
+                ) : <span style={{ color: "#9ca3af" }}>—</span>}
               </td>
             </tr>
           ))}

@@ -1,5 +1,5 @@
 import { getCurrentTenantId } from '../../common/tenancy/tenant-context';
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { CloudinaryService } from '../../common/cloudinary.service';
@@ -41,59 +41,68 @@ export class CatalogService {
     private catalogPricingService: CatalogPricingService
   ) {}
 
+  /** Tenant autenticado (JWT). Todos los catálogos de negocio son por empresa. */
+  private tenant(): number {
+    const tenantId = getCurrentTenantId();
+    if (!tenantId) throw new ForbiddenException('Aislamiento SaaS: tenant no identificado');
+    return tenantId;
+  }
+
   // --- CATEGORIES ---
   async createCategory(createCategoryDto: CreateCategoryDto) {
-    const existing = await this.categoryRepository.findOneBy({ name: createCategoryDto.name });
-    if (existing) throw new ConflictException(`La categora ${createCategoryDto.name} ya existe`);
-    const category = this.categoryRepository.create(createCategoryDto);
+    const tenantId = this.tenant();
+    const existing = await this.categoryRepository.findOneBy({ tenantId, name: createCategoryDto.name });
+    if (existing) throw new ConflictException(`La categoría ${createCategoryDto.name} ya existe`);
+    const category = this.categoryRepository.create({ ...createCategoryDto, tenantId });
     return this.categoryRepository.save(category);
   }
   async findAllCategories() {
-    return this.categoryRepository.find({ order: { id: 'ASC' } });
+    return this.categoryRepository.find({ where: { tenantId: this.tenant() }, order: { id: 'ASC' } });
   }
   async findOneCategory(id: number) {
-    const category = await this.categoryRepository.findOneBy({ id });
-    if (!category) throw new NotFoundException(`Categora #${id} no encontrada`);
+    const category = await this.categoryRepository.findOneBy({ id, tenantId: this.tenant() });
+    if (!category) throw new NotFoundException(`Categoría #${id} no encontrada`);
     return category;
   }
   async updateCategory(id: number, updateCategoryDto: UpdateCategoryDto) {
     const category = await this.findOneCategory(id);
     if (updateCategoryDto.name && updateCategoryDto.name !== category.name) {
-      const existing = await this.categoryRepository.findOneBy({ name: updateCategoryDto.name });
-      if (existing) throw new ConflictException(`La categora ${updateCategoryDto.name} ya existe`);
+      const existing = await this.categoryRepository.findOneBy({ tenantId: category.tenantId, name: updateCategoryDto.name });
+      if (existing) throw new ConflictException(`La categoría ${updateCategoryDto.name} ya existe`);
     }
-    Object.assign(category, updateCategoryDto);
+    Object.assign(category, updateCategoryDto, { tenantId: category.tenantId });
     return this.categoryRepository.save(category);
   }
   async removeCategory(id: number) {
     const category = await this.findOneCategory(id);
     category.active = false;
     await this.categoryRepository.save(category);
-    return { success: true, message: `Categora ${id} desactivada` };
+    return { success: true, message: `Categoría ${id} desactivada` };
   }
 
   // --- SIZES ---
   async createSize(createSizeDto: CreateSizeDto) {
-    const existing = await this.sizeRepository.findOneBy({ name: createSizeDto.name });
+    const tenantId = this.tenant();
+    const existing = await this.sizeRepository.findOneBy({ tenantId, name: createSizeDto.name });
     if (existing) throw new ConflictException(`La talla ${createSizeDto.name} ya existe`);
-    const size = this.sizeRepository.create(createSizeDto);
+    const size = this.sizeRepository.create({ ...createSizeDto, tenantId });
     return this.sizeRepository.save(size);
   }
   async findAllSizes() {
-    return this.sizeRepository.find({ order: { id: 'ASC' } });
+    return this.sizeRepository.find({ where: { tenantId: this.tenant() }, order: { id: 'ASC' } });
   }
   async findOneSize(id: number) {
-    const size = await this.sizeRepository.findOneBy({ id });
+    const size = await this.sizeRepository.findOneBy({ id, tenantId: this.tenant() });
     if (!size) throw new NotFoundException(`Talla #${id} no encontrada`);
     return size;
   }
   async updateSize(id: number, updateSizeDto: UpdateSizeDto) {
     const size = await this.findOneSize(id);
     if (updateSizeDto.name && updateSizeDto.name !== size.name) {
-      const existing = await this.sizeRepository.findOneBy({ name: updateSizeDto.name });
+      const existing = await this.sizeRepository.findOneBy({ tenantId: size.tenantId, name: updateSizeDto.name });
       if (existing) throw new ConflictException(`La talla ${updateSizeDto.name} ya existe`);
     }
-    Object.assign(size, updateSizeDto);
+    Object.assign(size, updateSizeDto, { tenantId: size.tenantId });
     return this.sizeRepository.save(size);
   }
   async removeSize(id: number) {
@@ -105,26 +114,27 @@ export class CatalogService {
 
   // --- COLORS ---
   async createColor(createColorDto: CreateColorDto) {
-    const existing = await this.colorRepository.findOneBy({ name: createColorDto.name });
+    const tenantId = this.tenant();
+    const existing = await this.colorRepository.findOneBy({ tenantId, name: createColorDto.name });
     if (existing) throw new ConflictException(`El color ${createColorDto.name} ya existe`);
-    const color = this.colorRepository.create(createColorDto);
+    const color = this.colorRepository.create({ ...createColorDto, tenantId });
     return this.colorRepository.save(color);
   }
   async findAllColors() {
-    return this.colorRepository.find({ order: { id: 'ASC' } });
+    return this.colorRepository.find({ where: { tenantId: this.tenant() }, order: { id: 'ASC' } });
   }
   async findOneColor(id: number) {
-    const color = await this.colorRepository.findOneBy({ id });
+    const color = await this.colorRepository.findOneBy({ id, tenantId: this.tenant() });
     if (!color) throw new NotFoundException(`Color #${id} no encontrado`);
     return color;
   }
   async updateColor(id: number, updateColorDto: UpdateColorDto) {
     const color = await this.findOneColor(id);
     if (updateColorDto.name && updateColorDto.name !== color.name) {
-      const existing = await this.colorRepository.findOneBy({ name: updateColorDto.name });
+      const existing = await this.colorRepository.findOneBy({ tenantId: color.tenantId, name: updateColorDto.name });
       if (existing) throw new ConflictException(`El color ${updateColorDto.name} ya existe`);
     }
-    Object.assign(color, updateColorDto);
+    Object.assign(color, updateColorDto, { tenantId: color.tenantId });
     return this.colorRepository.save(color);
   }
   async removeColor(id: number) {
@@ -140,8 +150,9 @@ export class CatalogService {
       throw new BadRequestException('El tipo de prenda AR (arType) es obligatorio si AR está habilitado');
     }
 
-    const category = await this.categoryRepository.findOneBy({ id: createProductDto.categoryId });
+    const category = await this.categoryRepository.findOneBy({ id: createProductDto.categoryId, tenantId: tenantId ?? this.tenant() });
     if (!category) throw new NotFoundException(`Categoría #${createProductDto.categoryId} no encontrada`);
+    if (createProductDto.collectionId) await this.findOneCollection(createProductDto.collectionId);
 
     const product = this.productRepository.create({
       ...createProductDto,
@@ -195,10 +206,15 @@ export class CatalogService {
     }
 
     if (updateProductDto.categoryId) {
-      const category = await this.categoryRepository.findOneBy({ id: updateProductDto.categoryId });
+      const category = await this.categoryRepository.findOneBy({ id: updateProductDto.categoryId, tenantId: product.tenantId });
       if (!category) throw new NotFoundException(`Categoría #${updateProductDto.categoryId} no encontrada`);
     }
-    Object.assign(product, updateProductDto);
+    if (updateProductDto.collectionId) await this.findOneCollection(updateProductDto.collectionId);
+    // El tenant del producto nunca cambia, aunque venga en el body
+    Object.assign(product, updateProductDto, { tenantId: product.tenantId });
+    // Las relaciones cargadas no deben sobrescribir los ids nuevos al guardar
+    if (updateProductDto.categoryId) delete (product as any).category;
+    if (updateProductDto.collectionId !== undefined) delete (product as any).collection;
     return this.productRepository.save(product);
   }
 
@@ -291,29 +307,28 @@ export class CatalogService {
 
   // --- VARIANTS ---
   async createVariant(createVariantDto: CreateVariantDto) {
-    const existing = await this.variantRepository.findOneBy({ sku: createVariantDto.sku });
-    if (existing) throw new ConflictException(`El SKU ${createVariantDto.sku} ya est en uso`);
+    const tenantId = this.tenant();
+    const existing = await this.variantRepository.findOneBy({ tenantId, sku: createVariantDto.sku });
+    if (existing) throw new ConflictException(`El SKU ${createVariantDto.sku} ya está en uso`);
 
-    const product = await this.productRepository.findOneBy({ id: createVariantDto.productId, tenantId: getCurrentTenantId() });
+    const product = await this.productRepository.findOneBy({ id: createVariantDto.productId, tenantId });
     if (!product) throw new NotFoundException(`Producto #${createVariantDto.productId} no encontrado`);
-    const size = await this.sizeRepository.findOneBy({ id: createVariantDto.sizeId });
-    if (!size) throw new NotFoundException(`Talla #${createVariantDto.sizeId} no encontrada`);
-    const color = await this.colorRepository.findOneBy({ id: createVariantDto.colorId });
-    if (!color) throw new NotFoundException(`Color #${createVariantDto.colorId} no encontrado`);
+    await this.findOneSize(createVariantDto.sizeId);
+    await this.findOneColor(createVariantDto.colorId);
 
-    const variant = this.variantRepository.create(createVariantDto);
+    const variant = this.variantRepository.create({ ...createVariantDto, tenantId });
     return this.variantRepository.save(variant);
   }
   async findAllVariants() {
     return this.variantRepository.find({
-      where: { product: { tenantId: getCurrentTenantId() } },
+      where: { tenantId: this.tenant() },
       relations: { product: true, size: true, color: true },
       order: { id: 'ASC' }
     });
   }
   async findOneVariant(id: number) {
     const variant = await this.variantRepository.findOne({
-      where: { id, product: { tenantId: getCurrentTenantId() } },
+      where: { id, tenantId: this.tenant() },
       relations: { product: true, size: true, color: true }
     });
     if (!variant) throw new NotFoundException(`Variante #${id} no encontrada`);
@@ -321,26 +336,22 @@ export class CatalogService {
   }
   async updateVariant(id: number, updateVariantDto: UpdateVariantDto) {
     const variant = await this.findOneVariant(id);
+    const tenantId = variant.tenantId;
 
     if (updateVariantDto.sku && updateVariantDto.sku !== variant.sku) {
-      const existing = await this.variantRepository.findOneBy({ sku: updateVariantDto.sku });
-      if (existing) throw new ConflictException(`El SKU ${updateVariantDto.sku} ya est en uso`);
+      const existing = await this.variantRepository.findOneBy({ tenantId, sku: updateVariantDto.sku });
+      if (existing) throw new ConflictException(`El SKU ${updateVariantDto.sku} ya está en uso`);
     }
-
     if (updateVariantDto.productId) {
-      const product = await this.productRepository.findOneBy({ id: updateVariantDto.productId, tenantId: getCurrentTenantId() });
+      const product = await this.productRepository.findOneBy({ id: updateVariantDto.productId, tenantId });
       if (!product) throw new NotFoundException(`Producto #${updateVariantDto.productId} no encontrado`);
     }
-    if (updateVariantDto.sizeId) {
-      const size = await this.sizeRepository.findOneBy({ id: updateVariantDto.sizeId });
-      if (!size) throw new NotFoundException(`Talla #${updateVariantDto.sizeId} no encontrada`);
-    }
-    if (updateVariantDto.colorId) {
-      const color = await this.colorRepository.findOneBy({ id: updateVariantDto.colorId });
-      if (!color) throw new NotFoundException(`Color #${updateVariantDto.colorId} no encontrado`);
-    }
+    if (updateVariantDto.sizeId) await this.findOneSize(updateVariantDto.sizeId);
+    if (updateVariantDto.colorId) await this.findOneColor(updateVariantDto.colorId);
 
-    Object.assign(variant, updateVariantDto);
+    Object.assign(variant, updateVariantDto, { tenantId });
+    // Evita que las relaciones cargadas sobrescriban los nuevos ids
+    delete (variant as any).product; delete (variant as any).size; delete (variant as any).color;
     return this.variantRepository.save(variant);
   }
   async removeVariant(id: number) {
@@ -355,21 +366,21 @@ export class CatalogService {
     if (new Date(createSeasonDto.startDate) >= new Date(createSeasonDto.endDate)) {
       throw new BadRequestException('startDate debe ser menor que endDate');
     }
-    const season = this.seasonRepository.create(createSeasonDto);
+    const season = this.seasonRepository.create({ ...createSeasonDto, tenantId: this.tenant() });
     return this.seasonRepository.save(season);
   }
   async findAllSeasons() {
-    return this.seasonRepository.find({ order: { id: 'ASC' } });
+    return this.seasonRepository.find({ where: { tenantId: this.tenant() }, order: { id: 'ASC' } });
   }
   async findOneSeason(id: number) {
-    const season = await this.seasonRepository.findOneBy({ id });
+    const season = await this.seasonRepository.findOneBy({ id, tenantId: this.tenant() });
     if (!season) throw new NotFoundException(`Temporada #${id} no encontrada`);
     return season;
   }
   async updateSeason(id: number, updateSeasonDto: UpdateSeasonDto) {
     const season = await this.findOneSeason(id);
-    Object.assign(season, updateSeasonDto);
-    
+    Object.assign(season, updateSeasonDto, { tenantId: season.tenantId });
+
     if (new Date(season.startDate) >= new Date(season.endDate)) {
       throw new BadRequestException('startDate debe ser menor que endDate');
     }
@@ -386,25 +397,23 @@ export class CatalogService {
   // --- COLLECTIONS ---
   async createCollection(createCollectionDto: CreateCollectionDto) {
     const season = await this.findOneSeason(createCollectionDto.seasonId);
-    if (!season) throw new NotFoundException(`Temporada #${createCollectionDto.seasonId} no encontrada`);
-    const collection = this.collectionRepository.create(createCollectionDto);
+    const collection = this.collectionRepository.create({ ...createCollectionDto, tenantId: season.tenantId });
     return this.collectionRepository.save(collection);
   }
   async findAllCollections() {
-    return this.collectionRepository.find({ relations: { season: true }, order: { id: 'ASC' } });
+    return this.collectionRepository.find({ where: { tenantId: this.tenant() }, relations: { season: true }, order: { id: 'ASC' } });
   }
   async findOneCollection(id: number) {
-    const collection = await this.collectionRepository.findOne({ where: { id }, relations: { season: true } });
+    const collection = await this.collectionRepository.findOne({ where: { id, tenantId: this.tenant() }, relations: { season: true } });
     if (!collection) throw new NotFoundException(`Colección #${id} no encontrada`);
     return collection;
   }
   async updateCollection(id: number, updateCollectionDto: UpdateCollectionDto) {
     const collection = await this.findOneCollection(id);
     if (updateCollectionDto.seasonId) {
-      const season = await this.findOneSeason(updateCollectionDto.seasonId);
-      if (!season) throw new NotFoundException(`Temporada #${updateCollectionDto.seasonId} no encontrada`);
+      collection.season = await this.findOneSeason(updateCollectionDto.seasonId);
     }
-    Object.assign(collection, updateCollectionDto);
+    Object.assign(collection, updateCollectionDto, { tenantId: collection.tenantId });
     return this.collectionRepository.save(collection);
   }
   async removeCollection(id: number) {
@@ -415,6 +424,17 @@ export class CatalogService {
   }
 
   // --- PROMOTIONS ---
+  /** Solo se pueden asociar productos de la misma empresa; ids ajenos → 404. */
+  private async loadOwnProducts(productIds: number[], tenantId: number) {
+    const unique = [...new Set(productIds.map(Number))];
+    const products = await this.productRepository.find({ where: { id: In(unique), tenantId } });
+    if (products.length !== unique.length) {
+      const found = new Set(products.map((p) => p.id));
+      throw new NotFoundException(`Productos no encontrados: ${unique.filter((id) => !found.has(id)).join(', ')}`);
+    }
+    return products;
+  }
+
   async createPromotion(createPromotionDto: CreatePromotionDto) {
     if (new Date(createPromotionDto.startDate) >= new Date(createPromotionDto.endDate)) {
       throw new BadRequestException('startDate debe ser menor que endDate');
@@ -426,26 +446,27 @@ export class CatalogService {
       throw new BadRequestException('Para FIXED, el valor debe ser mayor a 0');
     }
 
+    const tenantId = this.tenant();
     const { productIds, ...promoData } = createPromotionDto;
-    const promotion = this.promotionRepository.create(promoData);
+    const promotion = this.promotionRepository.create({ ...promoData, tenantId });
     if (productIds && productIds.length > 0) {
-      promotion.products = await this.productRepository.find({ where: { id: In(productIds) } });
+      promotion.products = await this.loadOwnProducts(productIds, tenantId);
     }
     return this.promotionRepository.save(promotion);
   }
   async findAllPromotions() {
-    return this.promotionRepository.find({ relations: { products: true }, order: { id: 'ASC' } });
+    return this.promotionRepository.find({ where: { tenantId: this.tenant() }, relations: { products: true }, order: { id: 'ASC' } });
   }
   async findOnePromotion(id: number) {
-    const promotion = await this.promotionRepository.findOne({ where: { id }, relations: { products: true } });
+    const promotion = await this.promotionRepository.findOne({ where: { id, tenantId: this.tenant() }, relations: { products: true } });
     if (!promotion) throw new NotFoundException(`Promoción #${id} no encontrada`);
     return promotion;
   }
   async updatePromotion(id: number, updatePromotionDto: UpdatePromotionDto) {
     const promotion = await this.findOnePromotion(id);
     const { productIds, ...promoData } = updatePromotionDto;
-    
-    Object.assign(promotion, promoData);
+
+    Object.assign(promotion, promoData, { tenantId: promotion.tenantId });
 
     if (new Date(promotion.startDate) >= new Date(promotion.endDate)) {
       throw new BadRequestException('startDate debe ser menor que endDate');
@@ -458,7 +479,7 @@ export class CatalogService {
     }
 
     if (productIds) {
-      promotion.products = await this.productRepository.find({ where: { id: In(productIds) } });
+      promotion.products = await this.loadOwnProducts(productIds, promotion.tenantId);
     }
     return this.promotionRepository.save(promotion);
   }

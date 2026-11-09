@@ -44,8 +44,12 @@ export class Inventory {
   ])
   branch: Branch;
 
+  // FK compuesta: la variante DEBE pertenecer al mismo tenant que el inventario
   @ManyToOne(() => Variant, (variant) => variant.inventories)
-  @JoinColumn({ name: 'variantId' })
+  @JoinColumn([
+    { name: 'variantId', referencedColumnName: 'id', foreignKeyConstraintName: 'fk_inventory_variant_tenant' },
+    { name: 'tenantId', referencedColumnName: 'tenantId' },
+  ])
   variant: Variant;
 
   @OneToMany(() => InventoryMovement, (movement) => movement.inventory)

@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, UnauthorizedException, ForbiddenException, ConflictException, OnModuleInit } from '@nestjs/common';
+import { getCurrentTenantId } from '../../common/tenancy/tenant-context';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In } from 'typeorm';
 
@@ -126,7 +127,7 @@ export class ReservationsService implements OnModuleInit {
 
       for (const itemDto of createReservationDto.items) {
         // Validar variante y producto
-        const variant = await queryRunner.manager.findOne(Variant, { where: { id: itemDto.variantId, active: true }, relations: { product: true } });
+        const variant = await queryRunner.manager.findOne(Variant, { where: { id: itemDto.variantId, active: true, ...(getCurrentTenantId() ? { tenantId: getCurrentTenantId() } : {}) }, relations: { product: true } });
         if (!variant || !variant.product.active) {
           throw new NotFoundException(`La variante ${itemDto.variantId} no está disponible`);
         }

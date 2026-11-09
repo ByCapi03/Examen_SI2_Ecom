@@ -76,8 +76,12 @@ export class Product {
   @Column({ type: 'enum', enum: ArGarmentType, nullable: true })
   arType: ArGarmentType;
 
+  // FK compuesta: la categoría DEBE pertenecer al mismo tenant que el producto
   @ManyToOne(() => Category, (category) => category.products)
-  @JoinColumn({ name: 'categoryId' })
+  @JoinColumn([
+    { name: 'categoryId', referencedColumnName: 'id', foreignKeyConstraintName: 'fk_products_category_tenant' },
+    { name: 'tenantId', referencedColumnName: 'tenantId' },
+  ])
   category: Category;
 
   @OneToMany(() => Variant, (variant) => variant.product)

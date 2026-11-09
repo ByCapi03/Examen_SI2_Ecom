@@ -1,10 +1,11 @@
+import { TenantGuard } from '../../common/guards/tenant.guard';
 import { Controller, Get, Post, Body, Patch, Param, Delete, Request, UseGuards } from '@nestjs/common';
 import { InventoryService } from './inventory.service';
 import { CreateInventoryDto, UpdateInventoryDto, RegisterMovementDto } from './inventory.dto';
 import { CreateSupplierDto, UpdateSupplierDto } from './inventory.dto';
 import { AuthGuard } from '../../common/guards/auth.guard';
 
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, TenantGuard)
 @Controller()
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}

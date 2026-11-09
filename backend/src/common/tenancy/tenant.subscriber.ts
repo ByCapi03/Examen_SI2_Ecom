@@ -12,6 +12,32 @@ import { ForbiddenException, InternalServerErrorException } from '@nestjs/common
 import { EventSubscriber, EntitySubscriberInterface, InsertEvent } from 'typeorm';
 import { DEFAULT_TENANT_ID, getTenantStore } from './tenant-context';
 
+/**
+ * Relaciones padre desde las que se puede heredar el tenant cuando la operación
+ * no tiene un usuario autenticado (webhooks de pago, tareas programadas).
+ * [columna FK, propiedad de relación, tabla padre]
+ */
+const PARENTS: [string, string, string][] = [
+  ['branchId', 'branch', 'branches'],
+  ['saleId', 'sale', 'sales'],
+  ['inventoryId', 'inventory', 'inventory'],
+  ['productId', 'product', 'products'],
+  ['seasonId', 'season', 'seasons'],
+  ['userId', 'user', 'users'],
+];
+
+async function inheritTenantFromParent(manager: any, entity: any): Promise<number | undefined> {
+  for (const [fk, rel, table] of PARENTS) {
+    const related = entity[rel];
+    if (related?.tenantId) return Number(related.tenantId);
+    const parentId = entity[fk] ?? related?.id;
+    if (!parentId) continue;
+    const rows = await manager.query(`SELECT "tenantId" FROM "${table}" WHERE id = $1`, [parentId]);
+    if (rows[0]?.tenantId) return Number(rows[0].tenantId);
+  }
+  return undefined;
+}
+
 /** Entidades que pueden crearse desde rutas públicas (registro/activación). */
 const PUBLIC_CREATABLE = new Set(['User', 'Client']);
 
@@ -42,14 +68,8 @@ export class TenantSubscriber implements EntitySubscriberInterface<any> {
     }
 
     // Respaldo: heredar el tenant de la entidad padre (webhooks, cron, sync).
-    if (entity.branchId) {
-      const rows = await event.manager.query('SELECT "tenantId" FROM branches WHERE id = $1', [entity.branchId]);
-      if (rows[0]?.tenantId) { entity.tenantId = Number(rows[0].tenantId); return; }
-    }
-    if (entity.saleId) {
-      const rows = await event.manager.query('SELECT "tenantId" FROM sales WHERE id = $1', [entity.saleId]);
-      if (rows[0]?.tenantId) { entity.tenantId = Number(rows[0].tenantId); return; }
-    }
+    const inherited = await inheritTenantFromParent(event.manager, entity);
+    if (inherited) { entity.tenantId = inherited; return; }
 
     if (PUBLIC_CREATABLE.has(event.metadata.name)) {
       entity.tenantId = store?.publicTenantId ?? DEFAULT_TENANT_ID;
