@@ -57,7 +57,7 @@ prenda en el vestidor virtual, la reserva o la compra y paga en línea o en sucu
 | RF-21 | Pronóstico de demanda y segmentación RFM de clientes (ML). | analytics |
 | RF-22 | Bitácora de auditoría filtrable y exportable. | audit |
 | RF-23 | Configuración de apariencia: tema, idioma, moneda, sidebar compacto. | frontend |
-| RF-24 | Notificaciones al cliente (tiempo real y push). | notifications |
+| RF-24 | Notificaciones internas y push: reservas (encargado/cliente) y **alerta de stock bajo** (encargado de la sucursal y administrador). | notifications |
 | RF-25 | Generar datos demostrativos (2 empresas, personal, cajas, ventas, bitácora). | scripts |
 
 ### Requisitos no funcionales

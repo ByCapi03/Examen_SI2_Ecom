@@ -50,6 +50,9 @@ export const DashboardHeader = () => {
         console.log('[DashboardHeader] onMessage received: ', payload);
         fetchNotifications();
         
+        if (payload.data?.type === 'LOW_STOCK') {
+          window.dispatchEvent(new CustomEvent('LOW_STOCK'));
+        }
         if (payload.data?.type === 'RESERVATION_CREATED') {
           window.dispatchEvent(new CustomEvent('RESERVATION_CREATED'));
         }
@@ -139,7 +142,7 @@ export const DashboardHeader = () => {
               
               {isSupported && permission === 'default' && (
                 <div style={{ padding: '10px 15px', backgroundColor: '#f0f8ff', borderBottom: '1px solid #eee', textAlign: 'center' }}>
-                  <p style={{ fontSize: '0.85rem', color: '#555', margin: '0 0 8px 0' }}>Activa las notificaciones de escritorio para no perder ninguna reserva.</p>
+                  <p style={{ fontSize: '0.85rem', color: '#555', margin: '0 0 8px 0' }}>Activa las notificaciones del navegador para recibir reservas y alertas de stock bajo.</p>
                   <button 
                     onClick={requestPermissionAndRegister}
                     style={{ backgroundColor: '#1c2a28', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
@@ -159,10 +162,11 @@ export const DashboardHeader = () => {
                       className={`notification-item ${!notif.read ? 'unread' : ''}`}
                       onClick={() => {
                         if (!notif.read) handleMarkAsRead(notif.id);
-                        if (notif.reservationId) navigate('/dashboard/reservations'); // or specific detail
+                        if (notif.type === 'LOW_STOCK') navigate('/dashboard/inventory');
+                        else if (notif.reservationId) navigate('/dashboard/reservations'); // or specific detail
                       }}
                     >
-                      <div className="notification-title">{notif.title}</div>
+                      <div className="notification-title">{notif.type === 'LOW_STOCK' ? '⚠️ ' : ''}{notif.title}</div>
                       <div className="notification-msg">{notif.message}</div>
                       <div className="notification-time">{new Date(notif.createdAt).toLocaleString()}</div>
                     </div>

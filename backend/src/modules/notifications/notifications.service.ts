@@ -3,9 +3,10 @@
  * Lógica Core: Envía emails usando el MailService (Nodemailer) y Notificaciones Push 
  * usando Firebase (FCM). También persiste en la base de datos (in-app notifications).
  */
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, DataSource } from 'typeorm';
+import { onLowStock } from '../inventory/stock-alert.subscriber';
 import { Notification, NotificationDevice } from './notification.entity';
 import { User } from '../auth/user.entity';
 import { FirebaseAdminService } from '../../common/firebase/firebase-admin.service';
@@ -13,7 +14,7 @@ import { SendResponse } from 'firebase-admin/messaging';
 import { MailService } from '../../common/mail.service';
 
 @Injectable()
-export class NotificationsService {
+export class NotificationsService implements OnModuleInit {
   private readonly logger = new Logger(NotificationsService.name);
 
   constructor(
@@ -22,7 +23,76 @@ export class NotificationsService {
     @InjectRepository(User) private userRepo: Repository<User>,
     private readonly firebaseAdmin: FirebaseAdminService,
     private readonly mailService: MailService,
+    private readonly dataSource: DataSource,
   ) {}
+
+  onModuleInit() {
+    onLowStock((inventoryId) => { void this.notifyLowStock(inventoryId); });
+  }
+
+  /** Estado de la configuración de push para el usuario (diagnóstico). */
+  async pushStatus(userId: number) {
+    const devices = await this.deviceRepo.find({ where: { userId, active: true } });
+    return {
+      serverPushReady: this.firebaseAdmin.isReady(),
+      devices: devices.length,
+      platforms: [...new Set(devices.map((d) => d.platform))],
+      hint: !this.firebaseAdmin.isReady()
+        ? 'Falta configurar Firebase en el servidor (GOOGLE_APPLICATION_CREDENTIALS). Las notificaciones internas (campana) funcionan igual.'
+        : devices.length === 0 ? 'Este usuario no tiene dispositivos registrados: active las notificaciones en la web o inicie sesión en la app móvil.' : 'OK',
+    };
+  }
+
+  /**
+   * Avisa de stock bajo al ENCARGADO de la sucursal y a los ADMIN de la empresa.
+   * Se re-lee el inventario para confirmar que la transacción se confirmó y sigue bajo el mínimo.
+   */
+  async notifyLowStock(inventoryId: number) {
+    try {
+      const rows = await this.dataSource.query(
+        `SELECT i.id, i.stock, i.reserved, i."stockMin", i."branchId", b."tenantId", b.name AS "branchName",
+                p.name AS "productName", s.name AS "sizeName", c.name AS "colorName"
+           FROM inventory i
+           JOIN branches b ON b.id = i."branchId"
+           JOIN variants v ON v.id = i."variantId"
+           JOIN products p ON p.id = v."productId"
+           LEFT JOIN sizes s ON s.id = v."sizeId"
+           LEFT JOIN colors c ON c.id = v."colorId"
+          WHERE i.id = $1`, [inventoryId]);
+      const inv = rows[0];
+      if (!inv) return;
+      const available = Number(inv.stock) - Number(inv.reserved);
+      if (available > Number(inv.stockMin)) return; // se revirtió o ya se repuso
+
+      const users = await this.userRepo.find({
+        where: { tenantId: Number(inv.tenantId), active: true },
+        relations: { userRoles: { role: true } },
+      });
+      const targets = users.filter((u) => u.userRoles?.some((ur) => ur.active && (
+        ur.role.name === 'ADMIN' || (ur.role.name === 'ENCARGADO' && u.branchId === inv.branchId)
+      )));
+      if (!targets.length) return;
+
+      const detail = [inv.productName, inv.sizeName, inv.colorName].filter(Boolean).join(' · ');
+      const out = available <= 0;
+      const title = out ? `Producto agotado en ${inv.branchName}` : `Stock bajo en ${inv.branchName}`;
+      const message = out
+        ? `${detail}: sin unidades disponibles (mínimo ${inv.stockMin}).`
+        : `${detail}: quedan ${available} unidades (mínimo ${inv.stockMin}).`;
+
+      await this.notificationRepo.save(targets.map((u) =>
+        this.notificationRepo.create({ userId: u.id, type: 'LOW_STOCK', title, message })));
+
+      const devices = await this.deviceRepo.createQueryBuilder('device')
+        .where('device.userId IN (:...ids)', { ids: targets.map((u) => u.id) })
+        .andWhere('device.active = true').getMany();
+      await this.sendPushNotification(devices.map((d) => d.token), {
+        title, message, data: { type: 'LOW_STOCK', inventoryId: String(inventoryId), route: '/dashboard/inventory' },
+      });
+    } catch (error) {
+      this.logger.error(`Error notificando stock bajo (inventario ${inventoryId})`, error as any);
+    }
+  }
 
   async findMyNotifications(userId: number) {
     return this.notificationRepo.find({

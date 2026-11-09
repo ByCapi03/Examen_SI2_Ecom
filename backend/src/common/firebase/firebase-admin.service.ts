@@ -1,3 +1,4 @@
+import { existsSync } from 'fs';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { initializeApp, getApps, applicationDefault } from 'firebase-admin/app';
 import { getMessaging, Messaging } from 'firebase-admin/messaging';
@@ -21,6 +22,13 @@ export class FirebaseAdminService implements OnModuleInit {
       // We don't throw here to prevent crashing the entire app if credentials are missing
       // But we will log it clearly.
     }
+  }
+
+  /** ¿Firebase Admin quedó inicializado (credenciales válidas)? */
+  isReady() {
+    // applicationDefault() no falla al iniciar aunque falten credenciales: se comprueba el archivo.
+    const file = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    return !!this.messaging && !!file && existsSync(file);
   }
 
   getMessaging() {

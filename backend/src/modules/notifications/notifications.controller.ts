@@ -19,6 +19,12 @@ export class NotificationsController {
     return this.notificationsService.findMyNotifications(req.user.sub);
   }
 
+  /** Diagnóstico: ¿está listo el push del servidor y este usuario tiene dispositivos? */
+  @Get('status')
+  pushStatus(@Req() req: any) {
+    return this.notificationsService.pushStatus(req.user.sub);
+  }
+
   @Patch('read-all')
   markAllAsRead(@Req() req: any) {
     return this.notificationsService.markAllAsRead(req.user.sub);

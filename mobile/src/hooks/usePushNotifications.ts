@@ -13,13 +13,15 @@ Notifications.setNotificationHandler({
   } as any),
 });
 
-export function usePushNotifications() {
+/** `enabled` = hay sesión iniciada: el token solo se puede guardar en el servidor con un usuario autenticado. */
+export function usePushNotifications(enabled: boolean = true) {
   const [expoPushToken, setExpoPushToken] = useState<string>('');
   const [notification, setNotification] = useState<Notifications.Notification | false>(false);
   const notificationListener = useRef<any>(null);
   const responseListener = useRef<any>(null);
 
   useEffect(() => {
+    if (!enabled) return;
     registerForPushNotificationsAsync().then(result => {
       if (result && result.token) {
         setExpoPushToken(result.token);
@@ -51,7 +53,7 @@ export function usePushNotifications() {
         responseListener.current.remove();
       }
     };
-  }, []);
+  }, [enabled]);
 
   return {
     expoPushToken,

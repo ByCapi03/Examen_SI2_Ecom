@@ -66,7 +66,7 @@ El esquema se define en 34 entidades TypeORM (diccionario de datos en el Anexo B
 | IA y ML | `ai-reports`, `analytics`, `intelligence` | `AiReportsPage`, `AnalyticsPage` | Implementado |
 | Bitácora | `audit` (`AuditInterceptor`) | `AuditPage` | Implementado |
 | Configuración | — | `SettingsPage` (tema, idioma, moneda) | Implementado |
-| Notificaciones | `notifications`, gateway WebSocket, Firebase | Campana de notificaciones | Implementado |
+| Notificaciones | `notifications`, `StockAlertSubscriber`, gateway WebSocket, Firebase/Expo | Campana, push web, push móvil | Implementado (el push requiere credenciales de Firebase y un proyecto EAS reales) |
 
 ## 4.5. Integración de componentes
 

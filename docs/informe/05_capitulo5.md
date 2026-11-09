@@ -10,6 +10,7 @@ la seguridad por rol y por plan, la sincronización offline y el comportamiento 
 | Unitarias | Jest (`npx jest`) | Reglas de sincronización, especificación de reportes IA y SQL, modelos ML |
 | Integración / sistema (API + BD reales) | `npm run test:e2e:saas` | Aislamiento, offline, conflictos, IA, ML, planes |
 | Integración / sistema (tienda) | `npm run test:e2e:tienda` | Tienda pública, registro por empresa, Mi tienda web |
+| Notificaciones | `npm run test:e2e:notif` | Alerta de stock bajo (11 pruebas) |
 | Interfaz | Playwright (verificación manual asistida) | Landing, tienda por empresa, panel, vestidor |
 | Coherencia documental | `python3 docs/uml/scripts/verificar_coherencia.py` | RNF-12: diagramas vs. código |
 
@@ -39,6 +40,7 @@ Defectos detectados y corregidos durante esta fase:
 | 5 | Vestidor virtual: prendas chicas y deformadas. | Recorte del espacio transparente, proporción real y escala por cuerpo. |
 | 6 | Error al subir imágenes. | Integración y configuración de Cloudinary (variables de entorno). |
 | 7 | Cajas: se abría una caja sin haberla creado. | Modelo de cajas: primero se crea, luego se abre una sesión. |
+| 9 | No existía alerta de stock bajo; el móvil registraba el token push antes del login y nunca lo reintentaba. | `StockAlertSubscriber` + `notifyLowStock`; el registro del token depende de la sesión. |
 | 8 | Registro fallaba por roles inexistentes en BD vacía. | Siembra de roles al arrancar. |
 
 ## 5.5. Resultados de las pruebas
@@ -48,6 +50,7 @@ Defectos detectados y corregidos durante esta fase:
 | Jest (unitarias) | **24 / 24 aprobadas** |
 | E2E SaaS | **34 / 34 aprobadas** |
 | E2E tienda pública | **22 / 22 aprobadas** |
+| E2E notificaciones (stock bajo) | **11 / 11 aprobadas** |
 | `tsc` backend, frontend y móvil | Sin errores |
 | Coherencia documental | Todos los diagramas coherentes con el código |
 

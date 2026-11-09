@@ -19,6 +19,7 @@ import { TenantsModule } from './modules/tenants/tenants.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { FirebaseModule } from './common/firebase/firebase.module';
 import { WebsocketModule } from './common/realtime/websocket.module';
+import { StockAlertSubscriber } from './modules/inventory/stock-alert.subscriber';
 import { TenantSubscriber } from './common/tenancy/tenant.subscriber';
 import { SyncModule } from './modules/sync/sync.module';
 import { AiReportsModule } from './modules/ai-reports/ai-reports.module';
@@ -40,7 +41,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_DATABASE'),
         autoLoadEntities: true,
-        subscribers: [TenantSubscriber],
+        subscribers: [TenantSubscriber, StockAlertSubscriber],
         // SOLO DESARROLLO. En producción utilizar migrations (DB_SYNCHRONIZE=false).
         // Las FKs compuestas multitenant están declaradas en las entidades para que
         // synchronize NO las elimine.
