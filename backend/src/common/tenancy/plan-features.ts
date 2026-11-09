@@ -10,7 +10,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 
-export type PlanFeature = 'aiGenerativeReports' | 'offlineOperations';
+export type PlanFeature = 'aiGenerativeReports' | 'offlineOperations' | 'basicReports';
 
 export interface ActivePlan {
   code: string;
@@ -35,6 +35,12 @@ export async function getActivePlan(dataSource: DataSource, tenantId: number): P
   return rows[0] ?? null;
 }
 
+// El plan gratuito (BASICO) no incluye reportes; cualquier plan de pago sí.
+export function hasPlanFeature(plan: ActivePlan, feature: PlanFeature): boolean {
+  if (feature === 'basicReports') return plan.code !== 'BASICO';
+  return !!plan[feature];
+}
+
 @Injectable()
 export class PlanFeatureGuard implements CanActivate {
   constructor(private readonly reflector: Reflector, private readonly dataSource: DataSource) {}
@@ -48,9 +54,10 @@ export class PlanFeatureGuard implements CanActivate {
     const user = context.switchToHttp().getRequest().user;
     if (!user?.tenantId) throw new ForbiddenException('Tenant no identificado');
     const plan = await getActivePlan(this.dataSource, user.tenantId);
-    if (!plan || !plan[feature]) {
+    if (!plan || !hasPlanFeature(plan, feature)) {
+      const target = feature === 'basicReports' ? 'Starter' : 'Profesional';
       throw new ForbiddenException(
-        `Su plan actual (${plan?.name ?? 'sin suscripción'}) no incluye esta funcionalidad. Actualice al Plan Profesional.`,
+        `Su plan actual (${plan?.name ?? 'sin suscripción'}) no incluye esta funcionalidad. Actualice al Plan ${target}.`,
       );
     }
     return true;

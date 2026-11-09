@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/axios';
 import { BarChart, LineChart } from './ReportChart';
+import { DashStyles, PageHeader, PlanBadge, PlanGate } from '../../components/dashboard/ui';
 
 interface ReportResult {
   question: string;
@@ -18,7 +19,22 @@ interface ReportResult {
  * REPORTES GENERATIVOS — el usuario pregunta en lenguaje natural y obtiene un
  * reporte construido con los datos reales de su empresa (aislado por tenant).
  */
-export const AiReportsPage = () => {
+export const AiReportsPage = () => (
+  <div className="dz-page">
+    <DashStyles />
+    <PageHeader title="Reportes con IA" subtitle="Pregunta en lenguaje natural y obtén un reporte con los datos reales de tu empresa" badge={<PlanBadge />} />
+    <PlanGate feature="ai" title="Reportes generativos con IA" bullets={[
+      'Consultas en lenguaje natural ("¿qué vestidos se vendieron más este mes?")',
+      'Gráficos y narrativa generados automáticamente',
+      'Historial de consultas y exportación a CSV',
+      'Datos aislados por empresa (multitenant)',
+    ]}>
+      <AiReportsContent />
+    </PlanGate>
+  </div>
+);
+
+const AiReportsContent = () => {
   const [question, setQuestion] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [llmEnabled, setLlmEnabled] = useState(false);
@@ -63,10 +79,8 @@ export const AiReportsPage = () => {
   };
 
   return (
-    <div style={{ paddingTop: 24 }}>
-      <h2 style={{ marginBottom: 4 }}>Reportes con IA</h2>
-      <p style={{ color: '#666', marginTop: 0 }}>
-        Pregunte en lenguaje natural. El reporte se construye con los datos reales de su empresa.
+    <div className="dz-card">
+      <p style={{ color: 'var(--atemporal-muted)', marginTop: 0, fontSize: '0.85rem' }}>
         Motor: {llmEnabled ? 'IA generativa (LLM) con validación de seguridad' : 'intérprete de lenguaje natural local (configure AI_API_KEY para usar LLM)'}.
       </p>
 
