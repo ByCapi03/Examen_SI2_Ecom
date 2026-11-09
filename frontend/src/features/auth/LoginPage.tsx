@@ -120,38 +120,38 @@ export const LoginPage = () => {
         }
 
         .login-sidebar {
-          width: 420px;
-          min-width: 300px;
+          width: 340px;
+          min-width: 240px;
           flex-shrink: 0;
           background: linear-gradient(155deg, #182D2A 0%, #0d1f1d 100%);
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          padding: 48px 36px;
+          padding: 40px 32px;
           position: relative;
           overflow: hidden;
         }
         .login-sidebar::before {
           content:'';
-          position:absolute; top:-90px; right:-90px;
-          width:260px; height:260px; border-radius:50%;
+          position:absolute; top:-70px; right:-70px;
+          width:200px; height:200px; border-radius:50%;
           background: rgba(201,144,74,0.07);
         }
         .login-sidebar::after {
           content:'';
-          position:absolute; bottom:-60px; left:-60px;
-          width:200px; height:200px; border-radius:50%;
+          position:absolute; bottom:-50px; left:-50px;
+          width:160px; height:160px; border-radius:50%;
           background: rgba(201,144,74,0.05);
         }
         .sidebar-content {
           position: relative;
           text-align: center;
-          max-width: 280px;
+          max-width: 240px;
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 20px;
+          gap: 16px;
         }
 
         .login-main {
@@ -174,13 +174,13 @@ export const LoginPage = () => {
           .login-sidebar {
             width: 100%;
             min-width: unset;
-            padding: 22px 20px;
+            padding: 20px 20px;
             flex-direction: row;
             justify-content: flex-start;
             gap: 14px;
-            border-radius: 0 0 22px 22px;
+            border-radius: 0 0 20px 20px;
           }
-          .login-sidebar::before { width:120px; height:120px; top:-40px; right:-40px; }
+          .login-sidebar::before { width:100px; height:100px; top:-30px; right:-30px; }
           .login-sidebar::after  { display: none; }
 
           .sidebar-content {
@@ -199,7 +199,7 @@ export const LoginPage = () => {
 
         /* ── Tablet 768–1023px ── */
         @media (min-width: 768px) and (max-width: 1023px) {
-          .login-sidebar { width: 320px; padding: 40px 28px; }
+          .login-sidebar { width: 280px; padding: 36px 24px; }
         }
       `}</style>
 
@@ -208,38 +208,31 @@ export const LoginPage = () => {
         {/* ── SIDEBAR ── */}
         <aside className="login-sidebar">
           <div className="sidebar-content">
-            <AppIcon size={50}/>
-
             <div>
-              <span style={{ fontSize:'0.62rem', fontWeight:700, letterSpacing:'0.16em', textTransform:'uppercase', color:'#C9904A', display:'block', marginBottom:5 }}>
-                Plataforma de gestión
-              </span>
-              <h1 style={{ margin:0, fontSize:'1.8rem', fontWeight:900, color:'#fff', letterSpacing:'0.03em', lineHeight:1 }}>
-                FashionOS
+              <h1 style={{ margin:0, fontSize:'2.4rem', fontWeight:900, color:'#fff', letterSpacing:'0.08em', lineHeight:1, textTransform:'uppercase' }}>
+                DRESSED
               </h1>
-              <p className="sidebar-tagline" style={{ margin:'10px 0 0', fontSize:'0.84rem', color:'rgba(255,255,255,0.4)', lineHeight:1.6 }}>
+              <p className="sidebar-tagline" style={{ margin:'14px 0 0', fontSize:'0.83rem', color:'rgba(255,255,255,0.38)', lineHeight:1.7 }}>
                 Gestiona tu tienda de moda.<br/>Inventario · POS · Reportes.
               </p>
             </div>
 
-            {/* Badge empresa si viene ?tenant= */}
-            {tenantSlug && (
-              <div className="sidebar-tenant-block" style={{ marginTop:4 }}>
-                <p style={{ margin:'0 0 7px', fontSize:'0.68rem', color:'rgba(255,255,255,0.3)', textTransform:'uppercase', letterSpacing:'0.1em' }}>
+            {/* Badge empresa solo si viene ?tenant= y ya cargó */}
+            {tenantSlug && !tenantLoading && (
+              <div className="sidebar-tenant-block" style={{ marginTop:8 }}>
+                <p style={{ margin:'0 0 7px', fontSize:'0.65rem', color:'rgba(255,255,255,0.28)', textTransform:'uppercase', letterSpacing:'0.1em' }}>
                   Accediendo a
                 </p>
-                {tenantLoading
-                  ? <div style={{ width:120, height:28, background:'rgba(255,255,255,0.08)', borderRadius:20 }}/>
-                  : tenantName
-                    ? <TenantBadge name={tenantName}/>
-                    : <span style={{ fontSize:'0.75rem', color:'rgba(255,255,255,0.3)' }}>Empresa no encontrada</span>
+                {tenantName
+                  ? <TenantBadge name={tenantName}/>
+                  : <span style={{ fontSize:'0.75rem', color:'rgba(255,255,255,0.28)' }}>Empresa no encontrada</span>
                 }
               </div>
             )}
           </div>
 
-          <p style={{ position:'absolute', bottom:14, fontSize:'0.65rem', color:'rgba(255,255,255,0.15)', textAlign:'center', margin:0 }}>
-            FashionOS © {new Date().getFullYear()}
+          <p style={{ position:'absolute', bottom:14, fontSize:'0.62rem', color:'rgba(255,255,255,0.12)', textAlign:'center', margin:0 }}>
+            DRESSED © {new Date().getFullYear()}
           </p>
         </aside>
 
