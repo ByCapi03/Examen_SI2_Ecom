@@ -32,6 +32,16 @@ export const StoreShell = ({ children }: { children?: React.ReactNode }) => {
     );
   }
 
+  if (store && store.config?.published === false) {
+    return (
+      <Centered>
+        <h2 style={{ margin: '0 0 8px', color: '#182D2A' }}>{store.name}</h2>
+        <p style={{ margin: '0 0 22px', color: '#6b7280', lineHeight: 1.5 }}>Esta tienda aún no está disponible. Vuelve pronto.</p>
+        <Link to="/" style={linkBtn}>Ir al inicio</Link>
+      </Centered>
+    );
+  }
+
   if (mismatch && sessionStore) {
     return (
       <Centered>

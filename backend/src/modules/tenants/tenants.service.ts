@@ -127,7 +127,43 @@ export class TenantsService implements OnModuleInit {
       slug: tenant.slug,
       plan: tenant.subscription?.plan ?? null,
       subscriptionStatus: tenant.subscription?.status ?? null,
+      storeConfig: TenantsService.normalizeStoreConfig(tenant.storeConfig),
     };
+  }
+
+  static readonly STORE_DEFAULTS = {
+    published: true, tagline: '', heroTitle: '', heroText: '', accentColor: '#C9904A', logoUrl: '',
+    whatsapp: '', instagram: '', showFeatured: true, showBranches: true, showTryOn: true,
+  };
+
+  static normalizeStoreConfig(raw: any) {
+    const d = TenantsService.STORE_DEFAULTS;
+    const c = raw && typeof raw === 'object' ? raw : {};
+    const str = (v: any, max: number, def: string) => (typeof v === 'string' ? v.trim().slice(0, max) : def);
+    const bool = (v: any, def: boolean) => (typeof v === 'boolean' ? v : def);
+    const color = typeof c.accentColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(c.accentColor) ? c.accentColor : d.accentColor;
+    const logo = str(c.logoUrl, 500, '');
+    return {
+      published: bool(c.published, d.published),
+      tagline: str(c.tagline, 120, ''),
+      heroTitle: str(c.heroTitle, 80, ''),
+      heroText: str(c.heroText, 300, ''),
+      accentColor: color,
+      logoUrl: /^https?:\/\//i.test(logo) ? logo : '',
+      whatsapp: str(c.whatsapp, 25, '').replace(/[^0-9+]/g, ''),
+      instagram: str(c.instagram, 40, '').replace(/^@/, '').replace(/[^a-zA-Z0-9._]/g, ''),
+      showFeatured: bool(c.showFeatured, d.showFeatured),
+      showBranches: bool(c.showBranches, d.showBranches),
+      showTryOn: bool(c.showTryOn, d.showTryOn),
+    };
+  }
+
+  async updateStoreConfig(tenantId: number, body: any) {
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    if (!tenant) throw new NotFoundException('Tenant no encontrado');
+    tenant.storeConfig = TenantsService.normalizeStoreConfig({ ...(tenant.storeConfig ?? {}), ...(body ?? {}) });
+    await this.tenantRepo.save(tenant);
+    return this.getMyTenant(tenantId);
   }
 
   async changePlan(tenantId: number, planCode: string) {
@@ -157,7 +193,7 @@ export class TenantsService implements OnModuleInit {
         WHERE b."tenantId" = $1 AND b.active = true ORDER BY b.id`,
       [tenant.id],
     );
-    return { name: tenant.name, slug: tenant.slug, branches };
+    return { name: tenant.name, slug: tenant.slug, branches, config: TenantsService.normalizeStoreConfig(tenant.storeConfig) };
   }
 
   async findAll() {

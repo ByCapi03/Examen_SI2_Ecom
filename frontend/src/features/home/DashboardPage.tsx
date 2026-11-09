@@ -91,7 +91,7 @@ export const DashboardPage = () => {
         actions={<button className="dz-btn ghost" onClick={() => void fetchMetrics()}><RefreshCw size={15} /> Actualizar</button>}
       />
 
-      {isAdmin && <StoreLinkCard />}
+      <StoreLinkCard />
 
       {/* Slicers */}
       <div className="dz-card" style={{ padding: 14, marginBottom: 18, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>

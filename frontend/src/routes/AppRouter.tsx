@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../features/auth/AuthContext';
 import { SettingsPage } from '../features/settings/SettingsPage';
+import { StoreBuilderPage } from '../features/store/StoreBuilderPage';
 import { AuditPage } from '../features/audit/AuditPage';
 
 // Layouts
@@ -139,6 +140,7 @@ export const AppRouter = () => {
             <Route path="analytics" element={<AnalyticsPage />} />
             <Route path="sync-conflicts" element={<SyncConflictsPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="store" element={<StoreBuilderPage />} />
             <Route path="audit" element={<AuditPage />} />
           </Route>
         </Route>

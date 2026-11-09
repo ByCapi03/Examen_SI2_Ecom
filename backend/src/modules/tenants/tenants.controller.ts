@@ -34,6 +34,14 @@ export class TenantsController {
     return this.tenantsService.changePlan(tenantId, body.planCode);
   }
 
+  /** El ADMIN personaliza la web pública de su empresa. */
+  @Patch('tenants/me/store')
+  @UseGuards(AuthGuard, TenantGuard, RolesGuard)
+  @Roles('ADMIN')
+  updateStore(@CurrentTenant() tenantId: number, @Body() body: any) {
+    return this.tenantsService.updateStoreConfig(tenantId, body);
+  }
+
   @Get('plans')
   @Public()
   plans() {

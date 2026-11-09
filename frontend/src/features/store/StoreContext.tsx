@@ -6,7 +6,15 @@ import { useAuth } from '../auth/AuthContext';
 import { CartProvider } from '../cart/CartContext';
 
 export interface StoreBranch { name: string; address: string; phone: string; city: string | null }
-export interface StoreInfo { name: string; slug: string; branches: StoreBranch[] }
+export interface StoreConfig {
+  published: boolean; tagline: string; heroTitle: string; heroText: string; accentColor: string; logoUrl: string;
+  whatsapp: string; instagram: string; showFeatured: boolean; showBranches: boolean; showTryOn: boolean;
+}
+export const DEFAULT_STORE_CONFIG: StoreConfig = {
+  published: true, tagline: '', heroTitle: '', heroText: '', accentColor: '#C9904A', logoUrl: '',
+  whatsapp: '', instagram: '', showFeatured: true, showBranches: true, showTryOn: true,
+};
+export interface StoreInfo { name: string; slug: string; branches: StoreBranch[]; config: StoreConfig }
 
 interface Ctx {
   slug: string;

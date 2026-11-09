@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useStore } from '../store/StoreContext';
+import { useStore, DEFAULT_STORE_CONFIG } from '../store/StoreContext';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useCart } from '../cart/CartContext';
@@ -32,6 +32,7 @@ export const HomePage = () => {
   const { cart } = useCart();
   const navigate = useNavigate();
   const { path, store } = useStore();
+  const cfg = { ...DEFAULT_STORE_CONFIG, ...(store?.config ?? {}) };
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -74,17 +75,21 @@ export const HomePage = () => {
       {/* HERO SECTION */}
       <section className="hero-section">
         <div className="hero-content" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div style={{ width: 84, height: 84, borderRadius: 22, background: 'rgba(201,144,74,0.18)', color: '#C9904A', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '2rem', letterSpacing: 2, marginBottom: 20 }}>
-            {(store?.name ?? '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase()}
-          </div>
-          <span className="hero-subtitle">BIENVENIDO A</span>
-          <h1 className="hero-title">{store?.name}</h1>
+          {cfg.logoUrl ? (
+            <img src={cfg.logoUrl} alt={store?.name} style={{ maxHeight: 96, maxWidth: 220, objectFit: 'contain', marginBottom: 20 }} />
+          ) : (
+            <div style={{ width: 84, height: 84, borderRadius: 22, background: 'rgba(255,255,255,0.12)', color: cfg.accentColor, display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '2rem', letterSpacing: 2, marginBottom: 20 }}>
+              {(store?.name ?? '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase()}
+            </div>
+          )}
+          <span className="hero-subtitle" style={{ color: cfg.accentColor }}>{cfg.tagline || 'BIENVENIDO A'}</span>
+          <h1 className="hero-title">{cfg.heroTitle || store?.name}</h1>
 
-          <p className="hero-text">Explora nuestro catálogo, prueba las prendas con el vestidor virtual y reserva en la sucursal que prefieras.</p>
+          <p className="hero-text">{cfg.heroText || 'Explora nuestro catálogo, prueba las prendas con el vestidor virtual y reserva en la sucursal que prefieras.'}</p>
           <button
             className="btn-secondary"
             onClick={() => navigate(path('/catalog'))}
-            style={{ marginTop: '10px' }}
+            style={{ marginTop: '10px', background: cfg.accentColor, color: '#fff' }}
           >
             Ver Catálogo
           </button>
@@ -155,7 +160,7 @@ export const HomePage = () => {
       )}
 
       {/* FEATURED PRODUCTS */}
-      <section className="featured-section">
+      {cfg.showFeatured && <section className="featured-section">
         <div className="section-header">
           <h2 className="section-title">Productos Destacados</h2>
           <div className="section-divider"></div>
@@ -190,7 +195,7 @@ export const HomePage = () => {
             ))}
           </div>
         )}
-      </section>
+      </section>}
     </div>
   );
 };

@@ -36,6 +36,7 @@ export const DASHBOARD_NAVIGATION: NavGroup[] = [
     items: [
       { key: 'nav.products', path: '/dashboard/products', allowedRoles: MGMT },
       { key: 'nav.inventory', path: '/dashboard/inventory', allowedRoles: MGMT },
+      { key: 'nav.store', path: '/dashboard/store', allowedRoles: [ROL.ADMIN] },
       { key: 'nav.suppliers', path: '/dashboard/suppliers', allowedRoles: [ROL.ADMIN] },
     ],
   },

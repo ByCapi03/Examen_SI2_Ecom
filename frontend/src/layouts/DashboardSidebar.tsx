@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import {
   LogOut, LayoutDashboard, Calendar, Box, Package, Users, ShoppingCart, DollarSign, Store,
-  BarChart3, Sparkles, BrainCircuit, Truck, Building2, RefreshCcw, Settings, Lock, ScrollText,
+  BarChart3, Sparkles, BrainCircuit, Truck, Building2, RefreshCcw, Settings, Lock, ScrollText, Globe,
 } from 'lucide-react';
 import { DASHBOARD_NAVIGATION } from '../config/navigation';
 import { useAuth } from '../features/auth/AuthContext';
@@ -27,6 +27,7 @@ const ICONS: Record<string, ReactNode> = {
   '/dashboard/sync-conflicts': <RefreshCcw size={18} />,
   '/dashboard/audit': <ScrollText size={18} />,
   '/dashboard/settings': <Settings size={18} />,
+  '/dashboard/store': <Globe size={18} />,
 };
 
 export const DashboardSidebar = ({ open = false, onNavigate }: { open?: boolean; onNavigate?: () => void }) => {
