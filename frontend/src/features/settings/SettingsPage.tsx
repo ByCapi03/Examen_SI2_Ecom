@@ -1,4 +1,5 @@
 import { Sun, Moon, Check, RotateCcw, Palette, Globe, Coins, PanelLeft } from 'lucide-react';
+import { StoreLinkCard } from '../../components/common/StoreLinkCard';
 import { useSettings, PALETTES, CURRENCIES } from '../../config/SettingsContext';
 import type { CurrencyCode } from '../../config/SettingsContext';
 import { DashStyles, PageHeader, Card, KpiCard, ColumnChart } from '../../components/dashboard/ui';
@@ -33,6 +34,8 @@ export const SettingsPage = () => {
       <DashStyles />
       <PageHeader title={t('set.title')} subtitle={t('set.subtitle')}
         actions={<button className="dz-btn ghost" onClick={reset}><RotateCcw size={15} /> {t('set.reset')}</button>} />
+
+      <StoreLinkCard />
 
       <div className="dz-grid dz-2-1">
         <div className="dz-grid">

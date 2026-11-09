@@ -50,6 +50,7 @@ import { SyncConflictsPage } from '../features/sync/SyncConflictsPage';
 import { AiReportsPage } from '../features/ai-reports/AiReportsPage';
 import { AnalyticsPage } from '../features/analytics/AnalyticsPage';
 import { PricingPage } from '../features/saas/PricingPage';
+import { LandingPage } from '../features/landing/LandingPage';
 import { TenantRegisterPage } from '../features/saas/TenantRegisterPage';
 
 /** Inicio del panel: el cajero no tiene dashboard, su inicio es su caja. */
@@ -79,7 +80,8 @@ export const AppRouter = () => {
         <Route path="/saas/register" element={<TenantRegisterPage />} />
 
         {/* Store Routes (Customer Facing) */}
-        <Route path="/" element={<StoreLayout />}>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/t/:slug" element={<StoreLayout />}>
           <Route index element={<HomePage />} />
           <Route path="catalog" element={<CatalogPage />} />
           <Route path="products/:id" element={<ProductDetailPage />} />

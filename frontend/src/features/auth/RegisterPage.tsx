@@ -1,8 +1,7 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { api } from '../../api/axios';
-import atemporalLogo from '../../assets/ATEMPORAL.png';
 
 export const RegisterPage = () => {
   const [email, setEmail] = useState('');
@@ -16,6 +15,18 @@ export const RegisterPage = () => {
 
   const navigate = useNavigate();
   const { login } = useAuth();
+  const [params] = useSearchParams();
+  const tenantSlug = (params.get('tenant') ?? '').trim().toLowerCase();
+  const [storeName, setStoreName] = useState<string | null>(null);
+  const [storeError, setStoreError] = useState(false);
+  const [codeInput, setCodeInput] = useState('');
+
+  useEffect(() => {
+    if (!tenantSlug) return;
+    api.get(`/saas/tenants/by-slug/${encodeURIComponent(tenantSlug)}`)
+      .then((r) => setStoreName(r.data.name))
+      .catch(() => setStoreError(true));
+  }, [tenantSlug]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,21 +34,21 @@ export const RegisterPage = () => {
     setLoading(true);
 
     try {
-      const res = await api.post('/auth/register', { name, lastName, email, password, phone });
+      const res = await api.post('/auth/register', { name, lastName, email, password, phone }, { headers: { 'X-Tenant-Slug': tenantSlug } });
       login(res.data.accessToken, res.data.user);
       
       const pendingReservationStr = sessionStorage.getItem('pendingReservation');
       if (pendingReservationStr) {
         try {
           const pendingReservation = JSON.parse(pendingReservationStr);
-          navigate('/reservations/new', { state: pendingReservation, replace: true });
+          navigate(`/t/${tenantSlug}/reservations/new`, { state: pendingReservation, replace: true });
           return;
         } catch (e) {
           console.error('Error parsing pendingReservation', e);
         }
       }
       
-      navigate('/');
+      navigate(`/t/${tenantSlug}`);
     } catch (err: any) {
       console.error(err);
       if (err.response?.data?.code === 'CLIENT_EXISTS_WITHOUT_DIGITAL_ACCOUNT') {
@@ -50,29 +61,40 @@ export const RegisterPage = () => {
     }
   };
 
+  if (!tenantSlug || storeError) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, background: '#F5F2EB', fontFamily: "'Outfit', system-ui, sans-serif" }}>
+        <form
+          onSubmit={(e) => { e.preventDefault(); if (codeInput.trim()) navigate(`/register?tenant=${codeInput.trim().toLowerCase()}`); }}
+          style={{ maxWidth: 420, width: '100%', background: '#fff', borderRadius: 18, padding: '32px 28px', boxShadow: '0 8px 40px rgba(0,0,0,0.08)' }}
+        >
+          <h2 style={{ margin: '0 0 8px', color: '#182D2A' }}>¿En qué tienda quieres registrarte?</h2>
+          <p style={{ margin: '0 0 18px', color: '#6b7280', fontSize: '0.9rem', lineHeight: 1.5 }}>
+            {storeError ? <>No encontramos la tienda <b>{tenantSlug}</b>. </> : null}
+            Tu cuenta pertenece a la tienda donde compras. Abre el enlace que te compartió tu tienda o escribe su código.
+          </p>
+          <input value={codeInput} onChange={(e) => setCodeInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))} placeholder="código-de-la-tienda" autoFocus
+            style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', border: '1.5px solid #d1d5db', borderRadius: 10, fontSize: '1rem', marginBottom: 14, fontFamily: 'monospace' }} />
+          <button type="submit" disabled={!codeInput.trim()} style={{ width: '100%', padding: '12px 0', border: 'none', borderRadius: 10, background: '#182D2A', color: '#fff', fontWeight: 700, cursor: 'pointer', opacity: codeInput.trim() ? 1 : 0.5, fontFamily: 'inherit' }}>Continuar</button>
+          <p style={{ textAlign: 'center', marginTop: 16, fontSize: '0.85rem' }}><Link to="/" style={{ color: '#9ca3af' }}>Volver al inicio</Link></p>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div className="login-container">
       <div className="login-left">
         <div className="brand-info" style={{ textAlign: 'center' }}>
-          <img
-
-            alt="ATEMPORAL - Moda que trasciende épocas"
-            style={{ maxWidth: '240px', width: '100%', height: 'auto', objectFit: 'contain', marginBottom: '15px', borderRadius: '8px' }}
-          />
-          <h1>ATEMPORAL</h1>
-          <p>Moda que trasciende épocas.</p>
+          <h1>{storeName ?? 'DRESSED'}</h1>
+          <p>{storeName ? 'Crea tu cuenta para comprar y reservar.' : 'Tu tienda de ropa en línea.'}</p>
         </div>
       </div>
       <div className="login-right">
         <div className="login-box" style={{ maxHeight: '100%', overflowY: 'auto', padding: '10px' }}>
           <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-            <img
-              src={atemporalLogo}
-              alt="ATEMPORAL"
-              style={{ maxHeight: '70px', width: 'auto', objectFit: 'contain', borderRadius: '6px' }}
-            />
             <h2 style={{ marginTop: '10px' }}>Crear Cuenta</h2>
-            <p className="subtitle">Regístrate para hacer reservas y compras</p>
+            <p className="subtitle">{storeName ? `Regístrate en ${storeName} para hacer reservas y compras` : 'Regístrate para hacer reservas y compras'}</p>
           </div>
 
           {error === 'CLIENT_EXISTS_WITHOUT_DIGITAL_ACCOUNT' ? (
@@ -81,7 +103,7 @@ export const RegisterPage = () => {
               <p style={{ marginBottom: '15px' }}>Para realizar compras online, necesitas activar tu cuenta digital.</p>
               <button
                 type="button"
-                onClick={() => navigate('/activate-account')}
+                onClick={() => navigate(`/activate-account${tenantSlug ? `?tenant=${tenantSlug}` : ''}`)}
                 className="btn-primary"
                 style={{ width: '100%' }}
               >
@@ -155,7 +177,7 @@ export const RegisterPage = () => {
             </button>
 
             <div className="register-link" style={{ marginTop: '15px' }}>
-              ¿Ya tienes cuenta? <a href="/login">Inicia sesión</a>
+              ¿Ya tienes cuenta? <Link to={`/login?tenant=${tenantSlug}`}>Inicia sesión</Link>
             </div>
           </form>
         </div>

@@ -29,6 +29,8 @@ export const AppNavigator = () => {
         contentStyle: { backgroundColor: '#ffffff' },
       }}
     >
+      {isAuthenticated ? (
+        <>
       <Stack.Screen
         name="MainTabs"
         component={ClientDrawer}
@@ -71,7 +73,8 @@ export const AppNavigator = () => {
         options={{ title: 'Vestidor Virtual', headerShown: false }}
       />
 
-      {!isAuthenticated && (
+        </>
+      ) : (
         <>
           <Stack.Screen
             name="Login"

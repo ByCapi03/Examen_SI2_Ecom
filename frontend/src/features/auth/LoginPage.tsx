@@ -83,7 +83,12 @@ export const LoginPage = () => {
         navigate(staffHome(data.user.roles), { replace:true });
       } else {
         const pr = sessionStorage.getItem('pendingReservation');
-        if (pr) { try { navigate('/reservations/new', { state:JSON.parse(pr), replace:true }); return; } catch {} }
+        if (pr) {
+          try {
+            const me = await api.get('/saas/tenants/me', { headers: { Authorization: `Bearer ${data.accessToken}` } });
+            navigate(`/t/${me.data.slug}/reservations/new`, { state:JSON.parse(pr), replace:true }); return;
+          } catch {}
+        }
         const redir = sessionStorage.getItem('redirectUrl');
         if (redir) { sessionStorage.removeItem('redirectUrl'); navigate(redir, { replace:true }); return; }
         navigate('/account', { replace:true });
@@ -350,6 +355,12 @@ export const LoginPage = () => {
                   ¿No tienes una cuenta?{' '}
                   <Link to="/pricing" style={{ color:'#C9904A', fontWeight:600, textDecoration:'none' }}>Registra tu empresa</Link>
                 </p>
+                {tenantSlug && (
+                  <p style={{ margin:0, fontSize:'0.81rem', color:'#6b7280' }}>
+                    ¿Eres cliente de {tenantName ?? 'esta tienda'}?{' '}
+                    <Link to={`/register?tenant=${tenantSlug}`} style={{ color:'#C9904A', fontWeight:600, textDecoration:'none' }}>Crear cuenta de cliente</Link>
+                  </p>
+                )}
                 <p style={{ margin:0, fontSize:'0.81rem', color:'#6b7280' }}>
                   ¿Ya compraste en nuestra tienda?{' '}
                   <Link to="/activate-account" style={{ color:'#182D2A', fontWeight:600, textDecoration:'none' }}>Activa tu cuenta</Link>

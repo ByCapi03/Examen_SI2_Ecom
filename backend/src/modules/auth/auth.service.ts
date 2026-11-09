@@ -9,6 +9,7 @@ import { Role } from './role.entity';
 import { UserRole } from './user-role.entity';
 import { Client } from '../clients/client.entity';
 import { MailService } from '../../common/mail.service';
+import { requireTenantId } from '../../common/tenancy/tenant-context';
 import { LoginDto, SetupAdminDto } from './auth.dto';
 
 @Injectable()
@@ -160,6 +161,8 @@ export class AuthService {
   }
 
   async registerClient(registerDto: any) {
+    // El cliente pertenece a la empresa de la tienda desde la que se registra (X-Tenant-Slug); nunca a una por defecto.
+    const tenantId = requireTenantId();
     const { name, lastName, password, phone } = registerDto;
     const email = (registerDto.email as string).trim().toLowerCase();
 
@@ -197,6 +200,7 @@ export class AuthService {
 
       const passwordHash = await bcrypt.hash(password, 10);
       const user = queryRunner.manager.create(User, {
+        tenantId,
         name: `${name}${lastName ? ' ' + lastName : ''}`,
         email,
         passwordHash,
@@ -216,6 +220,7 @@ export class AuthService {
 
       // Create Client entity linked to User
       const client = queryRunner.manager.create(Client, {
+        tenantId,
         name,
         lastName: lastName || '',
         email,

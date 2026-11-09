@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useStore } from '../store/StoreContext';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useCart } from '../cart/CartContext';
 import { api } from '../../api/axios';
-import atemporalLogo from '../../assets/ATEMPORAL.png';
 import '../../styles/store.css';
 
 interface Product {
@@ -31,6 +31,7 @@ export const HomePage = () => {
   const { user } = useAuth();
   const { cart } = useCart();
   const navigate = useNavigate();
+  const { path, store } = useStore();
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -73,18 +74,16 @@ export const HomePage = () => {
       {/* HERO SECTION */}
       <section className="hero-section">
         <div className="hero-content" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <img 
-            src={atemporalLogo} 
-            alt="ATEMPORAL - Moda que trasciende épocas" 
-            style={{ maxWidth: '280px', width: '100%', height: 'auto', objectFit: 'contain', marginBottom: '20px', borderRadius: '12px' }} 
-          />
-          <span className="hero-subtitle">NUEVA COLECCIÓN</span>
-          <h1 className="hero-title">Moda que trasciende épocas</h1>
+          <div style={{ width: 84, height: 84, borderRadius: 22, background: 'rgba(201,144,74,0.18)', color: '#C9904A', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '2rem', letterSpacing: 2, marginBottom: 20 }}>
+            {(store?.name ?? '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase()}
+          </div>
+          <span className="hero-subtitle">BIENVENIDO A</span>
+          <h1 className="hero-title">{store?.name}</h1>
 
-          <p className="hero-text">Descubre nuestra nueva colección diseñada para resaltar tu estilo en cualquier ocasión.</p>
+          <p className="hero-text">Explora nuestro catálogo, prueba las prendas con el vestidor virtual y reserva en la sucursal que prefieras.</p>
           <button
             className="btn-secondary"
-            onClick={() => navigate('/catalog')}
+            onClick={() => navigate(path('/catalog'))}
             style={{ marginTop: '10px' }}
           >
             Ver Catálogo
@@ -110,7 +109,7 @@ export const HomePage = () => {
                 <div key={rec.product.id} className="product-card" style={{ border: '1px solid #eee' }}>
                   <div
                     className="product-image-placeholder"
-                    onClick={() => navigate(`/products/${rec.product.id}`)}
+                    onClick={() => navigate(path(`/products/${rec.product.id}`))}
                     style={{ padding: rec.product.imageUrl ? 0 : undefined, overflow: 'hidden', position: 'relative' }}
                   >
                     {rec.product.discount && (
@@ -140,7 +139,7 @@ export const HomePage = () => {
                   </p>
                   <button
                     className="btn-outline"
-                    onClick={() => navigate(`/products/${rec.product.id}`)}
+                    onClick={() => navigate(path(`/products/${rec.product.id}`))}
                   >
                     Ver Producto
                   </button>
@@ -170,7 +169,7 @@ export const HomePage = () => {
               <div key={p.id} className="product-card">
                 <div
                   className="product-image-placeholder"
-                  onClick={() => navigate(`/products/${p.id}`)}
+                  onClick={() => navigate(path(`/products/${p.id}`))}
                   style={{ padding: p.imageUrl ? 0 : undefined, overflow: 'hidden' }}
                 >
                   {p.imageUrl ? (
@@ -183,7 +182,7 @@ export const HomePage = () => {
                 <p className="product-price">Bs. {Number(p.price).toFixed(2)}</p>
                 <button
                   className="btn-outline"
-                  onClick={() => navigate(`/products/${p.id}`)}
+                  onClick={() => navigate(path(`/products/${p.id}`))}
                 >
                   Ver
                 </button>

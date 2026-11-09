@@ -32,6 +32,13 @@ const isCacheable = (config?: InternalAxiosRequestConfig) =>
   !!config && (config.method ?? 'get').toLowerCase() === 'get' &&
   OFFLINE_CACHEABLE.some((p) => (config.url ?? '').startsWith(p));
 
+// La empresa de la tienda pública sale de la URL (/t/<slug>). Con sesión iniciada manda el token.
+api.interceptors.request.use((config) => {
+  const m = typeof window !== 'undefined' ? window.location.pathname.match(/^\/t\/([a-z0-9-]+)/i) : null;
+  if (m && config.headers && !config.headers['X-Tenant-Slug']) config.headers['X-Tenant-Slug'] = m[1].toLowerCase();
+  return config;
+});
+
 // Interceptor para inyectar el token
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');

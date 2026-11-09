@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCart } from './CartContext';
+import { useStore } from '../store/StoreContext';
 
 import { api } from '../../api/axios';
 
 export const CheckoutPage = () => {
   const { cart, clearCart } = useCart();
   const navigate = useNavigate();
+  const { path } = useStore();
   const [searchParams] = useSearchParams();
   
   const [loading, setLoading] = useState(false);
@@ -116,7 +118,7 @@ export const CheckoutPage = () => {
     return (
       <div style={{ maxWidth: '800px', margin: '40px auto', padding: '0 20px', textAlign: 'center' }}>
         <h2>Tu carrito está vacío o no has seleccionado sucursal.</h2>
-        <button onClick={() => navigate('/cart')} style={{ padding: '10px 20px', marginTop: '20px' }}>Volver al carrito</button>
+        <button onClick={() => navigate(path('/cart'))} style={{ padding: '10px 20px', marginTop: '20px' }}>Volver al carrito</button>
       </div>
     );
   }

@@ -1,5 +1,6 @@
 import { Injectable, NestMiddleware } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import * as jwt from 'jsonwebtoken';
 import { tenantStorage, TenantStore } from './tenant-context';
 
 /**
@@ -16,7 +17,17 @@ export class TenantContextMiddleware implements NestMiddleware {
     const store: TenantStore = {};
     const slug = String(req.headers['x-tenant-slug'] || '').trim().toLowerCase();
     if (slug) {
+      store.publicSlug = slug;
       store.publicTenantId = await this.resolveSlug(slug);
+    }
+    // Sesión iniciada: el tenant del token manda sobre la cabecera (rutas públicas sin guard,
+    // p. ej. el catálogo de la app móvil, que no envía slug).
+    const auth = String(req.headers['authorization'] || '');
+    if (auth.startsWith('Bearer ')) {
+      try {
+        const payload: any = jwt.verify(auth.slice(7), process.env.JWT_SECRET || 'defaultSecret');
+        if (payload?.tenantId) store.publicTenantId = Number(payload.tenantId);
+      } catch { /* token inválido: lo rechazará el guard donde aplique */ }
     }
     tenantStorage.run(store, () => next());
   }

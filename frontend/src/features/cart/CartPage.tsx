@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from './CartContext';
+import { useStore } from '../store/StoreContext';
 import { useAuth } from '../auth/AuthContext';
 import { api } from '../../api/axios';
 import '../../styles/store.css';
 
 export const CartPage = () => {
   const navigate = useNavigate();
+  const { path, slug } = useStore();
   const { cart, removeFromCart, updateQuantity, updateItemAvailability, clearCart } = useCart();
   const { isAuthenticated } = useAuth();
   
@@ -50,10 +52,10 @@ export const CartPage = () => {
     }
 
     if (!isAuthenticated) {
-      sessionStorage.setItem('redirectUrl', '/checkout');
-      navigate('/login');
+      sessionStorage.setItem('redirectUrl', path('/checkout'));
+      navigate(`/login?tenant=${slug}`);
     } else {
-      navigate('/checkout');
+      navigate(path('/checkout'));
     }
   };
 
@@ -63,7 +65,7 @@ export const CartPage = () => {
         <h1 style={{ fontSize: '2rem', marginBottom: '20px', color: '#333' }}>Tu Carrito de Compras</h1>
         <p style={{ color: '#666', fontSize: '1.1rem', marginBottom: '30px' }}>Tu carrito está vacío actualmente.</p>
         <Link 
-          to="/catalog" 
+          to={path('/catalog')} 
           style={{ 
             display: 'inline-block', 
             padding: '12px 24px', 

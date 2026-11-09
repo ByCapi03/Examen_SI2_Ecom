@@ -1,4 +1,4 @@
-import { getEffectiveTenantId } from '../../common/tenancy/tenant-context';
+import { requireTenantId } from '../../common/tenancy/tenant-context';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -23,7 +23,7 @@ export class StoreService {
     // Solo productos activos, con categoría activa y que tengan variantes activas
     const products = await this.productRepository.find({
       where: {
-        tenantId: getEffectiveTenantId(),
+        tenantId: requireTenantId(),
         active: true,
         category: { active: true },
         variants: { active: true }
@@ -55,7 +55,7 @@ export class StoreService {
     const product = await this.productRepository.findOne({
       where: {
         id,
-        tenantId: getEffectiveTenantId(),
+        tenantId: requireTenantId(),
         active: true,
         category: { active: true }
       },
@@ -115,7 +115,7 @@ export class StoreService {
       where: {
         variantId,
         variant: { active: true, product: { active: true } },
-        branch: { active: true, tenantId: getEffectiveTenantId() } // solo sucursales activas del tenant
+        branch: { active: true, tenantId: requireTenantId() } // solo sucursales activas del tenant
       },
       relations: { branch: { city: true } }
     });

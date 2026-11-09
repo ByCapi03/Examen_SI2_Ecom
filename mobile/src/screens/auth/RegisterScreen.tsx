@@ -27,6 +27,7 @@ export const RegisterScreen: React.FC<Props> = ({ navigation, route }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
+  const [storeCode, setStoreCode] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +36,11 @@ export const RegisterScreen: React.FC<Props> = ({ navigation, route }) => {
   const handleRegister = async () => {
     if (!name.trim() || !email.trim() || !password.trim()) {
       setError('Por favor completa los campos obligatorios (*).');
+      return;
+    }
+
+    if (!storeCode.trim()) {
+      setError('Escribe el código de tu tienda (te lo da la empresa).');
       return;
     }
 
@@ -54,7 +60,7 @@ export const RegisterScreen: React.FC<Props> = ({ navigation, route }) => {
         email: email.trim(),
         password: password.trim(),
         phone: phone.trim() || undefined,
-      });
+      }, { headers: { 'X-Tenant-Slug': storeCode.trim().toLowerCase() } });
 
       await login(data.accessToken, data.user);
       
@@ -110,6 +116,19 @@ export const RegisterScreen: React.FC<Props> = ({ navigation, route }) => {
         )}
 
         <View style={styles.formCard}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Código de tienda *</Text>
+            <TextInput
+              style={styles.input}
+              value={storeCode}
+              onChangeText={(v) => setStoreCode(v.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+              placeholder="ej. mi-tienda"
+              placeholderTextColor={colors.muted}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Nombre *</Text>
             <TextInput

@@ -151,7 +151,13 @@ export class TenantsService implements OnModuleInit {
   async findBySlugPublic(slug: string) {
     const tenant = await this.tenantRepo.findOne({ where: { slug, active: true } });
     if (!tenant) throw new NotFoundException('Empresa no encontrada');
-    return { name: tenant.name, slug: tenant.slug };
+    const branches = await this.dataSource.query(
+      `SELECT b.name, b.address, b.phone, c.name AS city
+         FROM branches b LEFT JOIN cities c ON c.id = b."cityId"
+        WHERE b."tenantId" = $1 AND b.active = true ORDER BY b.id`,
+      [tenant.id],
+    );
+    return { name: tenant.name, slug: tenant.slug, branches };
   }
 
   async findAll() {

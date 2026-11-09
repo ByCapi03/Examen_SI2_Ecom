@@ -72,7 +72,7 @@ export const QrPaymentPage: React.FC = () => {
   if (loading && !info) {
     return (
       <div style={{ minHeight: '100vh', background: '#fff', color: '#111', padding: 24, textAlign: 'center', fontFamily: 'sans-serif' }}>
-        <h2>ATEMPORAL</h2>
+        <h2>DRESSED</h2>
         <p>Cargando pago QR...</p>
         <p style={{ fontSize: '0.8rem', color: '#666' }}>Token: {token}</p>
         <p style={{ fontSize: '0.8rem', color: '#666' }}>API: {API_URL}</p>
@@ -82,7 +82,7 @@ export const QrPaymentPage: React.FC = () => {
 
   return (
     <div style={{ textAlign: 'center', padding: '50px', fontFamily: 'sans-serif', maxWidth: '400px', margin: '0 auto', background: '#fff', minHeight: '100vh', color: '#333' }}>
-      <h1>ATEMPORAL</h1>
+      <h1>DRESSED</h1>
       <h2>Confirmación de Pago QR</h2>
 
       {error && (

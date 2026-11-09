@@ -57,23 +57,13 @@ export const ActivateAccountPage = () => {
     <div className="login-container">
       <div className="login-left">
         <div className="brand-info" style={{ textAlign: 'center' }}>
-          <img
-
-            alt="ATEMPORAL - Moda que trasciende épocas"
-            style={{ maxWidth: '240px', width: '100%', height: 'auto', objectFit: 'contain', marginBottom: '15px', borderRadius: '8px' }}
-          />
-          <h1>ATEMPORAL</h1>
-          <p>Moda que trasciende épocas.</p>
+          <h1>DRESSED</h1>
+          <p>Activa tu cuenta para continuar.</p>
         </div>
       </div>
       <div className="login-right">
         <div className="login-box">
           <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-            <img
-
-              alt="ATEMPORAL"
-              style={{ maxHeight: '70px', width: 'auto', objectFit: 'contain', borderRadius: '6px' }}
-            />
             <h2 style={{ marginTop: '10px' }}>Activar Cuenta</h2>
             <p className="subtitle">
               {step === 1
