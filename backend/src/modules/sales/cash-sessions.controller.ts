@@ -2,7 +2,7 @@
  * CASH SESSIONS CONTROLLER
  * Flujo de Caja (Turnos): Expone las rutas /cash-sessions/open, /cash-sessions/close, etc.
  */
-import { Controller, Post, Get, Body, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Req, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { CashSessionsService } from './cash-sessions.service';
 import { OpenCashSessionDto } from './sales.dto';
 import { AuthGuard } from '../../common/guards/auth.guard';
@@ -15,7 +15,10 @@ export class CashSessionsController {
   @Post('open')
   openSession(@Req() req: any, @Body() openCashSessionDto: OpenCashSessionDto) {
     const userId = req.user.sub;
-    return this.cashSessionsService.openSession(userId, openCashSessionDto);
+    const isManager = req.user.roles?.includes('ADMIN') || req.user.roles?.includes('ENCARGADO');
+    return isManager
+      ? this.cashSessionsService.openSessionAsManager(req.user, openCashSessionDto)
+      : this.cashSessionsService.openSession(userId, openCashSessionDto);
   }
 
   @Get('current')
@@ -30,8 +33,13 @@ export class CashSessionsController {
     return this.cashSessionsService.closeSession(userId, closeCashSessionDto);
   }
 
+  @Post(':id/close')
+  closeSessionAsManager(@Req() req: any, @Param('id', ParseIntPipe) id: number, @Body() dto: import('./sales.dto').CloseCashSessionDto) {
+    return this.cashSessionsService.closeSessionAsManager(req.user, id, dto);
+  }
+
   @Get()
-  findAll(@Req() req: any) {
-    return this.cashSessionsService.findAll(req.user);
+  findAll(@Req() req: any, @Query('branchId') branchId?: string) {
+    return this.cashSessionsService.findAll(req.user, branchId);
   }
 }

@@ -48,6 +48,13 @@ export class CashSession {
   @Column({ type: 'timestamp', nullable: true })
   closedAt: Date;
 
+  /** Quién abrió/cerró la caja (puede ser un ADMIN/ENCARGADO actuando por el cajero). */
+  @Column({ type: 'int', nullable: true })
+  openedById: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  closedById: number | null;
+
   @Column({ type: 'enum', enum: CashSessionStatus, default: CashSessionStatus.OPEN })
   status: CashSessionStatus;
 

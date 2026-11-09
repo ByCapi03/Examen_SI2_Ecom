@@ -769,7 +769,7 @@ export class ReservationsService implements OnModuleInit {
     return { ...reservation, paymentSummary: this.calculatePaymentSummary(reservation) };
   }
 
-  async findAll(user: any, deliveryQueue: boolean = false) {
+  async findAll(user: any, deliveryQueue: boolean = false, branchId?: string) {
     const isAdmin = user.roles?.includes('ADMIN');
     const isEncargado = user.roles?.includes('ENCARGADO');
     const isCajero = user.roles?.includes('CAJERO');
@@ -782,6 +782,8 @@ export class ReservationsService implements OnModuleInit {
 
     if (isEncargado || isCajero) {
       whereClause.branchId = user.branchId;
+    } else if (isAdmin && branchId && Number(branchId) > 0) {
+      whereClause.branchId = Number(branchId);
     }
 
     if (deliveryQueue) {

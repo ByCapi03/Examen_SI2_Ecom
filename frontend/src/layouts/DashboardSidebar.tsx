@@ -11,6 +11,7 @@ import { useSettings } from '../config/SettingsContext';
 
 const ICONS: Record<string, ReactNode> = {
   '/dashboard': <LayoutDashboard size={18} />,
+  '/dashboard/my-branch': <Building2 size={18} />,
   '/dashboard/pos': <Store size={18} />,
   '/dashboard/sales': <ShoppingCart size={18} />,
   '/dashboard/reservations': <Calendar size={18} />,

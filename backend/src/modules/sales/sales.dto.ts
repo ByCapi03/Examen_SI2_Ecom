@@ -13,6 +13,18 @@ export class OpenCashSessionDto {
   @IsNumber()
   @Min(0, { message: 'El monto de apertura no puede ser negativo' })
   openingAmount: number;
+
+  /** Solo ADMIN/ENCARGADO: caja que se abre a nombre de un cajero. */
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  cashierId?: number;
+
+  /** Solo ADMIN: sucursal de la caja (el ENCARGADO usa la suya). */
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  branchId?: number;
 }
 
 export class CloseCashSessionDto {

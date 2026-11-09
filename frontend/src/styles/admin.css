@@ -105,3 +105,9 @@
   .adm-tabs::-webkit-scrollbar { display: none; }
   .adm-tab { flex-shrink: 0; }
 }
+
+.adm-scope .btn-action { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 9px; font: inherit; font-size: 0.76rem; font-weight: 700; cursor: pointer; background: transparent; color: var(--atemporal-text); border: 1.5px solid var(--atemporal-border); text-transform: none; letter-spacing: 0; }
+.adm-scope .btn-action:hover { border-color: var(--atemporal-gold); }
+.adm-scope .error-message { background: rgba(220, 38, 38, 0.08); color: #dc2626; border: 1px solid rgba(220, 38, 38, 0.3); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; font-size: 0.86rem; }
+.adm-scope .warning-message { background: rgba(217, 119, 6, 0.1); color: #b45309; border: 1px solid rgba(217, 119, 6, 0.3); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; font-size: 0.86rem; }
+.adm-scope .loading-state { padding: 32px; text-align: center; color: var(--atemporal-muted); }

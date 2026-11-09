@@ -2,24 +2,28 @@ import { useAuth } from '../auth/AuthContext';
 import { CitiesSection } from './CitiesSection';
 import { BranchesSection } from './BranchesSection';
 import { ROL } from '../../types/roles';
+import { DashStyles, PageHeader, PlanBadge } from '../../components/dashboard/ui';
+import '../../styles/admin.css';
 
 export const BranchesPage = () => {
   const { user } = useAuth();
   const isAdmin = user?.roles?.includes(ROL.ADMIN);
 
   return (
-    <div className="dashboard-container">
-      <div className="page-header">
-        <h1 className="page-title">Sucursales</h1>
-        <p className="page-subtitle">
-          {isAdmin 
-            ? 'Administra las ciudades y sucursales de la tienda' 
-            : 'Administra la información de tu sucursal asignada'}
-        </p>
-      </div>
+    <div className="dz-page adm-scope">
+      <DashStyles />
+      <PageHeader
+        title="Sucursales"
+        subtitle={isAdmin
+          ? 'Administra las ciudades y sucursales. Entra a una sucursal para gestionar sus ventas, inventario, reservas, cajas y personal.'
+          : 'Administra la información de tu sucursal asignada'}
+        badge={<PlanBadge />}
+      />
 
-      {isAdmin && <CitiesSection />}
-      <BranchesSection />
+      <div style={{ display: 'grid', gap: 18 }}>
+        {isAdmin && <CitiesSection />}
+        <BranchesSection />
+      </div>
     </div>
   );
 };

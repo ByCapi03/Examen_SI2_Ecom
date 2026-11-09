@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, Query } from '@nestjs/common';
 import { AccessService } from './access.service';
 import { CreateUserDto, UpdateUserDto, CreateRoleDto, UpdateRoleDto } from './access.dto';
 import { AuthGuard } from '../../common/guards/auth.guard';
@@ -14,8 +14,8 @@ export class AccessController {
   }
 
   @Get()
-  findAllUsers(@Request() req: any) {
-    return this.accessService.findAllUsers(req.user);
+  findAllUsers(@Request() req: any, @Query('branchId') branchId?: string) {
+    return this.accessService.findAllUsers(req.user, branchId);
   }
 
   @Get(':id')

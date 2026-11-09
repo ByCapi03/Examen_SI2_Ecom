@@ -7,6 +7,7 @@ import { api } from '../../api/axios';
 import { useAuth } from '../auth/AuthContext';
 import { useSettings } from '../../config/SettingsContext';
 import { usePlan } from '../saas/PlanContext';
+import { useBranchScope } from '../branches/BranchScopeContext';
 import {
   DashStyles, PageHeader, PlanBadge, Card, KpiCard, AreaChart, DonutChart, HBarChart, ColumnChart, Funnel, Skeleton, Empty, SERIES,
 } from '../../components/dashboard/ui';
@@ -33,6 +34,7 @@ export const DashboardPage = () => {
   const { user } = useAuth();
   const { t, money, num, locale } = useSettings();
   const { tenant } = usePlan();
+  const { scope } = useBranchScope();
   const isAdmin = !!user?.roles?.includes('ADMIN');
 
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
@@ -94,7 +96,7 @@ export const DashboardPage = () => {
       <div className="dz-card" style={{ padding: 14, marginBottom: 18, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <Slicer label={t('filters.from')}><input type="date" className="dz-input" value={f.startDate} onChange={(e) => setF({ ...f, startDate: e.target.value })} /></Slicer>
         <Slicer label={t('filters.to')}><input type="date" className="dz-input" value={f.endDate} onChange={(e) => setF({ ...f, endDate: e.target.value })} /></Slicer>
-        {isAdmin && (
+        {isAdmin && !scope && (
           <Slicer label={t('filters.branch')}>
             <select className="dz-input" value={f.branchId} onChange={(e) => setF({ ...f, branchId: e.target.value })}>
               <option value="">{t('filters.all')}</option>
