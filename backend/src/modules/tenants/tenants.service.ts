@@ -30,8 +30,10 @@ export class TenantsService implements OnModuleInit {
       await this.planRepo.query(`UPDATE plans SET code = UPPER(REGEXP_REPLACE(COALESCE(name,'plan'), '[^A-Za-z0-9]', '_', 'g')) WHERE code IS NULL`);
 
       const plans = [
-        { code: 'BASICO', name: 'Plan Básico', priceMonthly: 49, maxBranches: 2, aiGenerativeReports: false, offlineOperations: true },
-        { code: 'PROFESIONAL', name: 'Plan Profesional', priceMonthly: 149, maxBranches: 10, aiGenerativeReports: true, offlineOperations: true },
+        { code: 'BASICO', name: 'Plan Básico', priceMonthly: 0, maxBranches: 1, aiGenerativeReports: false, offlineOperations: true },
+        { code: 'STARTER', name: 'Plan Starter', priceMonthly: 29, maxBranches: 3, aiGenerativeReports: false, offlineOperations: true },
+        { code: 'PROFESIONAL', name: 'Plan Profesional', priceMonthly: 79, maxBranches: 10, aiGenerativeReports: true, offlineOperations: true },
+        { code: 'EMPRESARIAL', name: 'Plan Empresarial', priceMonthly: 199, maxBranches: 99, aiGenerativeReports: true, offlineOperations: true },
       ];
       for (const p of plans) {
         const existing = await this.planRepo.findOne({ where: { code: p.code } });

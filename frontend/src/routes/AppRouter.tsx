@@ -46,6 +46,8 @@ import { SuppliersPage } from '../features/suppliers/SuppliersPage';
 import { SyncConflictsPage } from '../features/sync/SyncConflictsPage';
 import { AiReportsPage } from '../features/ai-reports/AiReportsPage';
 import { AnalyticsPage } from '../features/analytics/AnalyticsPage';
+import { PricingPage } from '../features/saas/PricingPage';
+import { TenantRegisterPage } from '../features/saas/TenantRegisterPage';
 
 export const AppRouter = () => {
   return (
@@ -61,6 +63,10 @@ export const AppRouter = () => {
 
         {/* Public QR Payment Page */}
         <Route path="/qr-payment/:token" element={<QrPaymentPage />} />
+
+        {/* SaaS - Pricing & Tenant Registration */}
+        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/saas/register" element={<TenantRegisterPage />} />
 
         {/* Store Routes (Customer Facing) */}
         <Route path="/" element={<StoreLayout />}>

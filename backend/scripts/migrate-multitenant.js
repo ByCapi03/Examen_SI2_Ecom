@@ -130,7 +130,11 @@ async function main() {
     }
 
     await db.query(`INSERT INTO plans (code, name, "priceMonthly", "maxBranches", "aiGenerativeReports", "offlineOperations")
-      VALUES ('BASICO', 'Plan Básico', 49, 2, false, true), ('PROFESIONAL', 'Plan Profesional', 149, 10, true, true)
+      VALUES
+        ('BASICO',      'Plan Básico',      0,   1,  false, true),
+        ('STARTER',     'Plan Starter',     29,  3,  false, true),
+        ('PROFESIONAL', 'Plan Profesional', 79,  10, true,  true),
+        ('EMPRESARIAL', 'Plan Empresarial', 199, 99, true,  true)
       ON CONFLICT (code) DO NOTHING`);
     await db.query(`INSERT INTO tenants (id, slug, name) VALUES (1, 'fashionstore-central', 'FashionStore S.R.L.')
       ON CONFLICT (id) DO NOTHING`);

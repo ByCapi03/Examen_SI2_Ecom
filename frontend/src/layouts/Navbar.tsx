@@ -24,6 +24,21 @@ export const Navbar = () => {
         <Link to="/catalog">Catálogo</Link>
         <Link to="/cart">Carrito {totalItems > 0 ? `(${totalItems})` : ''}</Link>
         <Link to={isAuthenticated ? "/account" : "/login"}>Mi Cuenta</Link>
+        <Link
+          to="/pricing"
+          style={{
+            background: '#c8963e',
+            color: '#fff',
+            padding: '6px 14px',
+            borderRadius: '20px',
+            fontWeight: 600,
+            fontSize: '0.82rem',
+            letterSpacing: '0.03em',
+            textDecoration: 'none',
+          }}
+        >
+          Registrar empresa
+        </Link>
       </div>
     </nav>
   );
