@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../../api/axios';
 import { useAuth } from '../auth/AuthContext';
 
@@ -19,10 +19,11 @@ const errMsg = (e: any, fallback: string) => {
 export const EmpresaRegistroPage = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const preselected: string = (useLocation().state as any)?.plan?.code ?? '';
 
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(preselected ? 1 : 0);
   const [plans, setPlans] = useState<PlanInfo[]>([]);
-  const [planCode, setPlanCode] = useState('');
+  const [planCode, setPlanCode] = useState(preselected);
   const [companyName, setCompanyName] = useState('');
   const [taxId, setTaxId] = useState('');
   const [slug, setSlug] = useState('');

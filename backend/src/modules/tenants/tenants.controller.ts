@@ -45,6 +45,12 @@ export class TenantsController {
     return this.tenantsService.findAllPlans();
   }
 
+  @Get('tenants/by-slug/:slug')
+  @Public()
+  bySlug(@Param('slug') slug: string) {
+    return this.tenantsService.findBySlugPublic(slug);
+  }
+
   @Get('tenants/:id')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('SUPERADMIN')
@@ -54,7 +60,10 @@ export class TenantsController {
 
   @Post('tenants/register')
   @Public()
-  createTenant(@Body() body: { name: string; slug: string; taxId?: string; planCode?: string }) {
+  createTenant(@Body() body: {
+    name: string; slug: string; taxId?: string; planCode?: string;
+    adminName?: string; adminEmail?: string; adminPassword?: string;
+  }) {
     return this.tenantsService.createTenant(body);
   }
 
