@@ -30,11 +30,22 @@ export class TenantsService implements OnModuleInit {
    */
   async onModuleInit() {
     try {
+      await this.ensureRoles();
+    } catch (err) {
+      this.logger.error('No se pudieron garantizar los roles base', err as any);
+    }
+    try {
       // Backfill: si TypeORM agregó la columna code como nullable (tabla preexistente sin esa columna),
       // asignamos el code correcto antes de hacer las búsquedas por code.
-      await this.planRepo.query(`UPDATE plans SET code = 'BASICO' WHERE code IS NULL AND name ILIKE '%basico%'`);
-      await this.planRepo.query(`UPDATE plans SET code = 'PROFESIONAL' WHERE code IS NULL AND name ILIKE '%profesional%'`);
-      await this.planRepo.query(`UPDATE plans SET code = UPPER(REGEXP_REPLACE(COALESCE(name,'plan'), '[^A-Za-z0-9]', '_', 'g')) WHERE code IS NULL`);
+      await this.planRepo.query(`
+        UPDATE plans SET code = CASE
+          WHEN translate(lower(name), 'áéíóú', 'aeiou') LIKE '%basico%' THEN 'BASICO'
+          WHEN translate(lower(name), 'áéíóú', 'aeiou') LIKE '%starter%' THEN 'STARTER'
+          WHEN translate(lower(name), 'áéíóú', 'aeiou') LIKE '%profesional%' THEN 'PROFESIONAL'
+          WHEN translate(lower(name), 'áéíóú', 'aeiou') LIKE '%empresarial%' THEN 'EMPRESARIAL'
+          ELSE UPPER(REGEXP_REPLACE(COALESCE(name,'plan'), '[^A-Za-z0-9]', '_', 'g'))
+        END
+        WHERE code IS NULL`);
 
       const plans = [
         { code: 'BASICO', name: 'Plan Básico', priceMonthly: 0, maxBranches: 1, aiGenerativeReports: false, offlineOperations: true },
@@ -47,6 +58,9 @@ export class TenantsService implements OnModuleInit {
         if (!existing) await this.planRepo.save(this.planRepo.create(p));
         else await this.planRepo.update({ code: p.code }, p);
       }
+      await this.mergeDuplicatePlans(plans);
+      const synced = await this.planRepo.find({ order: { priceMonthly: 'ASC' } });
+      this.logger.log(`Planes: ${synced.map((x) => `${x.code} $${Number(x.priceMonthly)}`).join(' · ')}`);
       if ((await this.tenantRepo.count()) === 0) {
         const tenant = await this.tenantRepo.save(
           this.tenantRepo.create({ name: 'FashionStore S.R.L.', slug: 'fashionstore-central', active: true }),
@@ -58,6 +72,47 @@ export class TenantsService implements OnModuleInit {
     } catch (err) {
       this.logger.error('No se pudo inicializar planes/tenant', err as any);
     }
+  }
+
+  /**
+   * Bases antiguas pudieron generar planes duplicados (mismo nombre, otro code). Se reasignan sus
+   * suscripciones al plan canónico del catálogo y se elimina el duplicado.
+   */
+  private async mergeDuplicatePlans(catalog: { code: string; name: string }[]) {
+    const norm = `translate(lower(name), 'áéíóú', 'aeiou')`;
+    for (const c of catalog) {
+      const canonical = await this.planRepo.findOne({ where: { code: c.code } });
+      if (!canonical) continue;
+      const dupes: { id: number }[] = await this.planRepo.query(
+        `SELECT id FROM plans WHERE code <> $1 AND ${norm} = translate(lower($2), 'áéíóú', 'aeiou')`,
+        [c.code, c.name],
+      );
+      for (const d of dupes) {
+        await this.planRepo.query(`UPDATE subscriptions SET plan_id=$1 WHERE plan_id=$2`, [canonical.id, d.id]);
+        await this.planRepo.query(`UPDATE subscription_history SET plan_id=$1 WHERE plan_id=$2`, [canonical.id, d.id]);
+        await this.planRepo.query(`UPDATE subscription_history SET previous_plan_id=$1 WHERE previous_plan_id=$2`, [canonical.id, d.id]);
+        await this.planRepo.query(`DELETE FROM plans WHERE id=$1`, [d.id]);
+        this.logger.warn(`Plan duplicado #${d.id} fusionado en ${c.code}`);
+      }
+    }
+  }
+
+  /** Roles base del sistema. Idempotente: evita depender de correr `npm run seed` a mano. */
+  private async ensureRoles() {
+    const roles: [string, string][] = [
+      ['ADMIN', 'Administrador'], ['CLIENTE', 'Cliente'], ['ENCARGADO', 'Encargado de Sucursal'], ['CAJERO', 'Cajero'],
+    ];
+    await this.dataSource.query(
+      `SELECT setval(pg_get_serial_sequence('roles','id'), COALESCE((SELECT MAX(id) FROM roles), 0) + 1, false)`,
+    );
+    for (const [name, description] of roles) {
+      await this.dataSource.query(
+        `INSERT INTO roles (name, description, active) VALUES ($1,$2,true) ON CONFLICT (name) DO NOTHING`,
+        [name, description],
+      );
+    }
+    const total = await this.dataSource.query(`SELECT COUNT(*)::int AS n FROM roles WHERE active`);
+    this.logger.log(`Roles base verificados (${total[0].n} activos)`);
   }
 
   async getMyTenant(tenantId: number) {
@@ -155,6 +210,8 @@ export class TenantsService implements OnModuleInit {
     const planCode = data.planCode || 'BASICO';
     const plan = await this.planRepo.findOne({ where: { code: planCode } });
     if (!plan) throw new NotFoundException(`Plan ${planCode} no existe`);
+
+    await this.ensureRoles();
 
     const qr = this.dataSource.createQueryRunner();
     await qr.connect();
