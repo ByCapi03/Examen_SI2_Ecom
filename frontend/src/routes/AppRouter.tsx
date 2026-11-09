@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useAuth } from '../features/auth/AuthContext';
 import { SettingsPage } from '../features/settings/SettingsPage';
 import { AuditPage } from '../features/audit/AuditPage';
 
@@ -50,6 +51,13 @@ import { AiReportsPage } from '../features/ai-reports/AiReportsPage';
 import { AnalyticsPage } from '../features/analytics/AnalyticsPage';
 import { PricingPage } from '../features/saas/PricingPage';
 import { TenantRegisterPage } from '../features/saas/TenantRegisterPage';
+
+/** Inicio del panel: el cajero no tiene dashboard, su inicio es su caja. */
+const DashboardIndex = () => {
+  const { user } = useAuth();
+  const cashierOnly = !!user?.roles?.includes('CAJERO') && !user.roles.includes('ADMIN') && !user.roles.includes('ENCARGADO');
+  return cashierOnly ? <Navigate to="/dashboard/pos" replace /> : <DashboardPage />;
+};
 
 export const AppRouter = () => {
   return (
@@ -113,7 +121,7 @@ export const AppRouter = () => {
           }
         >
           <Route element={<DashboardLayout />}>
-            <Route index element={<DashboardPage />} />
+            <Route index element={<DashboardIndex />} />
             <Route path="products" element={<ProductsAdminPage />} />
             <Route path="inventory" element={<InventoryAdminPage />} />
             <Route path="branches" element={<BranchesPage />} />

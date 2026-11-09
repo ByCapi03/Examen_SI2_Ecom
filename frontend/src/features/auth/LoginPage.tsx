@@ -42,8 +42,11 @@ export const LoginPage = () => {
   const [code, setCode] = useState('');
   const [verifyInfo, setVerifyInfo] = useState<string | null>(null);
 
+  // El cajero no tiene dashboard: entra directo a su caja.
+  const staffHome = (roles: string[]) => (roles.includes('ADMIN') || roles.includes('ENCARGADO') ? '/dashboard' : '/dashboard/pos');
+
   const goAfterLogin = (user: any) => {
-    if (['ADMIN','ENCARGADO','CAJERO'].some(r => user.roles.includes(r))) navigate('/dashboard', { replace:true });
+    if (['ADMIN','ENCARGADO','CAJERO'].some(r => user.roles.includes(r))) navigate(staffHome(user.roles), { replace:true });
     else navigate('/account', { replace:true });
   };
 
@@ -77,7 +80,7 @@ export const LoginPage = () => {
       login(data.accessToken, data.user);
       if (data.user.mustChangePassword) { navigate('/change-password', { replace:true }); return; }
       if (['ADMIN','ENCARGADO','CAJERO'].some(r => data.user.roles.includes(r))) {
-        navigate('/dashboard', { replace:true });
+        navigate(staffHome(data.user.roles), { replace:true });
       } else {
         const pr = sessionStorage.getItem('pendingReservation');
         if (pr) { try { navigate('/reservations/new', { state:JSON.parse(pr), replace:true }); return; } catch {} }
