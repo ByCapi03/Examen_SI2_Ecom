@@ -23,6 +23,12 @@ export class TenantsService implements OnModuleInit {
    */
   async onModuleInit() {
     try {
+      // Backfill: si TypeORM agregó la columna code como nullable (tabla preexistente sin esa columna),
+      // asignamos el code correcto antes de hacer las búsquedas por code.
+      await this.planRepo.query(`UPDATE plans SET code = 'BASICO' WHERE code IS NULL AND name ILIKE '%basico%'`);
+      await this.planRepo.query(`UPDATE plans SET code = 'PROFESIONAL' WHERE code IS NULL AND name ILIKE '%profesional%'`);
+      await this.planRepo.query(`UPDATE plans SET code = UPPER(REGEXP_REPLACE(COALESCE(name,'plan'), '[^A-Za-z0-9]', '_', 'g')) WHERE code IS NULL`);
+
       const plans = [
         { code: 'BASICO', name: 'Plan Básico', priceMonthly: 49, maxBranches: 2, aiGenerativeReports: false, offlineOperations: true },
         { code: 'PROFESIONAL', name: 'Plan Profesional', priceMonthly: 149, maxBranches: 10, aiGenerativeReports: true, offlineOperations: true },

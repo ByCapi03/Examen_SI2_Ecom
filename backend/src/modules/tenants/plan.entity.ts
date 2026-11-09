@@ -6,7 +6,7 @@ export class Plan {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ unique: true })
+  @Column({ unique: true, nullable: true })
   code: string;
 
   @Column()
