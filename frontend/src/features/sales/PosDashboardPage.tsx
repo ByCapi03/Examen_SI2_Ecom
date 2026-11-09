@@ -7,6 +7,7 @@ interface CashSessionData {
   status: 'OPEN' | 'CLOSED';
   session: {
     id: number;
+    registerName?: string | null;
     openingAmount: string;
     openedAt: string;
     summary?: {
@@ -31,6 +32,8 @@ export const PosDashboardPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [openingAmount, setOpeningAmount] = useState('');
+  const [registers, setRegisters] = useState<{ id: number; name: string }[]>([]);
+  const [registerId, setRegisterId] = useState<number | ''>('');
   
   const [closingAmount, setClosingAmount] = useState('');
   const [isClosing, setIsClosing] = useState(false);
@@ -42,6 +45,12 @@ export const PosDashboardPage = () => {
       setLoading(true);
       const res = await api.get('/cash-sessions/current');
       setData(res.data);
+
+      if (res.data.status === 'CLOSED') {
+        const free = await api.get('/cash-registers/available').then((r) => r.data as { id: number; name: string }[]).catch(() => []);
+        setRegisters(free);
+        setRegisterId(free.length === 1 ? free[0].id : '');
+      }
 
       const resReservas = await api.get('/reservations');
       const listas = resReservas.data.filter((r: any) => r.status === 'LISTA').length;
@@ -67,8 +76,13 @@ export const PosDashboardPage = () => {
       return;
     }
 
+    if (registers.length > 1 && !registerId) {
+      setError('Selecciona la caja que vas a usar');
+      return;
+    }
+
     try {
-      await api.post('/cash-sessions/open', { openingAmount: amount });
+      await api.post('/cash-sessions/open', { openingAmount: amount, ...(registerId ? { registerId } : {}) });
       await fetchSession();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al aperturar caja');
@@ -137,6 +151,22 @@ export const PosDashboardPage = () => {
 
       {data.status === 'CLOSED' ? (
         <form onSubmit={handleOpenSession} style={{ display: 'flex', flexDirection: 'column', gap: '15px', maxWidth: '400px' }}>
+          {registers.length === 0 ? (
+            <div style={{ padding: '12px', backgroundColor: '#fff3cd', border: '1px solid #ffeeba', borderRadius: '6px', color: '#856404' }}>
+              No hay cajas libres en tu sucursal. Pide a la administración que cree una caja o libere alguna en uso.
+            </div>
+          ) : registers.length === 1 ? (
+            <p style={{ margin: 0 }}><strong>Caja:</strong> {registers[0].name}</p>
+          ) : (
+            <div>
+              <label style={{ display: 'block', marginBottom: '5px' }}>Caja</label>
+              <select required value={registerId} onChange={e => setRegisterId(e.target.value ? Number(e.target.value) : '')}
+                style={{ padding: '10px', width: '100%', borderRadius: '4px', border: '1px solid #ccc' }}>
+                <option value="">Selecciona una caja</option>
+                {registers.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
+            </div>
+          )}
           <div>
             <label style={{ display: 'block', marginBottom: '5px' }}>Monto Inicial (Bs.)</label>
             <input 
@@ -149,7 +179,7 @@ export const PosDashboardPage = () => {
               style={{ padding: '10px', width: '100%', borderRadius: '4px', border: '1px solid #ccc' }}
             />
           </div>
-          <button type="submit" style={{ padding: '12px', backgroundColor: '#0056b3', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>
+          <button type="submit" disabled={registers.length === 0} style={{ padding: '12px', backgroundColor: '#0056b3', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: registers.length === 0 ? 'not-allowed' : 'pointer', opacity: registers.length === 0 ? 0.5 : 1 }}>
             APERTURAR CAJA
           </button>
         </form>
@@ -159,6 +189,7 @@ export const PosDashboardPage = () => {
           <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
             <div style={{ padding: '15px', border: '1px solid #ddd', borderRadius: '8px' }}>
               <h3 style={{ marginTop: 0 }}>Resumen de Sesión</h3>
+              {data.session?.registerName && <p style={{ margin: '0 0 6px' }}><strong>Caja:</strong> {data.session.registerName}</p>}
               <p><strong>Abierta el:</strong> {new Date(data.session?.openedAt || '').toLocaleString()}</p>
               <hr />
               <p style={{ display: 'flex', justifyContent: 'space-between' }}>

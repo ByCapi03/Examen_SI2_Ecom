@@ -4,7 +4,7 @@
  * todo lo que entra por las peticiones HTTP (Apertura de caja, Ventas POS, Creación 
  * de clientes rápidos, y boilerplate de pagos/ventas).
  */
-import { IsNumber, IsPositive, Min, IsOptional, ValidateNested, IsArray, IsIn, IsInt, IsEmail, IsString, IsNotEmpty, IsEnum } from 'class-validator';
+import { MaxLength, IsBoolean, IsNumber, IsPositive, Min, IsOptional, ValidateNested, IsArray, IsIn, IsInt, IsEmail, IsString, IsNotEmpty, IsEnum } from 'class-validator';
 import { PartialType } from '@nestjs/mapped-types';
 import { PaymentMethod } from './sales.enums';
 import { Type } from 'class-transformer';
@@ -20,11 +20,36 @@ export class OpenCashSessionDto {
   @IsPositive()
   cashierId?: number;
 
+  /** Caja sobre la que se abre el turno. Obligatoria para ADMIN/ENCARGADO; opcional para el cajero si solo hay una libre. */
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  registerId?: number;
+}
+
+export class CreateCashRegisterDto {
+  @IsString()
+  @IsNotEmpty({ message: 'El nombre de la caja es obligatorio' })
+  @MaxLength(60)
+  name: string;
+
   /** Solo ADMIN: sucursal de la caja (el ENCARGADO usa la suya). */
   @IsOptional()
   @IsInt()
   @IsPositive()
   branchId?: number;
+}
+
+export class UpdateCashRegisterDto {
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(60)
+  name?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
 }
 
 export class CloseCashSessionDto {

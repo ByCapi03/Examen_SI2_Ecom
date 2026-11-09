@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { ILike, Not, Repository } from 'typeorm';
 import { City } from './city.entity';
 import { CreateCityDto, UpdateCityDto } from './branches.dto';
 
@@ -11,7 +11,16 @@ export class CitiesService {
     private readonly cityRepository: Repository<City>,
   ) {}
 
+  // Las ciudades son un catálogo compartido por todas las empresas: el nombre no puede repetirse.
+  private async assertNameFree(name: string, exceptId?: number) {
+    const clash = await this.cityRepository.findOne({
+      where: { name: ILike(name.trim().replace(/[%_\\]/g, '\\$&')), ...(exceptId ? { id: Not(exceptId) } : {}) },
+    });
+    if (clash) throw new ConflictException(`La ciudad "${clash.name}" ya existe en el catálogo; selecciónala al crear la sucursal`);
+  }
+
   async create(createCityDto: CreateCityDto) {
+    await this.assertNameFree(createCityDto.name);
     const city = this.cityRepository.create(createCityDto);
     return await this.cityRepository.save(city);
   }
@@ -32,6 +41,7 @@ export class CitiesService {
 
   async update(id: number, updateCityDto: UpdateCityDto) {
     const city = await this.findOne(id);
+    if (updateCityDto.name) await this.assertNameFree(updateCityDto.name, id);
     Object.assign(city, updateCityDto);
     return await this.cityRepository.save(city);
   }

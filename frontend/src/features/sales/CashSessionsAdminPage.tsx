@@ -6,7 +6,7 @@ export const CashSessionsAdminPage = () => (
     <DashStyles />
     <PageHeader
       title="Sesiones de caja"
-      subtitle="Abre cajas para tus cajeros, cierra las pendientes y revisa diferencias"
+      subtitle="Crea las cajas de tus sucursales, ábrelas con tus cajeros y revisa los turnos y sus diferencias"
       badge={<PlanBadge />}
     />
     <CashSessionsView />

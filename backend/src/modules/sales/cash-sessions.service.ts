@@ -7,6 +7,7 @@ import { Injectable, UnauthorizedException, BadRequestException, ConflictExcepti
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
+import { CashRegister } from './cash-register.entity';
 import { CashSession } from './cash-session.entity';
 import { User } from '../auth/user.entity';
 import { Branch } from '../branches/branch.entity';
@@ -21,6 +22,7 @@ export class CashSessionsService {
     @InjectRepository(CashSession) private cashSessionRepository: Repository<CashSession>,
     @InjectRepository(User) private userRepository: Repository<User>,
     @InjectRepository(Branch) private branchRepository: Repository<Branch>,
+    @InjectRepository(CashRegister) private registerRepository: Repository<CashRegister>,
   ) {}
 
   private async getValidCashierAndBranch(userId: number) {
@@ -61,9 +63,12 @@ export class CashSessionsService {
       throw new ConflictException('Ya tienes una caja abierta. Ciérrala antes de abrir una nueva.');
     }
 
+    const registerId = await this.pickRegisterForCashier(branch.id, dto.registerId);
+
     const newSession = this.cashSessionRepository.create({
       branchId: branch.id,
       cashierId: user.id,
+      registerId,
       openingAmount: dto.openingAmount,
       openedById: user.id,
       status: CashSessionStatus.OPEN
@@ -72,12 +77,40 @@ export class CashSessionsService {
     try {
       return await this.cashSessionRepository.save(newSession);
     } catch (error: any) {
-      // Postgres unique constraint violation error code
-      if (error.code === '23505') {
-        throw new ConflictException('Ya tienes una caja abierta. Ciérrala antes de abrir una nueva.');
-      }
-      throw error;
+      this.rethrowOpenConflict(error, 'Ya tienes una caja abierta. Ciérrala antes de abrir una nueva.');
     }
+  }
+
+  private rethrowOpenConflict(error: any, cashierMessage: string): never {
+    // Postgres unique constraint violation: distingue turno del cajero vs. caja ya en uso
+    if (error?.code === '23505') {
+      throw new ConflictException(String(error.constraint ?? '').includes('REGISTER') ? 'Esa caja ya está abierta' : cashierMessage);
+    }
+    throw error;
+  }
+
+  /** Elige la caja del turno: la indicada, o la única libre de la sucursal. */
+  private async pickRegisterForCashier(branchId: number, requested?: number): Promise<number> {
+    const registers = await this.registerRepository.find({ where: { branchId, active: true }, order: { name: 'ASC' } });
+    if (!registers.length) {
+      const any = await this.registerRepository.count({ where: { branchId } });
+      throw new BadRequestException(any
+        ? 'Las cajas de tu sucursal están desactivadas. Contacta a la administración.'
+        : 'Tu sucursal aún no tiene cajas creadas. Pide a la administración que cree una.');
+    }
+    const busy = new Set(
+      (await this.cashSessionRepository.find({ where: { branchId, status: CashSessionStatus.OPEN } })).map((s) => s.registerId),
+    );
+    if (requested) {
+      const register = registers.find((r) => r.id === requested);
+      if (!register) throw new BadRequestException('La caja seleccionada no es válida para tu sucursal');
+      if (busy.has(register.id)) throw new ConflictException('Esa caja ya está en uso');
+      return register.id;
+    }
+    const free = registers.filter((r) => !busy.has(r.id));
+    if (!free.length) throw new ConflictException('Todas las cajas de tu sucursal están en uso');
+    if (free.length === 1) return free[0].id;
+    throw new BadRequestException('Selecciona la caja que vas a usar');
   }
 
   private async calculateSessionSummary(sessionId: number) {
@@ -126,7 +159,8 @@ export class CashSessionsService {
     const { user, branch } = await this.getValidCashierAndBranch(userId);
 
     const openSession = await this.cashSessionRepository.findOne({
-      where: { cashierId: user.id, status: CashSessionStatus.OPEN }
+      where: { cashierId: user.id, status: CashSessionStatus.OPEN },
+      relations: { register: true },
     });
 
     if (openSession) {
@@ -137,6 +171,7 @@ export class CashSessionsService {
         status: 'OPEN',
         session: {
           id: openSession.id,
+          registerName: openSession.register?.name ?? null,
           openingAmount: openSession.openingAmount,
           openedAt: openSession.openedAt,
           summary: {
@@ -197,16 +232,21 @@ export class CashSessionsService {
     }
   }
 
-  /** ADMIN/ENCARGADO abren una caja a nombre de un cajero de la sucursal. */
+  /** ADMIN/ENCARGADO abren un turno sobre una caja existente, a nombre de un cajero de esa sucursal. */
   async openSessionAsManager(actor: any, dto: OpenCashSessionDto) {
     this.assertManager(actor);
     const isAdmin = actor.roles.includes('ADMIN');
-    const branchId = isAdmin ? dto.branchId : actor.branchId;
-    if (!branchId) throw new BadRequestException(isAdmin ? 'Indica la sucursal de la caja' : 'No tienes una sucursal asignada');
+    if (!dto.registerId) throw new BadRequestException('Selecciona la caja que se va a abrir');
     if (!dto.cashierId) throw new BadRequestException('Selecciona el cajero que usará la caja');
 
-    const branch = await this.branchRepository.findOne({ where: { id: branchId, tenantId: actor.tenantId } });
-    if (!branch || !branch.active) throw new BadRequestException('La sucursal no existe o está inactiva');
+    const register = await this.registerRepository.findOne({
+      where: { id: dto.registerId, tenantId: actor.tenantId },
+      relations: { branch: true },
+    });
+    if (!register) throw new NotFoundException('La caja no existe');
+    if (!isAdmin && register.branchId !== actor.branchId) throw new ForbiddenException('No puedes abrir cajas de otra sucursal');
+    if (!register.active) throw new BadRequestException('La caja está desactivada');
+    if (!register.branch?.active) throw new BadRequestException('La sucursal de la caja está inactiva');
 
     const cashier = await this.userRepository.findOne({
       where: { id: dto.cashierId, tenantId: actor.tenantId },
@@ -215,24 +255,28 @@ export class CashSessionsService {
     if (!cashier || !cashier.active || !cashier.userRoles.some((ur) => ur.role.name === 'CAJERO' && ur.active)) {
       throw new BadRequestException('El usuario seleccionado no es un cajero activo');
     }
-    if (cashier.branchId !== branch.id) {
-      throw new BadRequestException('El cajero no pertenece a esa sucursal');
+    if (cashier.branchId !== register.branchId) {
+      throw new BadRequestException('El cajero no pertenece a la sucursal de esta caja');
     }
 
-    const existing = await this.cashSessionRepository.findOne({ where: { cashierId: cashier.id, status: CashSessionStatus.OPEN } });
-    if (existing) throw new ConflictException(`${cashier.name} ya tiene una caja abierta`);
+    if (await this.cashSessionRepository.findOne({ where: { registerId: register.id, status: CashSessionStatus.OPEN } })) {
+      throw new ConflictException('Esta caja ya está abierta');
+    }
+    if (await this.cashSessionRepository.findOne({ where: { cashierId: cashier.id, status: CashSessionStatus.OPEN } })) {
+      throw new ConflictException(`${cashier.name} ya tiene una caja abierta`);
+    }
 
     try {
       return await this.cashSessionRepository.save(this.cashSessionRepository.create({
-        branchId: branch.id,
+        branchId: register.branchId,
+        registerId: register.id,
         cashierId: cashier.id,
         openingAmount: dto.openingAmount,
         openedById: actor.sub,
         status: CashSessionStatus.OPEN,
       }));
     } catch (error: any) {
-      if (error.code === '23505') throw new ConflictException(`${cashier.name} ya tiene una caja abierta`);
-      throw error;
+      this.rethrowOpenConflict(error, `${cashier.name} ya tiene una caja abierta`);
     }
   }
 
@@ -265,7 +309,7 @@ export class CashSessionsService {
 
     const sessions = await this.cashSessionRepository.find({
       where: whereClause,
-      relations: { cashier: true, branch: true },
+      relations: { cashier: true, branch: true, register: true },
       order: { openedAt: 'DESC' }
     });
 
@@ -273,13 +317,19 @@ export class CashSessionsService {
       // En cajas abiertas, el esperado se calcula en vivo (apertura + ventas en efectivo).
       let expectedAmount = s.expectedAmount !== null && s.expectedAmount !== undefined ? Number(s.expectedAmount) : null;
       if (s.status === CashSessionStatus.OPEN) {
-        const summary = await this.calculateSessionSummary(s.id);
-        expectedAmount = Number(s.openingAmount) + summary.cashSales;
+        try {
+          const summary = await this.calculateSessionSummary(s.id);
+          expectedAmount = Number(s.openingAmount) + summary.cashSales;
+        } catch {
+          expectedAmount = Number(s.openingAmount); // un resumen fallido no debe tumbar todo el listado
+        }
       }
       return {
         id: s.id,
         cashierId: s.cashierId,
         branchId: s.branchId,
+        registerId: s.registerId,
+        registerName: s.register?.name ?? null,
         cashierName: s.cashier?.name || 'Cajero',
         branchName: s.branch?.name || '',
         openingAmount: Number(s.openingAmount),

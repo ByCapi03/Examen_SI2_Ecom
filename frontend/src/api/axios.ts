@@ -34,8 +34,8 @@ const isCacheable = (config?: InternalAxiosRequestConfig) =>
   OFFLINE_CACHEABLE.some((p) => (config.url ?? '').startsWith(p));
 
 /** Lecturas que respetan el filtro `branchId` cuando el ADMIN está dentro de una sucursal. */
-const BRANCH_SCOPED_GET = ['/sales', '/inventory', '/reservations', '/cash-sessions', '/users', '/dashboard/metrics', '/reports/'];
-const BRANCH_SCOPE_EXCLUDED = ['/sales/my', '/reservations/my', '/cash-sessions/current'];
+const BRANCH_SCOPED_GET = ['/sales', '/inventory', '/reservations', '/cash-sessions', '/cash-registers', '/users', '/dashboard/metrics', '/reports/'];
+const BRANCH_SCOPE_EXCLUDED = ['/sales/my', '/reservations/my', '/cash-sessions/current', '/cash-registers/available'];
 
 const isAdminUser = () => {
   try { return !!JSON.parse(localStorage.getItem('user') || 'null')?.roles?.includes('ADMIN'); } catch { return false; }
