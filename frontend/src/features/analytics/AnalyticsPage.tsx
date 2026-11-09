@@ -1,13 +1,29 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/axios';
 import { Sparkline } from '../ai-reports/ReportChart';
+import { DashStyles, PageHeader, PlanBadge, PlanGate } from '../../components/dashboard/ui';
 
 /**
  * ANALÍTICA PREDICTIVA (Plan Profesional)
  *  - Pronóstico de demanda: aprendizaje supervisado (regresión lineal).
  *  - Segmentación de clientes: aprendizaje no supervisado (K-Means sobre RFM).
  */
-export const AnalyticsPage = () => {
+export const AnalyticsPage = () => (
+  <div className="dz-page">
+    <DashStyles />
+    <PageHeader title="Analítica predictiva (ML)" subtitle="Modelos de Machine Learning entrenados con el historial de tu empresa" badge={<PlanBadge />} />
+    <PlanGate feature="ai" title="Machine Learning para tu tienda" bullets={[
+      'Pronóstico de demanda por producto (aprendizaje supervisado)',
+      'Stock de seguridad y sugerencias de reposición',
+      'Segmentación de clientes K-Means sobre RFM (no supervisado)',
+      'Acciones sugeridas por segmento',
+    ]}>
+      <AnalyticsContent />
+    </PlanGate>
+  </div>
+);
+
+const AnalyticsContent = () => {
   const [tab, setTab] = useState<'demand' | 'segments'>('demand');
   const [weeks, setWeeks] = useState(12);
   const [horizon, setHorizon] = useState(4);
@@ -34,13 +50,12 @@ export const AnalyticsPage = () => {
 
   const riskColor: Record<string, string> = { QUIEBRE: '#b91c1c', REPONER: '#b45309', OK: '#15803d' };
   const tabBtn = (t: typeof tab, label: string) => (
-    <button onClick={() => setTab(t)} style={{ padding: '8px 16px', border: 'none', borderBottom: tab === t ? '3px solid var(--atemporal-gold)' : '3px solid transparent', background: 'none', fontWeight: tab === t ? 700 : 400, cursor: 'pointer' }}>{label}</button>
+    <button onClick={() => setTab(t)} style={{ padding: '8px 16px', border: 'none', borderBottom: tab === t ? '3px solid var(--atemporal-gold)' : '3px solid transparent', background: 'none', color: 'var(--atemporal-text)', fontFamily: 'inherit', fontWeight: tab === t ? 700 : 400, cursor: 'pointer' }}>{label}</button>
   );
 
   return (
-    <div style={{ paddingTop: 24 }}>
-      <h2 style={{ marginBottom: 4 }}>Analítica predictiva</h2>
-      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid #ddd', marginBottom: 16 }}>
+    <div className="dz-card">
+      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--atemporal-border)', marginBottom: 16, flexWrap: 'wrap' }}>
         {tabBtn('demand', 'Pronóstico de demanda (supervisado)')}
         {tabBtn('segments', 'Segmentación de clientes (no supervisado)')}
       </div>
@@ -58,7 +73,7 @@ export const AnalyticsPage = () => {
           {demand?.products?.length > 0 && (
             <div style={{ overflowX: 'auto' }}>
               <style>{'.ml-table th, .ml-table td { padding: 8px 10px; white-space: nowrap; }'}</style>
-              <table className="ml-table" style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', fontSize: 13 }}>
+              <table className="ml-table" style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--atemporal-white)', color: 'var(--atemporal-text)', fontSize: 13 }}>
                 <thead>
                   <tr style={{ textAlign: 'left', borderBottom: '2px solid #ddd' }}>
                     <th style={{ padding: 8 }}>Producto</th><th>Histórico → pronóstico</th><th>Tendencia</th>
@@ -97,7 +112,7 @@ export const AnalyticsPage = () => {
           {segments?.message && <div style={{ color: '#666' }}>{segments.message}</div>}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
             {segments?.segments?.map((s: any) => (
-              <div key={s.cluster} style={{ background: '#fff', borderRadius: 10, padding: 16, border: '1px solid var(--atemporal-border)' }}>
+              <div key={s.cluster} style={{ background: 'var(--atemporal-white)', borderRadius: 10, padding: 16, border: '1px solid var(--atemporal-border)' }}>
                 <h3 style={{ margin: '0 0 4px' }}>{s.name}</h3>
                 <div style={{ color: '#666', fontSize: 13, marginBottom: 8 }}>{s.size} cliente(s)</div>
                 <div style={{ fontSize: 13 }}>Recencia media: <b>{s.avgRecencyDays} días</b></div>

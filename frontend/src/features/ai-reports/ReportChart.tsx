@@ -2,8 +2,8 @@
 interface Row { label: string; value: number }
 
 const fmt = (n: number) => n.toLocaleString('es-BO', { maximumFractionDigits: 2 });
-const COLOR = '#182D2A';
-const ACCENT = '#C9904A';
+const COLOR = 'var(--chart-1, #182D2A)';
+const ACCENT = 'var(--chart-2, #C9904A)';
 
 export const BarChart = ({ rows }: { rows: Row[] }) => {
   const max = Math.max(...rows.map((r) => r.value), 1);
@@ -32,10 +32,10 @@ export const LineChart = ({ rows, height = 220 }: { rows: Row[]; height?: number
     <svg viewBox={`0 0 ${w} ${height}`} style={{ width: '100%', height: 'auto' }} role="img">
       <line x1={pad} y1={height - pad} x2={w - pad} y2={height - pad} stroke="#ccc" />
       <text x={pad} y={pad - 10} fontSize="11" fill="#666">máx {fmt(max)}</text>
-      <path d={d} fill="none" stroke={COLOR} strokeWidth="2.5" />
+      <path d={d} fill="none" style={{ stroke: COLOR }} strokeWidth="2.5" />
       {rows.map((r, i) => (
         <g key={i}>
-          <circle cx={x(i)} cy={y(r.value)} r="3.5" fill={ACCENT}><title>{`${r.label}: ${fmt(r.value)}`}</title></circle>
+          <circle cx={x(i)} cy={y(r.value)} r="3.5" style={{ fill: ACCENT }}><title>{`${r.label}: ${fmt(r.value)}`}</title></circle>
           {(rows.length <= 12 || i % Math.ceil(rows.length / 12) === 0) && (
             <text x={x(i)} y={height - pad + 16} fontSize="10" textAnchor="middle" fill="#666">{r.label.slice(5) || r.label}</text>
           )}
@@ -57,8 +57,8 @@ export const Sparkline = ({ history, forecast }: { history: number[]; forecast: 
   const fc = [history[start] ?? 0, ...forecast].map((v, i) => `${i ? 'L' : 'M'}${x(start + i)},${y(v)}`).join(' ');
   return (
     <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h}>
-      <path d={hist} fill="none" stroke={COLOR} strokeWidth="2" />
-      <path d={fc} fill="none" stroke={ACCENT} strokeWidth="2" strokeDasharray="4 3" />
+      <path d={hist} fill="none" style={{ stroke: COLOR }} strokeWidth="2" />
+      <path d={fc} fill="none" style={{ stroke: ACCENT }} strokeWidth="2" strokeDasharray="4 3" />
     </svg>
   );
 };

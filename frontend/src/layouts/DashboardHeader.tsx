@@ -107,7 +107,7 @@ export const DashboardHeader = () => {
           borderRadius: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
           animation: 'fadeInOut 4s ease-in-out'
         }}>
-          <strong>ATEMPORAL:</strong> {toastMessage}
+          <strong>DRESSED:</strong> {toastMessage}
         </div>
       )}
 
