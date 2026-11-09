@@ -99,7 +99,7 @@ export class TenantsService implements OnModuleInit {
 
   async createTenant(data: { name: string; slug: string; taxId?: string; planCode?: string }) {
     const existing = await this.tenantRepo.findOne({ where: { slug: data.slug } });
-    if (existing) throw new ConflictException(`El slug ${data.slug} ya está registrado`);
+    if (existing) throw new ConflictException(`La URL "${data.slug}" ya está en uso por otra empresa. Usa otra o deja que el sistema sugiera una libre.`);
 
     const planCode = data.planCode || 'BASICO';
     const plan = await this.planRepo.findOne({ where: { code: planCode } });

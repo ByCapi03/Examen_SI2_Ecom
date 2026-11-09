@@ -14,6 +14,7 @@ import { LoginPage } from '../features/auth/LoginPage';
 import { RegisterPage } from '../features/auth/RegisterPage';
 import { ActivateAccountPage } from '../features/auth/ActivateAccountPage';
 import { ChangePasswordPage } from '../features/auth/ChangePasswordPage';
+import { EmpresaRegistroPage } from '../features/tenants/EmpresaRegistroPage';
 // Store Pages
 import { HomePage } from '../features/home/HomePage';
 import { CatalogPage } from '../features/catalog/CatalogPage';
@@ -57,6 +58,7 @@ export const AppRouter = () => {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/activate-account" element={<ActivateAccountPage />} />
           <Route path="/change-password" element={<ChangePasswordPage />} />
+          <Route path="/empresa/registro" element={<EmpresaRegistroPage />} />
         </Route>
 
         {/* Public QR Payment Page */}
