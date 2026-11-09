@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { StoreLinkCard } from '../../components/common/StoreLinkCard';
 import { Link } from 'react-router-dom';
 import {
   Wallet, Receipt, CalendarCheck, AlertTriangle, Users, TrendingUp, BrainCircuit, Sparkles, RefreshCw, ArrowRight,
@@ -90,8 +89,6 @@ export const DashboardPage = () => {
         badge={<PlanBadge />}
         actions={<button className="dz-btn ghost" onClick={() => void fetchMetrics()}><RefreshCw size={15} /> Actualizar</button>}
       />
-
-      <StoreLinkCard />
 
       {/* Slicers */}
       <div className="dz-card" style={{ padding: 14, marginBottom: 18, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>

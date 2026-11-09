@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { initDetector, getPose, clearSmoothing } from './utils/poseDetection';
+import { drawFitted, fitHeight } from './utils/garmentFit';
 import { api } from '../../api/axios';
 
 interface ProductDetail {
@@ -14,6 +15,8 @@ interface ProductDetail {
   arRightSleeveUrl?: string | null;
   arType: 'TOP' | 'BOTTOM' | 'DRESS';
 }
+
+const DEBUG_POSE = new URLSearchParams(window.location.search).has('debug');
 
 export const TryOnPage = () => {
   const { variantId } = useParams();
@@ -170,8 +173,8 @@ export const TryOnPage = () => {
         const shoulderDist = Math.hypot(rs.x - ls.x, rs.y - ls.y);
         const torsoHeight = Math.hypot(midHip.x - midShoulder.x, midHip.y - midShoulder.y);
         
-        const width = shoulderDist * 2.1;
-        const height = torsoHeight * 1.6;
+        const width = shoulderDist * 2.2;
+        const height = fitHeight(garmentImage.current, width, torsoHeight * 1.25, torsoHeight * 1.9);
 
         const isArticulated = garmentTorsoImage.current && garmentLeftSleeveImage.current && garmentRightSleeveImage.current;
 
@@ -181,7 +184,7 @@ export const TryOnPage = () => {
           const angle = Math.atan2(rs.y - ls.y, ls.x - rs.x);
           ctx.translate(midShoulder.x, midShoulder.y);
           ctx.rotate(angle);
-          ctx.drawImage(garmentTorsoImage.current!, -width / 2, -height * 0.1, width, height);
+          drawFitted(ctx, garmentTorsoImage.current!, -width / 2, -height * 0.08, width, height);
           ctx.restore();
 
           // Draw sleeves
@@ -234,7 +237,7 @@ export const TryOnPage = () => {
           ctx.save();
           ctx.translate(midShoulder.x, midShoulder.y);
           ctx.rotate(angle);
-          ctx.drawImage(garmentImage.current!, -width / 2, -height * 0.1, width, height);
+          drawFitted(ctx, garmentImage.current!, -width / 2, -height * 0.08, width, height);
           ctx.restore();
         }
 
@@ -246,18 +249,21 @@ export const TryOnPage = () => {
         const angle = Math.atan2(rh.y - lh.y, lh.x - rh.x);
         
         const width = hipDist * 2.3;
-        let height = width * 1.8; // default fallback height
-        
+        let height = fitHeight(garmentImage.current, width, hipDist * 1.2, hipDist * 4.5);
+
         if (lk && rk) {
-           const midKnee = { x: (lk.x + rk.x) / 2, y: (lk.y + rk.y) / 2 };
-           height = Math.hypot(midKnee.x - midHip.x, midKnee.y - midHip.y) * 1.4;
+          const midKnee = { x: (lk.x + rk.x) / 2, y: (lk.y + rk.y) / 2 };
+          const legLen = Math.hypot(midKnee.x - midHip.x, midKnee.y - midHip.y);
+          // Pantalón largo ≈ 2 veces cadera→rodilla; la falda/short respeta su proporción.
+          height = fitHeight(garmentImage.current, width, legLen * 0.9, legLen * 2.2);
         }
 
         ctx.translate(midHip.x, midHip.y);
         ctx.rotate(angle);
-        
-        ctx.drawImage(garmentImage.current, -width / 2, 0, width, height);
-        
+
+        // La cintura queda por encima del punto de la cadera.
+        drawFitted(ctx, garmentImage.current, -width / 2, -hipDist * 0.3, width, height);
+
       } else if (product.arType === 'DRESS' && ls && rs && lh && rh) {
         detected = true;
         
@@ -266,22 +272,21 @@ export const TryOnPage = () => {
         const shoulderDist = Math.hypot(rs.x - ls.x, rs.y - ls.y);
         const angle = Math.atan2(rs.y - ls.y, ls.x - rs.x);
         
-        const width = shoulderDist * 2.1;
-        let height = 0;
+        const width = shoulderDist * 2.2;
+        const torsoHeight = Math.hypot(midHip.x - midShoulder.x, midHip.y - midShoulder.y);
+        let minH = torsoHeight * 1.8, maxH = torsoHeight * 3.4;
 
         if (lk && rk) {
           const midKnee = { x: (lk.x + rk.x) / 2, y: (lk.y + rk.y) / 2 };
-          height = Math.hypot(midKnee.x - midShoulder.x, midKnee.y - midShoulder.y) * 1.2;
-        } else {
-          // Estimate length if knees not confident enough
-          const torsoHeight = Math.hypot(midHip.x - midShoulder.x, midHip.y - midShoulder.y);
-          height = torsoHeight * 2.5; 
+          const toKnee = Math.hypot(midKnee.x - midShoulder.x, midKnee.y - midShoulder.y);
+          minH = toKnee * 0.95; maxH = toKnee * 1.5;
         }
+        const height = fitHeight(garmentImage.current, width, minH, maxH);
 
         ctx.translate(midShoulder.x, midShoulder.y);
         ctx.rotate(angle);
-        
-        ctx.drawImage(garmentImage.current, -width / 2, -height * 0.1, width, height);
+
+        drawFitted(ctx, garmentImage.current, -width / 2, -height * 0.06, width, height);
       }
 
       ctx.restore();
@@ -299,6 +304,7 @@ export const TryOnPage = () => {
       // ----------------------------------------------------
       // DEBUG VISUALIZATION
       // ----------------------------------------------------
+      if (DEBUG_POSE) {
       ctx.save();
       const drawDebugKp = (label: string, kp: any) => {
         if (!kp) return;
@@ -338,6 +344,7 @@ export const TryOnPage = () => {
       drawDebugKp('LK', kps[13]);
       drawDebugKp('RK', kps[14]);
       ctx.restore();
+      }
       // ----------------------------------------------------
     } else {
       setNoBodyDetected(prev => {
