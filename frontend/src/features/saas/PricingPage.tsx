@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../../api/axios';
 
 interface Plan {
@@ -12,60 +12,35 @@ interface Plan {
   offlineOperations: boolean;
 }
 
-const PLAN_FEATURES: Record<string, { description: string; features: string[]; badge?: string; color: string }> = {
+const PLAN_META: Record<string, { description: string; features: string[]; badge?: string; accent: boolean }> = {
   BASICO: {
-    description: 'Perfecto para empezar tu negocio digital.',
-    badge: undefined,
-    color: 'border-gray-200',
-    features: [
-      '1 sucursal',
-      'Hasta 50 productos',
-      'Punto de venta (POS)',
-      'Catálogo en línea',
-      'Reservas de clientes',
-      'Operaciones offline',
-    ],
+    description: 'Perfecto para empezar tu negocio digital sin costo.',
+    accent: false,
+    features: ['1 sucursal', 'Hasta 50 productos', 'Punto de venta (POS)', 'Catálogo en línea', 'Reservas de clientes', 'Operaciones offline básicas'],
   },
   STARTER: {
-    description: 'Para negocios en crecimiento con múltiples puntos.',
-    badge: undefined,
-    color: 'border-gray-200',
-    features: [
-      '3 sucursales',
-      'Productos ilimitados',
-      'POS con sesiones de caja',
-      'Inventario multisucursal',
-      'Sincronización offline',
-      'Reportes básicos',
-    ],
+    description: 'Para negocios en crecimiento con múltiples puntos de venta.',
+    accent: false,
+    features: ['3 sucursales', 'Productos ilimitados', 'POS con sesiones de caja', 'Inventario multisucursal', 'Sincronización offline', 'Reportes básicos'],
   },
   PROFESIONAL: {
     description: 'La solución completa para empresas establecidas.',
     badge: 'Más popular',
-    color: 'border-amber-500',
-    features: [
-      '10 sucursales',
-      'Todo lo de Starter',
-      'Reportes con IA generativa',
-      'Análisis de demanda (ML)',
-      'Segmentación RFM de clientes',
-      'Soporte prioritario',
-    ],
+    accent: true,
+    features: ['10 sucursales', 'Todo lo del plan Starter', 'Reportes con IA generativa', 'Análisis de demanda (ML)', 'Segmentación RFM de clientes', 'Soporte prioritario'],
   },
   EMPRESARIAL: {
-    description: 'Escala sin límites con soporte dedicado.',
-    badge: undefined,
-    color: 'border-gray-200',
-    features: [
-      'Sucursales ilimitadas',
-      'Todo lo de Profesional',
-      'SLA 99.9% uptime',
-      'Onboarding personalizado',
-      'API dedicada',
-      'Soporte 24/7',
-    ],
+    description: 'Escala sin límites. Soporte dedicado 24/7.',
+    accent: false,
+    features: ['Sucursales ilimitadas', 'Todo lo del plan Profesional', 'SLA 99.9% uptime', 'Onboarding personalizado', 'API dedicada', 'Soporte 24/7'],
   },
 };
+
+const Check = () => (
+  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+  </svg>
+);
 
 export const PricingPage = () => {
   const navigate = useNavigate();
@@ -79,91 +54,159 @@ export const PricingPage = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleSelect = (plan: Plan) => {
-    navigate('/saas/register', { state: { plan } });
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      {/* Header */}
-      <div className="bg-[#1a1a1a] text-white py-16 px-4 text-center">
-        <div className="max-w-3xl mx-auto">
-          <span className="inline-block bg-amber-500/20 text-amber-400 text-xs font-semibold px-3 py-1 rounded-full mb-4 uppercase tracking-widest">
-            SaaS FashionStore
-          </span>
-          <h1 className="text-4xl font-bold mb-4">Elige el plan perfecto para tu negocio</h1>
-          <p className="text-gray-400 text-lg">
-            Comienza gratis. Escala cuando lo necesites. Sin permanencia.
-          </p>
-        </div>
+    <div style={{ minHeight: '100vh', background: 'var(--atemporal-cream, #F5F2EB)', fontFamily: "'Outfit', system-ui, sans-serif" }}>
+
+      {/* Nav */}
+      <nav style={{ background: 'var(--atemporal-green, #182D2A)', padding: '14px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Link to="/" style={{ color: 'var(--atemporal-cream, #F5F2EB)', textDecoration: 'none', fontWeight: 700, fontSize: '1.1rem', letterSpacing: 2 }}>
+          ATEMPORAL
+        </Link>
+        <Link to="/login" style={{ color: 'var(--atemporal-beige, #CFC1A5)', textDecoration: 'none', fontSize: '0.85rem' }}>
+          Ya tengo cuenta →
+        </Link>
+      </nav>
+
+      {/* Hero */}
+      <div style={{
+        background: 'linear-gradient(135deg, var(--atemporal-green, #182D2A) 0%, #0d1f1d 100%)',
+        padding: '64px 24px',
+        textAlign: 'center',
+        color: '#fff',
+      }}>
+        <span style={{
+          display: 'inline-block',
+          background: 'rgba(201,144,74,0.2)',
+          color: 'var(--atemporal-gold, #C9904A)',
+          fontSize: '0.72rem',
+          fontWeight: 700,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          padding: '5px 16px',
+          borderRadius: 20,
+          marginBottom: 20,
+          border: '1px solid rgba(201,144,74,0.3)',
+        }}>
+          SaaS FashionStore
+        </span>
+        <h1 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.8rem)', fontWeight: 800, margin: '0 0 16px', lineHeight: 1.2 }}>
+          Elige el plan perfecto<br />para tu negocio
+        </h1>
+        <p style={{ color: '#94a3a0', fontSize: '1.05rem', margin: 0 }}>
+          Comienza gratis. Escala cuando lo necesites. Sin permanencia mínima.
+        </p>
       </div>
 
-      {/* Plans */}
-      <div className="max-w-6xl mx-auto px-4 py-16">
+      {/* Cards */}
+      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '56px 24px' }}>
         {loading ? (
-          <div className="flex justify-center py-20">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-amber-500" />
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
+            <div style={{
+              width: 40, height: 40, border: '3px solid #e5e7eb',
+              borderTopColor: 'var(--atemporal-gold, #C9904A)',
+              borderRadius: '50%',
+              animation: 'spin 0.8s linear infinite',
+            }} />
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
+            gap: 20,
+            alignItems: 'stretch',
+          }}>
             {plans.map((plan) => {
-              const meta = PLAN_FEATURES[plan.code] ?? {
-                description: '', features: [], color: 'border-gray-200',
-              };
-              const isPopular = !!meta.badge;
-
+              const meta = PLAN_META[plan.code] ?? { description: '', features: [], accent: false };
               return (
-                <div
-                  key={plan.id}
-                  className={`relative bg-white rounded-2xl border-2 ${meta.color} ${isPopular ? 'shadow-xl scale-105' : 'shadow-md'} p-6 flex flex-col`}
-                >
-                  {isPopular && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                      <span className="bg-amber-500 text-white text-xs font-bold px-4 py-1 rounded-full whitespace-nowrap">
-                        {meta.badge}
-                      </span>
+                <div key={plan.id} style={{
+                  position: 'relative',
+                  background: meta.accent ? 'var(--atemporal-green, #182D2A)' : '#fff',
+                  color: meta.accent ? '#fff' : 'var(--atemporal-text, #1D2926)',
+                  borderRadius: 20,
+                  padding: meta.accent ? '36px 28px 28px' : '28px',
+                  boxShadow: meta.accent
+                    ? '0 20px 60px rgba(24,45,42,0.35)'
+                    : '0 2px 20px rgba(0,0,0,0.07)',
+                  border: meta.accent ? 'none' : '1.5px solid #e8e3d9',
+                  transform: meta.accent ? 'translateY(-8px)' : 'none',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  transition: 'box-shadow 0.2s, transform 0.2s',
+                }}>
+                  {meta.badge && (
+                    <div style={{
+                      position: 'absolute',
+                      top: -13,
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      background: 'var(--atemporal-gold, #C9904A)',
+                      color: '#fff',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      letterSpacing: '0.08em',
+                      textTransform: 'uppercase',
+                      padding: '5px 18px',
+                      borderRadius: 20,
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {meta.badge}
                     </div>
                   )}
 
-                  <div className="mb-4">
-                    <h2 className="text-lg font-bold text-gray-900">{plan.name}</h2>
-                    <p className="text-sm text-gray-500 mt-1">{meta.description}</p>
+                  {/* Plan name */}
+                  <div style={{ marginBottom: 6 }}>
+                    <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>{plan.name}</h3>
+                    <p style={{ margin: '6px 0 0', fontSize: '0.82rem', opacity: 0.65, lineHeight: 1.4 }}>{meta.description}</p>
                   </div>
 
-                  <div className="mb-6">
+                  {/* Price */}
+                  <div style={{ margin: '20px 0 24px' }}>
                     {plan.priceMonthly === 0 ? (
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-4xl font-black text-gray-900">Gratis</span>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                        <span style={{ fontSize: '2.6rem', fontWeight: 900, lineHeight: 1 }}>Gratis</span>
                       </div>
                     ) : (
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-sm text-gray-500">$</span>
-                        <span className="text-4xl font-black text-gray-900">{plan.priceMonthly}</span>
-                        <span className="text-sm text-gray-500">/mes</span>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                        <span style={{ fontSize: '1rem', opacity: 0.6, alignSelf: 'flex-start', marginTop: 6 }}>$</span>
+                        <span style={{ fontSize: '2.8rem', fontWeight: 900, lineHeight: 1 }}>{plan.priceMonthly}</span>
+                        <span style={{ fontSize: '0.85rem', opacity: 0.6 }}>/mes</span>
                       </div>
                     )}
                   </div>
 
-                  <ul className="space-y-2 mb-8 flex-1">
-                    {meta.features.map((f) => (
-                      <li key={f} className="flex items-center gap-2 text-sm text-gray-600">
-                        <svg className="w-4 h-4 text-green-500 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                        {f}
+                  {/* Features */}
+                  <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 28px', flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {meta.features.map(f => (
+                      <li key={f} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.85rem' }}>
+                        <span style={{ color: meta.accent ? 'var(--atemporal-gold, #C9904A)' : '#22c55e' }}>
+                          <Check />
+                        </span>
+                        <span style={{ opacity: 0.85 }}>{f}</span>
                       </li>
                     ))}
                   </ul>
 
                   <button
-                    onClick={() => handleSelect(plan)}
-                    className={`w-full py-3 rounded-xl font-semibold text-sm transition-all ${
-                      isPopular
-                        ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-md'
-                        : 'bg-gray-900 hover:bg-gray-700 text-white'
-                    }`}
+                    onClick={() => navigate('/saas/register', { state: { plan } })}
+                    style={{
+                      width: '100%',
+                      padding: '13px 0',
+                      border: 'none',
+                      borderRadius: 12,
+                      cursor: 'pointer',
+                      fontWeight: 700,
+                      fontSize: '0.9rem',
+                      letterSpacing: '0.02em',
+                      transition: 'all 0.2s',
+                      background: meta.accent
+                        ? 'var(--atemporal-gold, #C9904A)'
+                        : 'var(--atemporal-green, #182D2A)',
+                      color: '#fff',
+                    }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.88'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; }}
                   >
-                    {plan.priceMonthly === 0 ? 'Comenzar gratis' : `Contratar por $${plan.priceMonthly}/mes`}
+                    {plan.priceMonthly === 0 ? 'Comenzar gratis' : `Contratar — $${plan.priceMonthly}/mes`}
                   </button>
                 </div>
               );
@@ -171,12 +214,15 @@ export const PricingPage = () => {
           </div>
         )}
 
-        {/* Comparison note */}
-        <div className="mt-16 text-center text-sm text-gray-500">
-          <p>Todos los planes incluyen operaciones offline, múltiples usuarios y actualizaciones automáticas.</p>
-          <p className="mt-1">¿Dudas? <a href="mailto:soporte@fashionstore.io" className="text-amber-600 hover:underline">Contacta a soporte</a>.</p>
-        </div>
+        <p style={{ textAlign: 'center', marginTop: 48, fontSize: '0.85rem', color: '#6b7280' }}>
+          Todos los planes incluyen operaciones offline, múltiples usuarios y actualizaciones automáticas.{' '}
+          <a href="mailto:soporte@fashionstore.io" style={{ color: 'var(--atemporal-gold, #C9904A)' }}>
+            ¿Dudas? Contacta soporte.
+          </a>
+        </p>
       </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 };
