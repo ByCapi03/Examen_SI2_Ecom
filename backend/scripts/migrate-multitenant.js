@@ -116,6 +116,19 @@ async function main() {
       previous_plan_id integer, changed_at timestamp NOT NULL DEFAULT now(), notes text)`);
     log('Tablas plans / tenants / subscriptions / subscription_history');
 
+    // Si la tabla plans fue creada por TypeORM sin la columna code, la agregamos y hacemos backfill
+    if (!(await columnExists(db, 'plans', 'code'))) {
+      await db.query(`ALTER TABLE plans ADD COLUMN code varchar`);
+      await db.query(`UPDATE plans SET code = 'BASICO' WHERE code IS NULL AND (name ILIKE '%basico%' OR name ILIKE '%básico%')`);
+      await db.query(`UPDATE plans SET code = 'PROFESIONAL' WHERE code IS NULL AND name ILIKE '%profesional%'`);
+      await db.query(`UPDATE plans SET code = UPPER(REGEXP_REPLACE(COALESCE(name,'plan'), '[^A-Za-z0-9]', '_', 'g')) WHERE code IS NULL`);
+      await db.query(`ALTER TABLE plans ALTER COLUMN code SET NOT NULL`);
+      if (!(await constraintExists(db, 'plans_code_key'))) {
+        await db.query(`ALTER TABLE plans ADD CONSTRAINT plans_code_key UNIQUE (code)`);
+      }
+      log('Columna code agregada a plans y backfill completado');
+    }
+
     await db.query(`INSERT INTO plans (code, name, "priceMonthly", "maxBranches", "aiGenerativeReports", "offlineOperations")
       VALUES ('BASICO', 'Plan Básico', 49, 2, false, true), ('PROFESIONAL', 'Plan Profesional', 149, 10, true, true)
       ON CONFLICT (code) DO NOTHING`);
