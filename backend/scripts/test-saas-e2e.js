@@ -15,14 +15,34 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const { Client } = require('pg');
 
-(function loadEnv() {
+function loadEnv() {
   const envPath = path.join(__dirname, '..', '.env');
-  if (!fs.existsSync(envPath)) return;
-  for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
-    if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^['"]|['"]$/g, '');
+  if (!fs.existsSync(envPath)) {
+    console.warn(`⚠ No se encontró ${envPath}; se usarán las variables de entorno del sistema.`);
+    return;
   }
-})();
+  try {
+    // Mismo lector que usa NestJS (@nestjs/config): soporta BOM, CRLF, comillas y comentarios
+    require('dotenv').config({ path: envPath, quiet: true });
+  } catch {
+    const text = fs.readFileSync(envPath, 'utf8').replace(/^﻿/, '');
+    for (const raw of text.split(/\r?\n/)) {
+      const line = raw.replace(/^\s*export\s+/, '');
+      const m = line.match(/^\s*([A-Za-z0-9_]+)\s*=\s*(.*?)\s*$/);
+      if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
+    }
+  }
+}
+
+function requireDbConfig() {
+  const missing = ['DB_HOST', 'DB_USERNAME', 'DB_PASSWORD', 'DB_DATABASE'].filter((k) => !process.env[k]);
+  if (missing.length) {
+    console.error(`\n✖ Faltan variables de conexión: ${missing.join(', ')}.`);
+    console.error('  Revise que backend/.env las defina (las mismas que usa el backend) o defínalas en la terminal.\n');
+    process.exit(1);
+  }
+}
+loadEnv();
 
 const API = process.env.API_URL || `http://localhost:${process.env.PORT || 3000}`;
 const RUN = Date.now().toString(36);
@@ -55,9 +75,10 @@ async function login(email) {
 async function main() {
   const db = new Client({
     host: process.env.DB_HOST || 'localhost', port: Number(process.env.DB_PORT || 5432),
-    user: process.env.DB_USERNAME || 'postgres', password: process.env.DB_PASSWORD || '',
+    user: process.env.DB_USERNAME || 'postgres', password: String(process.env.DB_PASSWORD),
     database: process.env.DB_DATABASE || 'ecommerce_ropa',
   });
+  requireDbConfig();
   await db.connect();
   const q = async (sql, params) => (await db.query(sql, params)).rows;
   const one = async (sql, params) => (await q(sql, params))[0];
