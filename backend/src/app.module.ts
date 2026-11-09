@@ -16,6 +16,7 @@ import { StoreModule } from './modules/store/store.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
+import { AuditModule } from './modules/audit/audit.module';
 import { FirebaseModule } from './common/firebase/firebase.module';
 import { WebsocketModule } from './common/realtime/websocket.module';
 import { TenantSubscriber } from './common/tenancy/tenant.subscriber';
@@ -64,6 +65,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
     SyncModule,
     AiReportsModule,
     AnalyticsModule,
+    AuditModule,
   ],
   controllers: [AppController],
   providers: [AppService],

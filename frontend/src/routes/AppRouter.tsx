@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { SettingsPage } from '../features/settings/SettingsPage';
+import { AuditPage } from '../features/audit/AuditPage';
 
 // Layouts
 import { StoreLayout } from '../layouts/StoreLayout';
@@ -128,6 +129,7 @@ export const AppRouter = () => {
             <Route path="analytics" element={<AnalyticsPage />} />
             <Route path="sync-conflicts" element={<SyncConflictsPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="audit" element={<AuditPage />} />
           </Route>
         </Route>
       </Routes>

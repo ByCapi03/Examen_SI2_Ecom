@@ -53,6 +53,7 @@ export const DASHBOARD_NAVIGATION: NavGroup[] = [
       { key: 'nav.branches', path: '/dashboard/branches', allowedRoles: [ROL.ADMIN] },
       { key: 'nav.users', path: '/dashboard/users', allowedRoles: MGMT },
       { key: 'nav.sync', path: '/dashboard/sync-conflicts', allowedRoles: MGMT },
+      { key: 'nav.audit', path: '/dashboard/audit', allowedRoles: [ROL.ADMIN] },
       { key: 'nav.settings', path: '/dashboard/settings', allowedRoles: [ROL.ADMIN, ROL.ENCARGADO, ROL.CAJERO] },
     ],
   },
