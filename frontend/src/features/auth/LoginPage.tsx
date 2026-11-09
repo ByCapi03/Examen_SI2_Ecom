@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { api } from '../../api/axios';
 import { useAuth } from './AuthContext';
 
-/* ── Icono de plataforma ── */
 const AppIcon = ({ size = 48 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 52 52" fill="none">
     <rect width="52" height="52" rx="13" fill="rgba(201,144,74,0.18)"/>
@@ -12,7 +11,6 @@ const AppIcon = ({ size = 48 }: { size?: number }) => (
   </svg>
 );
 
-/* ── Badge empresa detectada ── */
 const TenantBadge = ({ name }: { name: string }) => (
   <div style={{ display:'inline-flex', alignItems:'center', gap:7, background:'rgba(201,144,74,0.14)', border:'1px solid rgba(201,144,74,0.4)', borderRadius:20, padding:'5px 14px' }}>
     <div style={{ width:7, height:7, borderRadius:'50%', background:'#22c55e', flexShrink:0 }}/>
@@ -20,31 +18,6 @@ const TenantBadge = ({ name }: { name: string }) => (
   </div>
 );
 
-/* ── Input de slug para acceder por empresa ── */
-const TenantSlugInput = () => {
-  const navigate = useNavigate();
-  const [slug, setSlug] = useState('');
-  return (
-    <div style={{ display:'flex', gap:8 }}>
-      <input
-        value={slug}
-        onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,''))}
-        placeholder="slug-de-empresa"
-        style={{ flex:1, padding:'9px 12px', border:'1.5px solid #d1d5db', borderRadius:9, fontSize:'0.82rem', outline:'none', fontFamily:'monospace', background:'#fff', minWidth:0 }}
-        onKeyDown={e => { if (e.key==='Enter' && slug) navigate(`/login?tenant=${slug}`); }}
-      />
-      <button
-        onClick={() => { if (slug) navigate(`/login?tenant=${slug}`); }}
-        disabled={!slug}
-        style={{ padding:'9px 16px', background:'#182D2A', color:'#fff', border:'none', borderRadius:9, fontSize:'0.82rem', fontWeight:700, cursor:slug?'pointer':'not-allowed', opacity:slug?1:0.4, whiteSpace:'nowrap', flexShrink:0 }}
-      >
-        Ir →
-      </button>
-    </div>
-  );
-};
-
-/* ── Componente de campo de formulario ── */
 const Field = ({ label, name, type='text', value, onChange, placeholder, action }: {
   label: string; name: string; type?: string; value: string;
   onChange: (v: string) => void; placeholder?: string;
@@ -81,9 +54,10 @@ const Field = ({ label, name, type='text', value, onChange, placeholder, action 
   );
 };
 
-/* ════════════════════════════════════
-   PÁGINA PRINCIPAL
-════════════════════════════════════ */
+const EyeIcon = ({ open }: { open: boolean }) => open
+  ? <svg width="18" height="18" fill="none" stroke="#9ca3af" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+  : <svg width="18" height="18" fill="none" stroke="#9ca3af" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>;
+
 export const LoginPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -131,15 +105,9 @@ export const LoginPage = () => {
     } finally { setIsSubmitting(false); }
   };
 
-  const EyeIcon = ({ open }: { open: boolean }) => open
-    ? <svg width="18" height="18" fill="none" stroke="#9ca3af" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
-    : <svg width="18" height="18" fill="none" stroke="#9ca3af" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>;
-
   return (
     <>
-      {/* ── CSS responsive ── */}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap');
         *, *::before, *::after { box-sizing: border-box; }
         body { margin: 0; }
 
@@ -151,7 +119,6 @@ export const LoginPage = () => {
           background: #F5F2EB;
         }
 
-        /* ── Panel izquierdo (sidebar) ── */
         .login-sidebar {
           width: 420px;
           min-width: 300px;
@@ -177,9 +144,16 @@ export const LoginPage = () => {
           width:200px; height:200px; border-radius:50%;
           background: rgba(201,144,74,0.05);
         }
-        .sidebar-content { position:relative; text-align:center; max-width:280px; }
+        .sidebar-content {
+          position: relative;
+          text-align: center;
+          max-width: 280px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 20px;
+        }
 
-        /* ── Panel derecho (formulario) ── */
         .login-main {
           flex: 1;
           display: flex;
@@ -193,41 +167,37 @@ export const LoginPage = () => {
           max-width: 420px;
         }
 
-        /* ── MOBILE: < 768px ── */
+        /* ── Móvil < 768px ── */
         @media (max-width: 767px) {
           .login-wrap { flex-direction: column; }
 
           .login-sidebar {
             width: 100%;
             min-width: unset;
-            padding: 28px 20px 24px;
+            padding: 22px 20px;
             flex-direction: row;
             justify-content: flex-start;
-            gap: 16px;
-            border-radius: 0 0 24px 24px;
+            gap: 14px;
+            border-radius: 0 0 22px 22px;
           }
-          .login-sidebar::before { top:-60px; right:-60px; width:160px; height:160px; }
-          .login-sidebar::after { display:none; }
+          .login-sidebar::before { width:120px; height:120px; top:-40px; right:-40px; }
+          .login-sidebar::after  { display: none; }
 
           .sidebar-content {
+            flex-direction: row;
             text-align: left;
             max-width: unset;
-            display: flex;
+            gap: 12px;
             align-items: center;
-            gap: 14px;
-            flex-wrap: wrap;
           }
-          .sidebar-platform-name { font-size: 1.3rem !important; }
           .sidebar-tagline { display: none; }
-          .sidebar-stats { display: none; }
           .sidebar-tenant-block { margin-top: 0 !important; }
-          .sidebar-footer { display: none; }
 
-          .login-main { padding: 28px 16px 40px; align-items: flex-start; }
-          .login-card { max-width: 100%; }
+          .login-main { padding: 24px 16px 36px; align-items: flex-start; }
+          .login-card  { max-width: 100%; }
         }
 
-        /* ── TABLET: 768–1023px ── */
+        /* ── Tablet 768–1023px ── */
         @media (min-width: 768px) and (max-width: 1023px) {
           .login-sidebar { width: 320px; padding: 40px 28px; }
         }
@@ -235,59 +205,48 @@ export const LoginPage = () => {
 
       <div className="login-wrap">
 
-        {/* ════════ SIDEBAR ════════ */}
+        {/* ── SIDEBAR ── */}
         <aside className="login-sidebar">
           <div className="sidebar-content">
-            <AppIcon size={48}/>
+            <AppIcon size={50}/>
 
             <div>
-              <span style={{ fontSize:'0.62rem', fontWeight:700, letterSpacing:'0.16em', textTransform:'uppercase', color:'#C9904A', display:'block', marginBottom:4 }}>
+              <span style={{ fontSize:'0.62rem', fontWeight:700, letterSpacing:'0.16em', textTransform:'uppercase', color:'#C9904A', display:'block', marginBottom:5 }}>
                 Plataforma de gestión
               </span>
-              <h1 className="sidebar-platform-name" style={{ margin:0, fontSize:'1.75rem', fontWeight:900, color:'#fff', letterSpacing:'0.03em', lineHeight:1 }}>
+              <h1 style={{ margin:0, fontSize:'1.8rem', fontWeight:900, color:'#fff', letterSpacing:'0.03em', lineHeight:1 }}>
                 FashionOS
               </h1>
-              <p className="sidebar-tagline" style={{ margin:'10px 0 0', fontSize:'0.84rem', color:'rgba(255,255,255,0.4)', lineHeight:1.5 }}>
-                Sistema SaaS para tiendas de moda.<br/>Inventario · POS · Reportes · IA.
+              <p className="sidebar-tagline" style={{ margin:'10px 0 0', fontSize:'0.84rem', color:'rgba(255,255,255,0.4)', lineHeight:1.6 }}>
+                Gestiona tu tienda de moda.<br/>Inventario · POS · Reportes.
               </p>
-
-              {/* Badge de empresa */}
-              {tenantSlug && (
-                <div className="sidebar-tenant-block" style={{ marginTop:20 }}>
-                  <p style={{ margin:'0 0 6px', fontSize:'0.68rem', color:'rgba(255,255,255,0.3)', textTransform:'uppercase', letterSpacing:'0.1em' }}>
-                    Accediendo a
-                  </p>
-                  {tenantLoading
-                    ? <div style={{ width:120, height:28, background:'rgba(255,255,255,0.08)', borderRadius:20 }}/>
-                    : tenantName
-                      ? <TenantBadge name={tenantName}/>
-                      : tenantSlug && <span style={{ fontSize:'0.75rem', color:'rgba(255,255,255,0.3)' }}>Empresa no encontrada</span>
-                  }
-                </div>
-              )}
             </div>
 
-            {/* Stats — solo desktop */}
-            <div className="sidebar-stats" style={{ display:'flex', gap:22, marginTop:40 }}>
-              {[['4 planes','desde gratis'],['Multisucursal','ilimitado'],['IA incluida','plan Pro+']].map(([v,l]) => (
-                <div key={v} style={{ textAlign:'center' }}>
-                  <p style={{ margin:0, fontWeight:800, fontSize:'0.85rem', color:'#C9904A' }}>{v}</p>
-                  <p style={{ margin:'2px 0 0', fontSize:'0.65rem', color:'rgba(255,255,255,0.28)' }}>{l}</p>
-                </div>
-              ))}
-            </div>
+            {/* Badge empresa si viene ?tenant= */}
+            {tenantSlug && (
+              <div className="sidebar-tenant-block" style={{ marginTop:4 }}>
+                <p style={{ margin:'0 0 7px', fontSize:'0.68rem', color:'rgba(255,255,255,0.3)', textTransform:'uppercase', letterSpacing:'0.1em' }}>
+                  Accediendo a
+                </p>
+                {tenantLoading
+                  ? <div style={{ width:120, height:28, background:'rgba(255,255,255,0.08)', borderRadius:20 }}/>
+                  : tenantName
+                    ? <TenantBadge name={tenantName}/>
+                    : <span style={{ fontSize:'0.75rem', color:'rgba(255,255,255,0.3)' }}>Empresa no encontrada</span>
+                }
+              </div>
+            )}
           </div>
 
-          <p className="sidebar-footer" style={{ position:'absolute', bottom:16, fontSize:'0.65rem', color:'rgba(255,255,255,0.18)', textAlign:'center' }}>
-            FashionOS © {new Date().getFullYear()} · Plataforma multitenant
+          <p style={{ position:'absolute', bottom:14, fontSize:'0.65rem', color:'rgba(255,255,255,0.15)', textAlign:'center', margin:0 }}>
+            FashionOS © {new Date().getFullYear()}
           </p>
         </aside>
 
-        {/* ════════ FORMULARIO ════════ */}
+        {/* ── FORMULARIO ── */}
         <main className="login-main">
           <div className="login-card">
 
-            {/* Header */}
             <div style={{ marginBottom:28 }}>
               {tenantName
                 ? <>
@@ -302,14 +261,12 @@ export const LoginPage = () => {
               }
             </div>
 
-            {/* Error */}
             {error && (
               <div style={{ background:'#fef2f2', border:'1px solid #fecaca', borderRadius:10, padding:'10px 14px', marginBottom:18 }}>
                 <p style={{ margin:0, fontSize:'0.83rem', color:'#dc2626' }}>{error}</p>
               </div>
             )}
 
-            {/* Formulario */}
             <form onSubmit={handleSubmit}>
               <Field label="Correo electrónico" name="email" type="email" value={email} onChange={setEmail} placeholder="admin@empresa.com"/>
 
@@ -346,7 +303,6 @@ export const LoginPage = () => {
               </button>
             </form>
 
-            {/* Links */}
             <div style={{ marginTop:22, display:'flex', flexDirection:'column', gap:9, textAlign:'center' }}>
               <p style={{ margin:0, fontSize:'0.83rem', color:'#6b7280' }}>
                 ¿No tienes una cuenta?{' '}
@@ -357,24 +313,9 @@ export const LoginPage = () => {
                 <Link to="/activate-account" style={{ color:'#182D2A', fontWeight:600, textDecoration:'none' }}>Activa tu cuenta</Link>
               </p>
             </div>
-
-            {/* Acceso por slug */}
-            <div style={{ marginTop:28, padding:'14px 16px', background:'#f9fafb', borderRadius:12, border:'1px solid #e5e7eb' }}>
-              <p style={{ margin:'0 0 9px', fontSize:'0.72rem', fontWeight:700, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.09em' }}>
-                Acceder por empresa
-              </p>
-              <TenantSlugInput/>
-            </div>
           </div>
         </main>
       </div>
     </>
   );
-
-  /* Componente de icono ojo */
-  function EyeIcon({ open }: { open: boolean }) {
-    return open
-      ? <svg width="18" height="18" fill="none" stroke="#9ca3af" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
-      : <svg width="18" height="18" fill="none" stroke="#9ca3af" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>;
-  }
 };
