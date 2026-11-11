@@ -25,7 +25,8 @@ export class AiReportLog {
   spec: any;
 
   /** LLM/LLM_LOCAL = modelo generativo; IA_LOCAL = NB+Reglas; REGLAS = reglas puras (legado). */
-  @Column({ type: 'varchar', length: 15 })
+  // 10 caracteres alcanzan (el valor más largo es LLM_LOCAL); no ampliar: obliga a recrear la columna en bases existentes
+  @Column({ type: 'varchar', length: 10 })
   engine: 'LLM' | 'LLM_LOCAL' | 'IA_LOCAL' | 'REGLAS';
 
   @Column({ default: 0 })
