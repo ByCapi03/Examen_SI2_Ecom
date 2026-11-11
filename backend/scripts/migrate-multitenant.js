@@ -102,6 +102,9 @@ const TENANT_SCOPED_UNIQUES = [
   ['colors', 'name', 'uq_colors_tenant_name'],
   ['suppliers', 'nit', 'uq_suppliers_tenant_nit'],
   ['variants', 'sku', 'uq_variants_tenant_sku'],
+  // Un mismo correo puede existir en varias empresas (único por empresa)
+  ['users', 'email', 'uq_users_tenant_email'],
+  ['clients', 'email', 'uq_clients_tenant_email'],
 ];
 
 const UNIQUES = [

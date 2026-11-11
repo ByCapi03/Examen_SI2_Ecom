@@ -59,8 +59,7 @@ export const EmpresaRegistroPage = () => {
   const submitCompany = (e: React.FormEvent) => {
     e.preventDefault();
     run(async () => {
-      const chk = await api.post('/saas/register/check', { name: companyName, email: adminEmail });
-      if (chk.data.emailTaken) throw { response: { data: { message: 'Ese correo ya está registrado. Inicia sesión o usa otro correo.' } } };
+      const chk = await api.post('/saas/register/check', { name: companyName });
       setSlug(chk.data.slug);
       await sendCode();
       setStep(2);

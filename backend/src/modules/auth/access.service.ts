@@ -8,6 +8,7 @@ import { Role } from './role.entity';
 import { UserRole } from './user-role.entity';
 import { CreateUserDto, UpdateUserDto, CreateRoleDto, UpdateRoleDto } from './access.dto';
 import { MailService } from '../../common/mail.service';
+import { getEffectiveTenantId } from '../../common/tenancy/tenant-context';
 
 @Injectable()
 export class AccessService {
@@ -42,7 +43,7 @@ export class AccessService {
     }
 
     // Check if user already exists
-    const existingUser = await this.userRepository.findOneBy({ email });
+    const existingUser = await this.userRepository.findOneBy({ email, tenantId: getEffectiveTenantId() });
     if (existingUser) {
       throw new BadRequestException('Email already in use');
     }

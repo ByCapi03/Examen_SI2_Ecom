@@ -121,11 +121,6 @@ export class TenantsService implements OnModuleInit {
     const existing = await this.tenantRepo.findOne({ where: { slug: data.slug } });
     if (existing) throw new ConflictException(`La URL "${data.slug}" ya está en uso por otra empresa. Usa otra o deja que el sistema sugiera una libre.`);
 
-    if (data.adminEmail) {
-      const emailInUse = await this.dataSource.query(`SELECT 1 FROM users WHERE email=$1 LIMIT 1`, [data.adminEmail]);
-      if (emailInUse.length > 0) throw new ConflictException(`El correo "${data.adminEmail}" ya está en uso`);
-    }
-
     const planCode = data.planCode || 'BASICO';
     const plan = await this.planRepo.findOne({ where: { code: planCode } });
     if (!plan) throw new NotFoundException(`Plan ${planCode} no existe`);

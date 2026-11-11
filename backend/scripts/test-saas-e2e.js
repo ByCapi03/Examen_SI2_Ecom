@@ -320,6 +320,27 @@ async function main() {
     r = await api('POST', '/categories', tok.clienteA, { name: `Cliente ${RUN}` });
     check('T47 Un CLIENTE no puede modificar el catálogo de su empresa → 403', r.status === 403, r.status);
 
+    // ======================================================== MISMO CORREO EN VARIAS EMPRESAS
+    console.log('\n--- HU: Un mismo correo puede pertenecer a varias empresas ---');
+    const sharedEmail = A.admin.email;
+    const dupB = await one(`INSERT INTO users ("tenantId", name, email, "passwordHash", active, "mustChangePassword", "emailVerified", "createdAt")
+      VALUES ($1, 'Admin compartido B', $2, $3, true, false, true, now()) RETURNING id`, [B.id, sharedEmail, hash]);
+    await q(`INSERT INTO user_roles ("userId", "roleId", active, "assignedAt") VALUES ($1, $2, true, now())`, [dupB.id, await roleId('ADMIN')]);
+    check('T48 El mismo correo se puede registrar en dos empresas (único por empresa)', !!dupB.id);
+    try {
+      await q(`INSERT INTO users ("tenantId", name, email, "passwordHash", active, "mustChangePassword", "emailVerified", "createdAt")
+        VALUES ($1, 'Duplicado A', $2, $3, true, false, true, now())`, [A.id, sharedEmail, hash]);
+      check('T49 PostgreSQL rechaza el correo repetido dentro de la misma empresa', false);
+    } catch (e) { check('T49 PostgreSQL rechaza el correo repetido dentro de la misma empresa (uq_users_tenant_email)', /uq_users_tenant_email/.test(e.message), e.message); }
+    r = await api('POST', '/auth/login', null, { email: sharedEmail, password: PASSWORD });
+    check('T50 Login sin indicar empresa con correo compartido → 409 MULTIPLE_TENANTS con las empresas', r.status === 409 && r.data?.code === 'MULTIPLE_TENANTS' && r.data.tenants.length === 2, r);
+    r = await api('POST', '/auth/login', null, { email: sharedEmail, password: PASSWORD, tenantSlug: `empresa-a-${RUN}` });
+    check('T51 Login indicando la empresa A entra a la empresa A', r.status === 200 && r.data.user.tenantId === A.id, r);
+    r = await api('POST', '/auth/login', null, { email: sharedEmail, password: PASSWORD, tenantSlug: `empresa-b-${RUN}` });
+    check('T52 Login indicando la empresa B entra a la empresa B (otro usuario, mismo correo)', r.status === 200 && r.data.user.tenantId === B.id && r.data.user.id === dupB.id, r);
+    r = await api('POST', '/auth/login', null, { email: sharedEmail, password: 'incorrecta', tenantSlug: `empresa-a-${RUN}` });
+    check('T53 Contraseña incorrecta → 401 sin revelar en qué empresas existe el correo', r.status === 401 && !r.data?.tenants, r);
+
     // ======================================================== IA GENERATIVA
     console.log('\n--- HU: Reportes generativos en lenguaje natural ---');
     r = await api('POST', '/ai-reports/query', tok.adminA, { question: '¿Cuáles fueron los 3 vestidos más vendidos este mes?' });

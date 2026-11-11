@@ -5,6 +5,7 @@ import { Tenant } from '../tenants/tenant.entity';
 
 @Entity('users')
 @Unique('uq_users_tenant_id', ['tenantId', 'id'])
+@Unique('uq_users_tenant_email', ['tenantId', 'email'])
 export class User {
   @PrimaryGeneratedColumn()
   id: number;
@@ -19,7 +20,7 @@ export class User {
   @Column()
   name: string;
 
-  @Column({ unique: true })
+  @Column()
   email: string;
 
   @Column()

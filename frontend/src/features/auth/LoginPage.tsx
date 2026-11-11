@@ -37,13 +37,15 @@ export const LoginPage = () => {
   const [showPass, setShowPass] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError]       = useState<string | null>(null);
+  const [choices, setChoices]   = useState<{ slug: string; name: string }[]>([]);
+  const [chosenSlug, setChosenSlug] = useState('');
   const [focusedField, setFocusedField] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true); setError(null);
     try {
-      const { data } = await api.post('/auth/login', { email, password });
+      const { data } = await api.post('/auth/login', { email, password, tenantSlug: chosenSlug || tenantSlug || undefined });
       login(data.accessToken, data.user);
       if (data.user.mustChangePassword) { navigate('/change-password', { replace:true }); return; }
       if (['ADMIN','ENCARGADO','CAJERO'].some(r => data.user.roles.includes(r))) {
@@ -56,6 +58,12 @@ export const LoginPage = () => {
         navigate('/account', { replace:true });
       }
     } catch (err: any) {
+      if (err.response?.status === 409 && err.response?.data?.code === 'MULTIPLE_TENANTS') {
+        setChoices(err.response.data.tenants ?? []);
+        setChosenSlug('');
+        setError(err.response.data.message);
+        return;
+      }
       setError(err.response?.status === 401
         ? (err.response?.data?.message || 'Correo o contraseña incorrectos')
         : 'Error al intentar iniciar sesión');
@@ -226,6 +234,16 @@ export const LoginPage = () => {
               {error && (
                 <div style={{ background:'#fef2f2', border:'1px solid #fecaca', borderRadius:10, padding:'10px 14px', marginBottom:16 }}>
                   <p style={{ margin:0, fontSize:'0.82rem', color:'#dc2626' }}>{error}</p>
+                </div>
+              )}
+
+              {choices.length > 0 && (
+                <div style={{ marginBottom:16 }}>
+                  <label style={{ display:'block', fontSize:'0.79rem', fontWeight:600, color:'#374151', marginBottom:6 }}>Empresa</label>
+                  <select value={chosenSlug} onChange={e => setChosenSlug(e.target.value)} style={inputStyle('tenant')}>
+                    <option value="">Selecciona una empresa…</option>
+                    {choices.map(c => <option key={c.slug} value={c.slug}>{c.name}</option>)}
+                  </select>
                 </div>
               )}
 

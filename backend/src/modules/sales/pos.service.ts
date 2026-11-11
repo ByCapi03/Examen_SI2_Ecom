@@ -329,8 +329,9 @@ export class PosService {
     const normalizedEmail = dto.email.trim().toLowerCase();
 
     // Check for existing client with same email
+    const tenantId = getEffectiveTenantId();
     const existingClient = await this.clientRepository.findOne({
-      where: { email: normalizedEmail }
+      where: { email: normalizedEmail, tenantId }
     });
     if (existingClient) {
       throw new ConflictException('Ya existe un cliente registrado con este correo.');
@@ -338,7 +339,7 @@ export class PosService {
 
     // Check for existing user with same email
     const existingUser = await this.userRepository.findOne({
-      where: { email: normalizedEmail }
+      where: { email: normalizedEmail, tenantId }
     });
     if (existingUser) {
       throw new ConflictException('Este correo ya pertenece a un usuario digital. Por favor, asocie la cuenta o use otro correo.');

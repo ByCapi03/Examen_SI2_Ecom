@@ -8,6 +8,11 @@ export class LoginDto {
   @IsString()
   @IsNotEmpty({ message: 'La contraseña es obligatoria.' })
   password: string;
+
+  /** Empresa (slug) cuando el mismo correo existe en varias empresas. */
+  @IsOptional()
+  @IsString()
+  tenantSlug?: string;
 }
 
 export class SetupAdminDto {
@@ -51,12 +56,20 @@ export class RegisterClientDto {
   @IsOptional()
   @IsString()
   phone?: string;
+
+  @IsOptional()
+  @IsString()
+  tenantSlug?: string;
 }
 
 export class RequestActivationDto {
   @IsEmail({}, { message: 'El correo electrónico no es válido.' })
   @IsNotEmpty({ message: 'El correo es obligatorio.' })
   email: string;
+
+  @IsOptional()
+  @IsString()
+  tenantSlug?: string;
 }
 
 export class ActivateAccountDto {
@@ -72,4 +85,8 @@ export class ActivateAccountDto {
   @IsNotEmpty({ message: 'La contraseña es obligatoria.' })
   @MinLength(6, { message: 'La contraseña debe tener al menos 6 caracteres.' })
   password: string;
+
+  @IsOptional()
+  @IsString()
+  tenantSlug?: string;
 }

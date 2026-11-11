@@ -10,6 +10,7 @@ import { UserRole } from './user-role.entity';
 import { Client } from '../clients/client.entity';
 import { MailService } from '../../common/mail.service';
 import { LoginDto, SetupAdminDto } from './auth.dto';
+import { DEFAULT_TENANT_ID, getTenantStore } from '../../common/tenancy/tenant-context';
 
 @Injectable()
 export class AuthService {
@@ -95,22 +96,57 @@ export class AuthService {
     }
   }
 
-  async login(loginDto: LoginDto) {
-    const { email, password } = loginDto;
+  /** Empresa indicada explícitamente (slug en el cuerpo o cabecera X-Tenant-Slug), si la hay. */
+  private async resolveTenantId(slug?: string): Promise<number | undefined> {
+    const s = (slug || '').trim().toLowerCase();
+    if (s) {
+      const rows = await this.dataSource.query('SELECT id FROM tenants WHERE slug = $1 AND active = true LIMIT 1', [s]);
+      if (!rows[0]) throw new NotFoundException('La empresa indicada no existe o está inactiva.');
+      return Number(rows[0].id);
+    }
+    return getTenantStore()?.publicTenantId;
+  }
 
-    const user = await this.userRepository.findOne({
-      where: { email },
+  /** Un mismo correo puede existir en varias empresas: el cliente debe elegir una. */
+  private async multipleTenantsError(tenantIds: number[]): Promise<HttpException> {
+    const tenants = await this.dataSource.query(
+      'SELECT slug, name FROM tenants WHERE id = ANY($1::int[]) ORDER BY name', [tenantIds]);
+    return new HttpException(
+      { code: 'MULTIPLE_TENANTS', message: 'Este correo pertenece a varias empresas. Elige la empresa a la que quieres ingresar.', tenants },
+      HttpStatus.CONFLICT,
+    );
+  }
+
+  /** Cliente por correo dentro de una empresa; si hay varias coincidencias exige elegir empresa. */
+  private async findClientByEmail(email: string, tenantSlug?: string): Promise<Client | null> {
+    const tenantId = await this.resolveTenantId(tenantSlug);
+    const clients = await this.clientRepository.find({ where: tenantId ? { email, tenantId } : { email } });
+    if (clients.length > 1) throw await this.multipleTenantsError(clients.map((c) => c.tenantId));
+    return clients[0] ?? null;
+  }
+
+  async login(loginDto: LoginDto) {
+    return this.loginInTenant(loginDto.email, loginDto.password, await this.resolveTenantId(loginDto.tenantSlug));
+  }
+
+  private async loginInTenant(email: string, password: string, tenantId?: number) {
+    const candidates = await this.userRepository.find({
+      where: tenantId ? { email, tenantId } : { email },
       relations: { userRoles: { role: true } },
     });
 
-    if (!user || !user.active) {
+    // Solo cuentan las cuentas cuya contraseña coincide: así no se revela en qué empresas existe un correo.
+    const matches: User[] = [];
+    for (const c of candidates) {
+      if (c.active && (await bcrypt.compare(password, c.passwordHash))) matches.push(c);
+    }
+    if (!matches.length) {
       throw new UnauthorizedException('Correo o contraseña incorrectos');
     }
-
-    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Correo o contraseña incorrectos');
+    if (matches.length > 1) {
+      throw await this.multipleTenantsError(matches.map((m) => m.tenantId));
     }
+    const user = matches[0];
 
     if (user.mustChangePassword && user.temporaryPasswordExpiresAt) {
       if (new Date() > user.temporaryPasswordExpiresAt) {
@@ -155,16 +191,17 @@ export class AuthService {
   async registerClient(registerDto: any) {
     const { name, lastName, password, phone } = registerDto;
     const email = (registerDto.email as string).trim().toLowerCase();
+    const tenantId = (await this.resolveTenantId(registerDto.tenantSlug)) ?? DEFAULT_TENANT_ID;
 
     // Case C: User with that email already exists → duplicate
-    const existingUser = await this.userRepository.findOne({ where: { email } });
+    const existingUser = await this.userRepository.findOne({ where: { email, tenantId } });
     if (existingUser) {
       throw new ConflictException('El correo electrónico ya está en uso');
     }
 
     // Case B: Client exists WITHOUT digital account (userId = null)
     // This happens when they were registered at a POS terminal
-    const existingClient = await this.clientRepository.findOne({ where: { email } });
+    const existingClient = await this.clientRepository.findOne({ where: { email, tenantId } });
     if (existingClient && existingClient.userId === null) {
       throw new HttpException(
         {
@@ -197,7 +234,8 @@ export class AuthService {
         mustChangePassword: false,
         temporaryPasswordExpiresAt: null,
         emailVerified: true,
-      });
+        tenantId,
+      } as any);
       const savedUser = await queryRunner.manager.save(user);
 
       const userRole = queryRunner.manager.create(UserRole, {
@@ -217,13 +255,14 @@ export class AuthService {
         active: true,
         activationCodeHash: null,
         activationCodeExpiresAt: null,
-      });
+        tenantId,
+      } as any);
       await queryRunner.manager.save(Client, client);
 
       await queryRunner.commitTransaction();
 
       // Return tokens
-      return this.login({ email, password });
+      return this.loginInTenant(email, password, tenantId);
     } catch (err) {
       await queryRunner.rollbackTransaction();
       throw err;
@@ -232,10 +271,10 @@ export class AuthService {
     }
   }
 
-  async requestAccountActivation(email: string) {
+  async requestAccountActivation(email: string, tenantSlug?: string) {
     const normalizedEmail = email.trim().toLowerCase();
 
-    const client = await this.clientRepository.findOne({ where: { email: normalizedEmail } });
+    const client = await this.findClientByEmail(normalizedEmail, tenantSlug);
     if (!client) {
       throw new NotFoundException('No existe un cliente registrado con este correo.');
     }
@@ -262,10 +301,10 @@ export class AuthService {
     return { message: 'Código de activación enviado a tu correo. Válido por 15 minutos.' };
   }
 
-  async activateAccount(email: string, code: string, password: string) {
+  async activateAccount(email: string, code: string, password: string, tenantSlug?: string) {
     const normalizedEmail = email.trim().toLowerCase();
 
-    const client = await this.clientRepository.findOne({ where: { email: normalizedEmail } });
+    const client = await this.findClientByEmail(normalizedEmail, tenantSlug);
     if (!client) {
       throw new NotFoundException('No existe un cliente registrado con este correo.');
     }
@@ -285,7 +324,7 @@ export class AuthService {
     }
 
     // Verify no User with that email exists yet
-    const existingUser = await this.userRepository.findOne({ where: { email: normalizedEmail } });
+    const existingUser = await this.userRepository.findOne({ where: { email: normalizedEmail, tenantId: client.tenantId } });
     if (existingUser) {
       throw new ConflictException('Ya existe una cuenta con este correo.');
     }

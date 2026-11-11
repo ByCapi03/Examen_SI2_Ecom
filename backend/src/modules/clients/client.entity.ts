@@ -1,12 +1,13 @@
 import {
   Entity, PrimaryGeneratedColumn, Column,
-  OneToOne, JoinColumn, OneToMany, CreateDateColumn,
+  OneToOne, JoinColumn, OneToMany, CreateDateColumn, Unique,
 } from 'typeorm';
 import { User } from '../auth/user.entity';
 import { Reservation } from '../reservations/reservation.entity';
 import { Sale } from '../sales/sale.entity';
 
 @Entity('clients')
+@Unique('uq_clients_tenant_email', ['tenantId', 'email'])
 export class Client {
   @PrimaryGeneratedColumn()
   id: number;
@@ -20,7 +21,7 @@ export class Client {
   @Column()
   lastName: string;
 
-  @Column({ unique: true })
+  @Column()
   email: string;
 
   @Column({ type: 'varchar', nullable: true })

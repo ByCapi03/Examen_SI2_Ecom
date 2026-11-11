@@ -71,7 +71,7 @@ export class TenantsController {
   @Post('register/check')
   @Public()
   checkRegistration(@Body() body: { name: string; email?: string }) {
-    return this.registration.checkAvailability(body.name, body.email);
+    return this.registration.checkAvailability(body.name);
   }
 
   /** Paso previo al pago: envía el código OTP al correo del administrador. */

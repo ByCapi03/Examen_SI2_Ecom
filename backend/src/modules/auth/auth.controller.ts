@@ -31,13 +31,13 @@ export class AuthController {
   @Post('request-account-activation')
   @HttpCode(HttpStatus.OK)
   requestAccountActivation(@Body() dto: RequestActivationDto) {
-    return this.authService.requestAccountActivation(dto.email);
+    return this.authService.requestAccountActivation(dto.email, dto.tenantSlug);
   }
 
   @Post('activate-account')
   @HttpCode(HttpStatus.OK)
   activateAccount(@Body() dto: ActivateAccountDto) {
-    return this.authService.activateAccount(dto.email, dto.code, dto.password);
+    return this.authService.activateAccount(dto.email, dto.code, dto.password, dto.tenantSlug);
   }
 
   @UseGuards(AuthGuard)

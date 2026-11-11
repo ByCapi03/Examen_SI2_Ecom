@@ -68,21 +68,14 @@ export class CompanyRegistrationService {
     return candidate;
   }
 
-  async checkAvailability(name: string, email?: string) {
+  async checkAvailability(name: string) {
     const slug = await this.uniqueSlug(name || '');
-    const emailTaken = email
-      ? await this.dataSource.getRepository(User).exists({ where: { email: email.trim().toLowerCase() } })
-      : false;
-    return { slug, emailTaken };
+    return { slug };
   }
 
   async sendCode(rawEmail: string) {
     const email = (rawEmail || '').trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new BadRequestException('Correo electrónico inválido.');
-    if (await this.dataSource.getRepository(User).exists({ where: { email } })) {
-      throw new ConflictException('Ese correo ya está registrado. Inicia sesión o usa otro correo.');
-    }
-
     const last = await this.verifRepo.findOne({ where: { email }, order: { createdAt: 'DESC' } });
     if (last && !last.used && Date.now() - last.createdAt.getTime() < RESEND_COOLDOWN_SEC * 1000) {
       throw new BadRequestException(`Espera ${RESEND_COOLDOWN_SEC} segundos antes de pedir otro código.`);
@@ -157,10 +150,6 @@ export class CompanyRegistrationService {
 
     const plan = await this.planRepo.findOne({ where: { code: dto.planCode } });
     if (!plan) throw new NotFoundException(`El plan ${dto.planCode} no existe.`);
-    if (await this.dataSource.getRepository(User).exists({ where: { email } })) {
-      throw new ConflictException('Ese correo ya está registrado.');
-    }
-
     // Pago simulado: se valida el formato, no se almacena ningún dato de la tarjeta.
     const last4 = this.validatePayment(dto.payment);
 
