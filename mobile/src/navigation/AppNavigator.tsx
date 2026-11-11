@@ -1,4 +1,5 @@
 import React from 'react';
+import { View, Text, Pressable } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -15,8 +16,27 @@ import { CheckoutScreen } from '../screens/store/CheckoutScreen';
 // El vestidor usa librerías nativas de TensorFlow que no existen en Expo Go: se cargan solo al abrirlo,
 // así la app inicia normalmente aunque esa pantalla no pueda funcionar en Expo Go.
 const TryOnScreen = (props: any) => {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { TryOnScreen: Screen } = require('../screens/store/TryOnScreen');
+  let Screen: any = null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    Screen = require('../screens/store/TryOnScreen').TryOnScreen;
+  } catch {
+    Screen = null;
+  }
+  if (!Screen) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, backgroundColor: '#fff' }}>
+        <Text style={{ fontSize: 20, fontWeight: '700', marginBottom: 8 }}>Vestidor virtual</Text>
+        <Text style={{ textAlign: 'center', color: '#555', marginBottom: 20 }}>
+          El vestidor usa la cámara con inteligencia artificial y no está disponible en Expo Go.
+          Funciona en la compilación propia de la app y en la versión web.
+        </Text>
+        <Pressable onPress={() => props.navigation.goBack()} style={{ paddingVertical: 12, paddingHorizontal: 24, backgroundColor: '#1a1a1a', borderRadius: 10 }}>
+          <Text style={{ color: '#fff', fontWeight: '700' }}>Volver</Text>
+        </Pressable>
+      </View>
+    );
+  }
   return <Screen {...props} />;
 };
 
