@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../api/axios';
 import { Sparkline } from '../ai-reports/ReportChart';
 import { DashStyles, PageHeader, PlanBadge, PlanGate } from '../../components/dashboard/ui';
+import { useAuth } from '../auth/AuthContext';
 
 /**
  * ANALÍTICA PREDICTIVA (Plan Profesional)
@@ -32,6 +33,29 @@ const AnalyticsContent = () => {
   const [segments, setSegments] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
+  const isAdmin = !!user?.roles?.includes('ADMIN');
+  const [models, setModels] = useState<any[]>([]);
+  const [training, setTraining] = useState(false);
+  const [trainMsg, setTrainMsg] = useState<string | null>(null);
+
+  const loadModels = async () => {
+    try { setModels((await api.get('/analytics/models')).data.filter((m: any) => m.active)); } catch { /* sin modelos */ }
+  };
+
+  const train = async () => {
+    setTraining(true); setTrainMsg(null); setError(null);
+    try {
+      const { data } = await api.post('/analytics/train', { weeks: 26, k: 4 });
+      setTrainMsg(data.warnings?.length ? data.warnings.join(' ') : 'Modelos entrenados y guardados correctamente.');
+      await loadModels();
+      await load();
+    } catch (e: any) {
+      setError(e.response?.data?.message || 'No se pudo entrenar los modelos');
+    } finally {
+      setTraining(false);
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -47,6 +71,7 @@ const AnalyticsContent = () => {
   };
 
   useEffect(() => { void load(); }, [tab, weeks, horizon, k]);
+  useEffect(() => { void loadModels(); }, []);
 
   const riskColor: Record<string, string> = { QUIEBRE: '#b91c1c', REPONER: '#b45309', OK: '#15803d' };
   const tabBtn = (t: typeof tab, label: string) => (
@@ -55,6 +80,28 @@ const AnalyticsContent = () => {
 
   return (
     <div className="dz-card">
+      <div style={{ border: '1px solid var(--atemporal-border)', borderRadius: 8, padding: 12, marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <strong>Modelos entrenados</strong>
+          {isAdmin && (
+            <button onClick={train} disabled={training} className="dz-btn" style={{ padding: '6px 14px', cursor: training ? 'wait' : 'pointer' }}>
+              {training ? 'Entrenando…' : models.length ? 'Reentrenar modelos' : 'Entrenar modelos'}
+            </button>
+          )}
+        </div>
+        {trainMsg && <div style={{ color: '#15803d', fontSize: 13, marginTop: 8 }}>{trainMsg}</div>}
+        {models.length === 0 && <div style={{ color: '#666', fontSize: 13, marginTop: 8 }}>Aún no hay modelos entrenados: las predicciones se ajustan en línea. {isAdmin ? 'Entrénalos para guardarlos y evaluarlos.' : 'Un administrador debe entrenarlos.'}</div>}
+        {models.map((m) => (
+          <div key={m.id} style={{ fontSize: 13, marginTop: 8, color: 'var(--atemporal-text)' }}>
+            <b>{m.name === 'DEMAND_FORECAST' ? 'Pronóstico de demanda' : 'Segmentación de clientes'}</b> · versión {m.version} · {m.learningType === 'SUPERVISADO' ? 'supervisado' : 'no supervisado'} · {new Date(m.trainedAt).toLocaleString()}
+            <div style={{ color: '#666' }}>
+              Datos: {m.dataSource.realSales} ventas reales + {m.dataSource.syntheticSales} sintéticas
+              {m.metrics?.evaluation && <> · Error (MAE) {m.metrics.evaluation.maeModel} vs. baseline {m.metrics.evaluation.maeNaive} ({m.metrics.evaluation.improvementPct >= 0 ? '+' : ''}{m.metrics.evaluation.improvementPct}% de mejora)</>}
+              {m.metrics?.silhouette != null && <> · Silueta {m.metrics.silhouette} · {m.metrics.clients} clientes</>}
+            </div>
+          </div>
+        ))}
+      </div>
       <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--atemporal-border)', marginBottom: 16, flexWrap: 'wrap' }}>
         {tabBtn('demand', 'Pronóstico de demanda (supervisado)')}
         {tabBtn('segments', 'Segmentación de clientes (no supervisado)')}

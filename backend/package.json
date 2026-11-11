@@ -21,6 +21,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed": "ts-node src/database/seed-runner.ts",
     "migrate:multitenant": "node scripts/migrate-multitenant.js",
+    "seed:synthetic": "node scripts/seed-synthetic.js",
     "test:e2e:saas": "node scripts/test-saas-e2e.js"
   },
   "dependencies": {

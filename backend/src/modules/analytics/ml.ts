@@ -185,3 +185,52 @@ export function labelRfmClusters(centroids: RfmPoint[], population?: RfmPoint): 
     return k > 1 ? `${nm} ${k}` : nm;
   });
 }
+
+// ------------------------------------------------------- Evaluación y persistencia
+const mean = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
+
+/** MAE de un baseline ingenuo: promedio de las 4 semanas previas al tramo de prueba. */
+export function naiveMae(y: number[], test = 2): number | null {
+  if (y.length < test + 3) return null;
+  const train = y.slice(0, y.length - test);
+  const base = mean(train.slice(-4));
+  const actual = y.slice(y.length - test);
+  return actual.reduce((a, v) => a + Math.abs(base - v), 0) / test;
+}
+
+export interface ForecastEvaluation {
+  products: number;
+  maeModel: number;
+  maeNaive: number;
+  /** Mejora porcentual del modelo frente al baseline (negativa si lo empeora). */
+  improvementPct: number;
+  avgR2: number;
+}
+
+/** Validación holdout agregada de todas las series (últimas `test` semanas como prueba). */
+export function evaluateForecast(series: number[][], test = 2): ForecastEvaluation | null {
+  const rows = series
+    .map((y) => ({ m: holdoutMae(y, test), n: naiveMae(y, test), r2: fitLinearRegression(y.slice(0, y.length - test)).r2 }))
+    .filter((r) => r.m != null && r.n != null);
+  if (!rows.length) return null;
+  const maeModel = mean(rows.map((r) => r.m as number));
+  const maeNaive = mean(rows.map((r) => r.n as number));
+  return {
+    products: rows.length,
+    maeModel: Number(maeModel.toFixed(3)),
+    maeNaive: Number(maeNaive.toFixed(3)),
+    improvementPct: maeNaive > 0 ? Number((((maeNaive - maeModel) / maeNaive) * 100).toFixed(1)) : 0,
+    avgR2: Number(mean(rows.map((r) => r.r2)).toFixed(3)),
+  };
+}
+
+/** Asigna un punto RFM (ya transformado con log) al centroide más cercano usando la normalización guardada. */
+export function assignCluster(point: number[], meanVec: number[], stdVec: number[], centroids: number[][]): number {
+  const z = point.map((v, j) => (v - meanVec[j]) / (stdVec[j] || 1));
+  let best = 0, bestD = Infinity;
+  centroids.forEach((c, i) => {
+    const d = dist2(z, c);
+    if (d < bestD) { bestD = d; best = i; }
+  });
+  return best;
+}

@@ -360,6 +360,26 @@ async function main() {
     check('T32 Segmentación RFM K-Means (no supervisado) responde', r.status === 200 && r.data.learningType === 'NO_SUPERVISADO', r.data);
     r = await api('GET', '/analytics/demand-forecast', tok.adminB);
     check('T33 Plan Básico no accede a analítica ML → 403', r.status === 403, r.status);
+
+    console.log('\n--- HU: Entrenamiento y persistencia de modelos ---');
+    r = await api('POST', '/analytics/train', tok.adminA, { weeks: 12 });
+    const m1 = r.data?.models?.find((m) => m.name === 'DEMAND_FORECAST');
+    check('T54 Entrenar modelos persiste una versión con métricas y procedencia de datos reales/sintéticos',
+      r.status === 201 && m1?.version === 1 && m1.dataSource.realSales >= 1 && m1.dataSource.syntheticSales === 0 && m1.metrics.products >= 1, r.data);
+    r = await api('POST', '/analytics/train', tok.adminA, { weeks: 12 });
+    const m2 = r.data?.models?.find((m) => m.name === 'DEMAND_FORECAST');
+    const vers = await q(`SELECT version, active FROM ml_models WHERE "tenantId" = $1 AND name = 'DEMAND_FORECAST' ORDER BY version`, [A.id]);
+    check('T55 Un nuevo entrenamiento crea la versión 2 y desactiva la anterior', m2?.version === 2 && vers.length === 2 && vers[0].active === false && vers[1].active === true, vers);
+    r = await api('GET', '/analytics/demand-forecast?weeks=12', tok.adminA);
+    check('T56 El pronóstico usa el modelo entrenado persistido (versión 2) y solo productos de A',
+      r.status === 200 && r.data.trainedModel?.version === 2 && r.data.products.every((p) => p.source === 'MODELO_ENTRENADO' && p.productName.includes(' A ')), r.data);
+    r = await api('POST', '/analytics/train', tok.cajeroA, {});
+    check('T57 Un CAJERO no puede entrenar modelos → 403', r.status === 403, r.status);
+    r = await api('GET', '/analytics/models', tok.adminA);
+    check('T58 El historial de modelos solo muestra los de la empresa A', r.status === 200 && r.data.length === 2 && await (async () => {
+      const foreign = await q(`SELECT 1 FROM ml_models WHERE "tenantId" = $1 AND id = ANY($2::int[])`, [B.id, r.data.map((m) => m.id)]);
+      return foreign.length === 0;
+    })(), r.data);
   } catch (err) {
     failed++;
     console.error('\n✖ Error inesperado:', err);

@@ -1,4 +1,4 @@
-import { fitLinearRegression, forecastDemand, kmeans, labelRfmClusters, silhouette, standardize } from './ml';
+import { assignCluster, evaluateForecast, fitLinearRegression, forecastDemand, kmeans, labelRfmClusters, naiveMae, silhouette, standardize } from './ml';
 
 describe('Regresión lineal (supervisado)', () => {
   it('recupera una tendencia lineal exacta', () => {
@@ -52,5 +52,39 @@ describe('K-Means (no supervisado)', () => {
       { recencyDays: 1, frequency: 9, monetary: 3000 },
     ]);
     expect(names).toEqual(['Clientes leales', 'Potenciales', 'Campeones']);
+  });
+});
+
+describe('Evaluación y persistencia de modelos', () => {
+  const growing = Array.from({ length: 16 }, (_, i) => 10 + 3 * i);
+
+  it('el baseline ingenuo falla en una tendencia creciente y el modelo lineal no', () => {
+    const ev = evaluateForecast([growing]);
+    expect(ev).not.toBeNull();
+    expect(ev!.maeModel).toBeLessThan(ev!.maeNaive);
+    expect(ev!.improvementPct).toBeGreaterThan(50);
+  });
+
+  it('series demasiado cortas no se evalúan', () => {
+    expect(naiveMae([1, 2, 3], 2)).toBeNull();
+    expect(evaluateForecast([[1, 2, 3]])).toBeNull();
+  });
+
+  it('un modelo K-Means guardado asigna nuevos puntos al centroide correcto', () => {
+    // Dos grupos RFM claros: compradores recientes/frecuentes y clientes inactivos
+    const raw = [
+      [5, Math.log1p(20), Math.log1p(9000)], [8, Math.log1p(18), Math.log1p(8000)], [4, Math.log1p(22), Math.log1p(9500)],
+      [300, Math.log1p(1), Math.log1p(100)], [280, Math.log1p(2), Math.log1p(150)], [320, Math.log1p(1), Math.log1p(90)],
+    ];
+    const { data, mean, std } = standardize(raw);
+    const { centroids, labels } = kmeans(data, 2, 42);
+    // Se guardan solo mean/std/centroids: una "reconstrucción" posterior debe dar las mismas etiquetas
+    const again = raw.map((p) => assignCluster(p, mean, std, centroids));
+    expect(again).toEqual(labels);
+    const vip = assignCluster([6, Math.log1p(19), Math.log1p(8500)], mean, std, centroids);
+    const lost = assignCluster([310, Math.log1p(1), Math.log1p(100)], mean, std, centroids);
+    expect(vip).toBe(labels[0]);
+    expect(lost).toBe(labels[3]);
+    expect(vip).not.toBe(lost);
   });
 });

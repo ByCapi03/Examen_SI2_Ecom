@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '../../common/guards/auth.guard';
 import { TenantGuard } from '../../common/guards/tenant.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -16,6 +16,18 @@ export class AnalyticsController {
   @Get('demand-forecast')
   demand(@Request() req: any, @Query() q: any) {
     return this.service.demandForecast(req.user, q);
+  }
+
+  /** Entrena y persiste una nueva versión de los modelos con las ventas de la empresa. */
+  @Post('train')
+  @Roles('ADMIN')
+  train(@Request() req: any, @Body() body: { weeks?: number; k?: number }) {
+    return this.service.train(req.user, body ?? {});
+  }
+
+  @Get('models')
+  models(@Request() req: any) {
+    return this.service.listModels(req.user);
   }
 
   @Get('customer-segments')
