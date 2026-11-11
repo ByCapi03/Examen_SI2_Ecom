@@ -238,7 +238,7 @@ Más detalles en [`docs/README.md`](docs/README.md).
 
 | Síntoma | Causa y solución |
 |---|---|
-| Los productos demo perdieron sus fotos | Pasaba al correr `seed:demo:reset` en versiones anteriores. Ahora las conserva. Para recuperarlas: `npm run seed:demo:images -- --list` y completa `backend\demo-images.json` (ver el ejemplo), o súbelas otra vez en Productos. |
+| Los productos demo perdieron sus fotos | Pasaba al correr `seed:demo:reset` en versiones anteriores. Ahora las conserva. Para recuperarlas: `npm run seed:demo:images -- --list` crea `backend\cloudinary-gallery.html` (galería de tus fotos) y `backend\demo-images.json` con tus productos; pega ahí la URL y el `public_id` de cada foto y ejecuta `npm run seed:demo:images`. O súbelas otra vez en Productos. |
 | `EADDRINUSE :3000` | Ya hay un backend corriendo. Usa `netstat` + `taskkill` (sección 3). |
 | `winget` no se reconoce | No lo necesitas: descarga `cloudflared.exe` como en la sección 4. |
 | El POS dice «necesita Internet» con señal | El backend o el túnel están caídos (el catálogo guardado engaña). Abre `…/saas/billing/config` desde el teléfono. |
