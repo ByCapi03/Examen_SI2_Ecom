@@ -20,12 +20,12 @@ export class DashboardService {
   ) {}
 
   async getMetrics(user: any, query: any = {}) {
-    const isCajeroOnly = user.roles.includes('CAJERO') && !user.roles.includes('ADMIN') && !user.roles.includes('ENCARGADO');
-    if (isCajeroOnly) {
+    // Solo la gerencia ve los indicadores del negocio (cajeros y clientes no).
+    const isAdmin = user.roles.includes('ADMIN');
+    if (!isAdmin && !user.roles.includes('ENCARGADO')) {
       throw new ForbiddenException('Acceso denegado');
     }
 
-    const isAdmin = user.roles.includes('ADMIN');
     const branchId = user.roles.includes('ENCARGADO') ? user.branchId : null;
 
     const effectiveStatuses = [SaleStatus.PAGADA, SaleStatus.COMPLETADA];

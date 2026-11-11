@@ -343,6 +343,13 @@ async function main() {
     const mobCount = await one(`SELECT COUNT(*)::int AS n FROM sales WHERE "offlineOperationId" = $1`, [mobOp]);
     check('T63 Reintento del móvil tras una respuesta perdida → DUPLICATE y una sola venta', r.data?.results?.[0]?.status === 'DUPLICATE' && mobCount.n === 1, { r: r.data, mobCount });
 
+    r = await api('GET', '/dashboard/metrics', tok.clienteA);
+    check('T64 Un CLIENTE no puede ver las métricas del dashboard de la empresa → 403', r.status === 403, r.status);
+    r = await api('GET', '/dashboard/metrics', tok.cajeroA);
+    check('T65 Un CAJERO tampoco → 403', r.status === 403, r.status);
+    r = await api('GET', '/dashboard/metrics', tok.adminA);
+    check('T66 El ADMIN sí ve las métricas de su empresa', r.status === 200 && typeof r.data.salesTodayAmount === 'number', r.status);
+
     // ======================================================== MISMO CORREO EN VARIAS EMPRESAS
     console.log('\n--- HU: Un mismo correo puede pertenecer a varias empresas ---');
     const sharedEmail = A.admin.email;
