@@ -4,6 +4,8 @@ import { ReservationsService } from './reservations.service';
 import { PaymentMethod } from '../sales/sales.enums';
 import { DataSource } from 'typeorm';
 import { Payment } from '../sales/payment.entity';
+import { Sale } from '../sales/sale.entity';
+import { PosService } from '../sales/pos.service';
 
 @Controller('payments')
 @UseGuards(AuthGuard)
@@ -79,8 +81,16 @@ import * as jwt from 'jsonwebtoken';
 export class PublicPaymentsController {
   constructor(
     private readonly reservationsService: ReservationsService,
+    private readonly posService: PosService,
     private readonly dataSource: DataSource
   ) {}
+
+  /** ¿El pago pertenece a una venta de POS (sin reserva)? */
+  private async isPosPayment(payment: Payment) {
+    if (!payment.saleId) return false;
+    const sale = await this.dataSource.manager.findOne(Sale, { where: { id: payment.saleId } });
+    return sale?.channel === 'POS';
+  }
 
   private verifyToken(token: string) {
     try {
@@ -134,12 +144,13 @@ export class PublicPaymentsController {
       throw new BadRequestException('El pago no está pendiente');
     }
 
+    const pos = await this.isPosPayment(payment);
     if (payment.expiresAt && new Date() > payment.expiresAt) {
-      await this.reservationsService.confirmPaymentById(payment.id, 'FAIL');
+      if (pos) await this.posService.settleQrPayment(payment.id, 'FAIL'); else await this.reservationsService.confirmPaymentById(payment.id, 'FAIL');
       throw new BadRequestException('El código QR ha expirado');
     }
 
-    return this.reservationsService.confirmPaymentById(payment.id, 'SUCCESS');
+    return pos ? this.posService.settleQrPayment(payment.id, 'SUCCESS') : this.reservationsService.confirmPaymentById(payment.id, 'SUCCESS');
   }
 
   @Post('reject/:token')
@@ -155,6 +166,6 @@ export class PublicPaymentsController {
       throw new BadRequestException('El pago no está pendiente');
     }
 
-    return this.reservationsService.confirmPaymentById(payment.id, 'FAIL');
+    return (await this.isPosPayment(payment)) ? this.posService.settleQrPayment(payment.id, 'FAIL') : this.reservationsService.confirmPaymentById(payment.id, 'FAIL');
   }
 }

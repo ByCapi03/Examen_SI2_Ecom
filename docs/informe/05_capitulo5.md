@@ -12,6 +12,7 @@ la seguridad por rol y por plan, la sincronización offline y el comportamiento 
 | Integración / sistema (tienda) | `npm run test:e2e:tienda` | Tienda pública, registro por empresa, Mi tienda web |
 | Notificaciones | `npm run test:e2e:notif` | Alerta de stock bajo y resumen por sucursal (16 pruebas) |
 | Planes y SuperAdmin | `npm run test:e2e:planes` | Ciclos, límites, vigencia, suspensión (33 pruebas) |
+| Cobro QR en POS | `npm run test:e2e:posqr` | QR, reserva de stock, pago, idempotencia, cancelación, vencimiento (18 pruebas) |
 | Cobro con Stripe | `npm run test:e2e:stripe` | Pago, idempotencia, monto manipulado, webhook firmado (16 pruebas, contra un Stripe simulado) |
 | Interfaz | Playwright (verificación manual asistida) | Landing, tienda por empresa, panel, vestidor |
 | Coherencia documental | `python3 docs/uml/scripts/verificar_coherencia.py` | RNF-12: diagramas vs. código |
@@ -55,6 +56,7 @@ Defectos detectados y corregidos durante esta fase:
 | E2E notificaciones (stock bajo) | **16 / 16 aprobadas** |
 | E2E planes y SuperAdmin | **33 / 33 aprobadas** |
 | E2E cobro con Stripe (simulado) | **16 / 16 aprobadas** |
+| E2E cobro QR en POS | **18 / 18 aprobadas** |
 | `tsc` backend, frontend y móvil | Sin errores |
 | Coherencia documental | Todos los diagramas coherentes con el código |
 

@@ -29,6 +29,8 @@ Leyenda: ✅ implementado y probado · 🟡 implementado, con prueba parcial o c
 | Suspensión de empresas (login, sesiones activas y tienda pública) | ✅ |
 | Cobro real del plan con Stripe Checkout (confirmación, idempotencia, webhook firmado) | ✅ 16 pruebas contra un Stripe simulado; **falta probarlo con tu clave real de Stripe (modo test)** |
 | Facturas/recibos y recordatorios de vencimiento por correo | ❌ |
+| Cobro por QR en el POS (QR del monto, el cliente escanea y confirma, stock reservado, vence y se cancela) | ✅ 18 pruebas E2E y verificado en navegador; el banco es de demostración |
+| QR y tarjeta sin conexión | ❌ no es posible cobrarlos sin red; solo efectivo (idea: venta "por verificar" para conciliar después) |
 | Avisos de empresa suspendida / plan vencido (web y móvil) | ✅ web verificada en navegador; móvil solo compilado |
 
 ## 2. Qué falta IMPLEMENTAR (lista previa; los puntos 1 y 2 ya se resolvieron)

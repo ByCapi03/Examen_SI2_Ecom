@@ -59,6 +59,7 @@ prenda en el vestidor virtual, la reserva o la compra y paga en línea o en sucu
 | RF-23 | Configuración de apariencia: tema, idioma, moneda, sidebar compacto. | frontend |
 | RF-24 | Notificaciones internas y push: reservas (encargado/cliente) y **alerta de stock bajo** (encargado de la sucursal y administrador). | notifications |
 | RF-26 | **Panel de plataforma (SuperAdmin):** ver empresas, plan, ciclo, vigencia y consumo; ingresos recurrentes (MRR/ARR); cambiar plan o ciclo, extender vigencia y suspender o reactivar empresas. | tenants |
+| RF-29 | **Cobro por QR en el POS:** al elegir QR el POS genera un código; el cliente lo escanea, ve el monto y confirma el pago; el POS detecta el pago solo. El stock se reserva hasta pagar y se libera si el QR vence (5 min) o el cajero cancela. | sales |
 | RF-28 | **Cobro real de la suscripción con Stripe:** cambiar o renovar un plan de pago exige pagar con tarjeta; el plan se aplica solo con el pago confirmado (consulta a Stripe y webhook firmado), sin duplicar. Sin clave de Stripe funciona en modo demostración, declarado en pantalla. | tenants |
 | RF-27 | **Suscripción por ciclo:** cada plan de pago tiene precio mensual y anual (10 meses); la suscripción vence al terminar el período y el administrador la renueva o cambia desde *Mi suscripción*. | tenants |
 | RF-25 | Generar datos demostrativos (2 empresas, personal, cajas, ventas, bitácora). | scripts |
@@ -98,7 +99,8 @@ prenda en el vestidor virtual, la reserva o la compra y paga en línea o en sucu
 | RN-06 | El administrador **no entra a una sucursal como espacio de trabajo aparte**: administra todo desde su propio panel lateral; el encargado tiene un panel equivalente, adaptado y limitado a su sucursal. |
 | RN-07 | Primero se **crea** una caja (única por sucursal y nombre); después un cajero **abre una sesión** sobre ella. |
 | RN-08 | Un cajero no puede tener dos cajas abiertas y una caja no puede estar abierta dos veces a la vez. |
-| RN-09 | Sin conexión solo se aceptan ventas en **efectivo**; tarjeta y QR requieren conexión. |
+| RN-09 | Sin conexión solo se aceptan ventas en **efectivo**: el QR y la tarjeta necesitan Internet porque el cliente debe pagar y el servidor confirmar. |
+| RN-23 | Una venta POS por QR queda PENDIENTE (stock reservado) hasta que el cliente paga; al pagar se descuenta el stock y se suma al arqueo de caja; al vencer o cancelarse se libera la reserva. |
 | RN-10 | Una operación offline se aplica una sola vez (idempotencia por UUID). |
 | RN-11 | Si lo vendido offline supera el stock real, se aplica y se registra un conflicto pendiente para el encargado. |
 | RN-12 | Un cliente solo ve el catálogo de la empresa a la que pertenece; en móvil debe iniciar sesión. |

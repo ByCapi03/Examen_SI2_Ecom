@@ -56,6 +56,19 @@ Necesitas el comando `cloudflared` instalado en tu PC (https://developers.cloudf
 8. Desactiva el modo avión. En unos segundos la barra pasa a **«Sincronizando…»** y luego **«Sincronizada»**.
    Confirma en el panel (**Ventas**) que la venta aparece una sola vez.
 
+### Prueba del cobro por QR (con conexión)
+1. Con internet, en el Terminal POS agrega una prenda y elige **Método de pago: QR** → **COBRAR**.
+2. Aparece el código QR con el monto y una cuenta regresiva de 5 minutos.
+3. Con **otro teléfono** (o la cámara del mismo), escanea el QR: se abre la página de confirmación con el monto. Pulsa **CONFIRMAR PAGO**.
+4. En el POS aparece **«¡Pago por QR recibido!»** y el stock se descuenta. Si nadie paga, el QR vence y el stock se libera.
+
+> El QR lleva al cliente a la web de DRESSED. Para que funcione desde otro teléfono, arranca el backend con la URL pública del **frontend**:
+> `$env:QR_PUBLIC_WEB_URL="https://TU-TUNEL-DEL-FRONTEND.trycloudflare.com"` antes de `npm run start:prod`.
+> El pago es una **simulación** (banco de demostración); conectarlo a un banco real requiere un proveedor de QR bancario.
+
+### Sin conexión, ¿QR y tarjeta?
+No se pueden cobrar offline: el cliente tiene que pagar y el servidor confirmar. Sin red el POS solo acepta **efectivo**.
+
 ### Prueba de conflicto de stock
 1. Con el iPhone **offline**, vende 2 unidades de un producto que tenga poco stock (p. ej. 3 disponibles).
 2. Desde tu PC (administrador o encargado) registra un **ajuste de inventario** que deje ese producto con 0.

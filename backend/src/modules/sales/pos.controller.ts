@@ -3,7 +3,7 @@
  * Flujo POS (Punto de Venta para el Cajero): Expone las rutas /pos/sales 
  * y /pos/clients usadas por el cajero en la sucursal física.
  */
-import { Controller, Get, Post, Body, UseGuards, Req, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Req, Query, Param, ParseIntPipe } from '@nestjs/common';
 import { PosService } from './pos.service';
 import { CreatePosSaleDto, CreatePosClientDto } from './sales.dto';
 import { AuthGuard } from '../../common/guards/auth.guard';
@@ -29,6 +29,18 @@ export class PosController {
   createPosClient(@Req() req: any, @Body() dto: CreatePosClientDto) {
     const userId = req.user.sub;
     return this.posService.createPosClient(userId, dto);
+  }
+
+  /** Estado del cobro por QR (el cajero lo consulta cada pocos segundos). */
+  @Get('sales/:id/payment')
+  qrStatus(@Req() req: any, @Param('id', ParseIntPipe) id: number) {
+    return this.posService.getQrSaleStatus(req.user.sub, id);
+  }
+
+  /** Cancela un cobro QR pendiente y libera el stock reservado. */
+  @Post('sales/:id/cancel-qr')
+  cancelQr(@Req() req: any, @Param('id', ParseIntPipe) id: number) {
+    return this.posService.cancelQrSale(req.user.sub, id);
   }
 
   @Post('sales')

@@ -5,6 +5,7 @@
 | Requisito | Caso de uso | Implementación principal | Pruebas |
 |---|---|---|---|
 | RF-01, RF-02 | CU-01, CU-02 | `tenants.service.ts` (`createTenant`, `verifyEmail`, `changePlan`) | T-SaaS, T10, T30, T33 |
+| RF-29 | CU-14 | `pos.service.ts` (`createPosSale` con QR, `settleQrPayment`, `getQrSaleStatus`), `payments.controller.ts`, `PosTerminalPage.tsx` | Q01–Q18 |
 | RF-28 | CU-29 | `billing.service.ts` (`startCheckout`, `confirm`, `handleWebhook`), `SubscriptionPage.tsx` | B01–B16 |
 | RF-26, RF-27 | CU-28, CU-29 | `tenants.service.ts` (`adminOverview`, `adminTenants`, `adminSetActive`, `adminChangePlan`, `adminExtend`), `plan-features.ts` (`assertPlanLimit`), `PlatformPage.tsx`, `SubscriptionPage.tsx` | S01–S31 (+S24b) |
 | RF-03 | CU-03 | `auth.service.ts` (`login`, `activateAccount`, `changePassword`) | TC-01, P06 |
@@ -82,5 +83,6 @@ npm run test:e2e:tienda        # 22 pruebas E2E
 npm run test:e2e:notif         # 16 pruebas E2E
 # Stripe: node scripts/mock-stripe.js y backend con STRIPE_SECRET_KEY=sk_test_mockserver STRIPE_API_HOST=localhost STRIPE_API_PORT=12111 STRIPE_API_PROTOCOL=http STRIPE_WEBHOOK_SECRET=whsec_testsecret
 npm run test:e2e:stripe        # 16 pruebas E2E
+npm run test:e2e:posqr         # 18 pruebas E2E
 SUPERADMIN_EMAIL=... SUPERADMIN_PASSWORD=... npm run test:e2e:planes   # 32 pruebas E2E (el backend debe tener las mismas variables)
 ```
