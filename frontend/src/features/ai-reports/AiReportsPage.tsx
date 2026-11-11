@@ -4,19 +4,8 @@ import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
 import { useSettings } from '../../config/SettingsContext';
 import { api } from '../../api/axios';
 import { BarChart, LineChart } from './ReportChart';
-import { DashStyles, PageHeader, PlanBadge, PlanGate } from '../../components/dashboard/ui';
-
-interface ReportResult {
-  question: string;
-  engine: 'LLM' | 'REGLAS';
-  spec: { title: string; metric: string; dimension: string; chart: string; filters: Record<string, any>; limit: number };
-  columns: [string, string];
-  rows: { label: string; value: number }[];
-  total: number;
-  narrative: string;
-  branchName: string | null;
-  generatedAt: string;
-}
+import { DashStyles, PageHeader, PlanBadge, PlanGate, downloadCsv } from '../../components/dashboard/ui';
+import type { ReportResult } from './exportReport';
 
 /**
  * REPORTES GENERATIVOS — el usuario pregunta en lenguaje natural y obtiene un
@@ -29,7 +18,7 @@ export const AiReportsPage = () => (
     <PlanGate feature="ai" title="Reportes generativos con IA" bullets={[
       'Consultas en lenguaje natural ("¿qué vestidos se vendieron más este mes?")',
       'Gráficos y narrativa generados automáticamente',
-      'Historial de consultas y exportación a CSV',
+      'Historial de consultas y exportación a PDF, Excel y CSV',
       'Datos aislados por empresa (multitenant)',
     ]}>
       <AiReportsContent />
@@ -44,6 +33,7 @@ const AiReportsContent = () => {
   const [result, setResult] = useState<ReportResult | null>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState<'csv' | 'excel' | 'pdf' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const { settings } = useSettings();
@@ -86,14 +76,26 @@ const AiReportsContent = () => {
     });
   };
 
-  const exportCsv = () => {
+  const exportReport = async (format: 'csv' | 'excel' | 'pdf') => {
     if (!result) return;
-    const lines = [result.columns.join(','), ...result.rows.map((r) => `"${r.label.replace(/"/g, '""')}",${r.value}`)];
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `reporte-ia-${Date.now()}.csv`;
-    a.click();
+    setExporting(format);
+    setError(null);
+    try {
+      if (format === 'csv') {
+        const stamp = new Date(result.generatedAt).toISOString().slice(0, 10);
+        downloadCsv(`reporte-ia-${stamp}.csv`, result.columns, result.rows.map((r) => [r.label, r.value]));
+      } else if (format === 'excel') {
+        const { exportReportExcel } = await import('./exportReport');
+        await exportReportExcel(result);
+      } else {
+        const { exportReportPdf } = await import('./exportReport');
+        exportReportPdf(result);
+      }
+    } catch {
+      setError('No se pudo exportar el reporte. Inténtalo de nuevo.');
+    } finally {
+      setExporting(null);
+    }
   };
 
   return (
@@ -153,7 +155,15 @@ const AiReportsContent = () => {
               <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, background: result.engine === 'LLM' ? '#e0e7ff' : '#f3f4f6' }}>
                 {result.engine === 'LLM' ? 'Interpretado por IA' : 'Intérprete local'}
               </span>
-              <button onClick={exportCsv} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ccc', background: '#fff', cursor: 'pointer' }}>Exportar CSV</button>
+              <div role="group" aria-label="Exportar reporte" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+                <span style={{ fontSize: 12, color: 'var(--atemporal-muted)', marginRight: 2 }}>Exportar:</span>
+                {([['pdf', 'PDF'], ['excel', 'Excel'], ['csv', 'CSV']] as const).map(([key, label]) => (
+                  <button key={key} onClick={() => void exportReport(key)} disabled={exporting !== null}
+                    style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ccc', background: '#fff', cursor: exporting ? 'wait' : 'pointer', opacity: exporting && exporting !== key ? 0.5 : 1 }}>
+                    {exporting === key ? 'Exportando…' : label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
           <div style={{ fontSize: 12, color: '#777', margin: '4px 0 12px' }}>
