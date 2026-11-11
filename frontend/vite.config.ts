@@ -4,6 +4,9 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Permite abrir el frontend desde un túnel HTTPS (p. ej. *.trycloudflare.com) para probar en el iPhone
+  preview: { allowedHosts: true },
+  server: { allowedHosts: true },
   plugins: [
     react(),
     VitePWA({
