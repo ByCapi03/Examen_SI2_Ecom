@@ -28,8 +28,8 @@ const TryOnScreen = (props: any) => {
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, backgroundColor: '#fff' }}>
         <Text style={{ fontSize: 20, fontWeight: '700', marginBottom: 8 }}>Vestidor virtual</Text>
         <Text style={{ textAlign: 'center', color: '#555', marginBottom: 20 }}>
-          El vestidor usa la cámara con inteligencia artificial y no está disponible en Expo Go.
-          Funciona en la compilación propia de la app y en la versión web.
+          El vestidor usa la cámara con inteligencia artificial y está desactivado en este modo.
+          Para probarlo arranca la app con TRYON=1 (ver README) o usa la versión web del cliente.
         </Text>
         <Pressable onPress={() => props.navigation.goBack()} style={{ paddingVertical: 12, paddingHorizontal: 24, backgroundColor: '#1a1a1a', borderRadius: 10 }}>
           <Text style={{ color: '#fff', fontWeight: '700' }}>Volver</Text>

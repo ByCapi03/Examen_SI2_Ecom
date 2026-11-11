@@ -177,6 +177,14 @@ $env:EXPO_PUBLIC_API_URL="https://URL-DEL-API.trycloudflare.com"
 npx expo start
 # si no conecta por la red local:  npx expo start --tunnel
 ```
+**Vestidor virtual con cámara en el iPhone (modo experimental):** por defecto está desactivado porque TensorFlow consume mucha memoria. Para activarlo:
+```powershell
+$env:TRYON="1"
+$env:NODE_OPTIONS="--max-old-space-size=4096"
+npx expo start --go --clear
+```
+Entra a un producto → **Probar en vestidor** y permite la cámara. Si falla en Expo Go, el vestidor completo funciona en la web del cliente (`/t/luna`).
+
 **En el navegador (Edge/Chrome), para pruebas rápidas:**
 ```powershell
 cd "C:\Users\MSI CYBORG 15 A13V\Desktop\UNI\Examen_SI2_Ecom\mobile"

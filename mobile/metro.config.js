@@ -14,13 +14,17 @@ const HEAVY = [
 ];
 const stub = path.resolve(__dirname, 'src/stubs/tryon-unavailable.js');
 
+const rnfsFake = path.resolve(__dirname, 'src/stubs/rnfs-fake.js');
 const stripeWeb = path.resolve(__dirname, 'src/stubs/stripe-web.js');
 const original = config.resolver.resolveRequest;
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (platform === 'web' && moduleName === '@stripe/stripe-react-native') {
     return { type: 'sourceFile', filePath: stripeWeb };
   }
-  if (process.env.TRYON !== '1' && HEAVY.some((re) => re.test(moduleName))) {
+  // TRYON=1: el vestidor con cámara se incluye (solo en teléfono); react-native-fs se simula porque Expo Go no lo trae.
+  if (process.env.TRYON === '1' && platform !== 'web') {
+    if (moduleName === 'react-native-fs') return { type: 'sourceFile', filePath: rnfsFake };
+  } else if (HEAVY.some((re) => re.test(moduleName))) {
     return { type: 'sourceFile', filePath: stub };
   }
   return original ? original(context, moduleName, platform) : context.resolveRequest(context, moduleName, platform);
