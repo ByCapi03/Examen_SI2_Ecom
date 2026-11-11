@@ -26,8 +26,78 @@ export class NotificationsService implements OnModuleInit {
     private readonly dataSource: DataSource,
   ) {}
 
+  private lowStockTimer?: NodeJS.Timeout;
+
   onModuleInit() {
     onLowStock((inventoryId) => { void this.notifyLowStock(inventoryId); });
+    // Revisión periódica: avisa del stock que YA estaba bajo (no solo cuando cruza el mínimo).
+    if (process.env.NODE_ENV !== 'test') {
+      setTimeout(() => { void this.syncLowStockAlerts(); }, 30_000).unref?.();
+      this.lowStockTimer = setInterval(() => { void this.syncLowStockAlerts(); }, 6 * 3_600_000);
+      this.lowStockTimer.unref?.();
+    }
+  }
+
+  /**
+   * Resumen por sucursal del stock crítico (disponible <= mínimo). Crea UNA notificación por sucursal y
+   * destinatario (encargado de la sucursal + administradores), como máximo cada 24 h, para no saturar.
+   * `tenantId` limita la revisión a una empresa (cuando la dispara el panel).
+   */
+  async syncLowStockAlerts(tenantId?: number) {
+    try {
+      const rows = await this.dataSource.query(
+        `SELECT i.id, i.stock, i.reserved, i."stockMin", i."branchId", b."tenantId", b.name AS "branchName", p.name AS "productName"
+           FROM inventory i
+           JOIN branches b ON b.id = i."branchId" AND b.active = true
+           JOIN tenants t ON t.id = b."tenantId" AND t.active = true
+           JOIN variants v ON v.id = i."variantId"
+           JOIN products p ON p.id = v."productId"
+          WHERE (i.stock - i.reserved) <= i."stockMin" ${tenantId ? 'AND b."tenantId" = $1' : ''}
+          ORDER BY b."tenantId", i."branchId", (i.stock - i.reserved)`,
+        tenantId ? [tenantId] : []);
+      if (!rows.length) return { branches: 0, notified: 0 };
+
+      const byBranch = new Map<number, any[]>();
+      for (const r of rows) byBranch.set(r.branchId, [...(byBranch.get(r.branchId) ?? []), r]);
+
+      let notified = 0;
+      for (const [branchId, items] of byBranch) {
+        const tenant = Number(items[0].tenantId);
+        const users = await this.userRepo.find({ where: { tenantId: tenant, active: true }, relations: { userRoles: { role: true } } });
+        const targets = users.filter((u) => u.userRoles?.some((ur) => ur.active && (
+          ur.role.name === 'ADMIN' || (ur.role.name === 'ENCARGADO' && u.branchId === branchId))));
+        if (!targets.length) continue;
+
+        const recent = await this.notificationRepo.createQueryBuilder('n')
+          .where('n.branchId = :branchId', { branchId })
+          .andWhere("n.type IN ('LOW_STOCK','LOW_STOCK_DIGEST')")
+          .andWhere("n.createdAt > NOW() - INTERVAL '24 hours'")
+          .andWhere('n.userId IN (:...ids)', { ids: targets.map((u) => u.id) })
+          .getMany();
+        const already = new Set(recent.map((n) => n.userId));
+        const pending = targets.filter((u) => !already.has(u.id));
+        if (!pending.length) continue;
+
+        const out = items.filter((i) => Number(i.stock) - Number(i.reserved) <= 0).length;
+        const names = [...new Set(items.map((i: any) => i.productName))];
+        const title = `Stock crítico en ${items[0].branchName}: ${items.length} ${items.length === 1 ? 'producto' : 'productos'}`;
+        const message = `${names.slice(0, 3).join(', ')}${names.length > 3 ? ` y ${names.length - 3} más` : ''}.${out ? ` ${out} agotado${out === 1 ? '' : 's'}.` : ''} Revisa Inventario.`;
+
+        await this.notificationRepo.save(pending.map((u) => this.notificationRepo.create({
+          userId: u.id, type: 'LOW_STOCK_DIGEST', title, message, branchId,
+        })));
+        const devices = await this.deviceRepo.createQueryBuilder('device')
+          .where('device.userId IN (:...ids)', { ids: pending.map((u) => u.id) }).andWhere('device.active = true').getMany();
+        await this.sendPushNotification(devices.map((d) => d.token), {
+          title, message, data: { type: 'LOW_STOCK', branchId: String(branchId), route: '/dashboard/inventory' },
+        });
+        notified += pending.length;
+      }
+      return { branches: byBranch.size, notified };
+    } catch (error) {
+      this.logger.error('Error en la revisión de stock bajo', error as any);
+      return { branches: 0, notified: 0 };
+    }
   }
 
   /** Estado de la configuración de push para el usuario (diagnóstico). */
@@ -81,7 +151,7 @@ export class NotificationsService implements OnModuleInit {
         : `${detail}: quedan ${available} unidades (mínimo ${inv.stockMin}).`;
 
       await this.notificationRepo.save(targets.map((u) =>
-        this.notificationRepo.create({ userId: u.id, type: 'LOW_STOCK', title, message })));
+        this.notificationRepo.create({ userId: u.id, type: 'LOW_STOCK', title, message, inventoryId, branchId: Number(inv.branchId) })));
 
       const devices = await this.deviceRepo.createQueryBuilder('device')
         .where('device.userId IN (:...ids)', { ids: targets.map((u) => u.id) })

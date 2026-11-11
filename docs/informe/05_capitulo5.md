@@ -10,7 +10,7 @@ la seguridad por rol y por plan, la sincronización offline y el comportamiento 
 | Unitarias | Jest (`npx jest`) | Reglas de sincronización, especificación de reportes IA y SQL, modelos ML |
 | Integración / sistema (API + BD reales) | `npm run test:e2e:saas` | Aislamiento, offline, conflictos, IA, ML, planes |
 | Integración / sistema (tienda) | `npm run test:e2e:tienda` | Tienda pública, registro por empresa, Mi tienda web |
-| Notificaciones | `npm run test:e2e:notif` | Alerta de stock bajo (11 pruebas) |
+| Notificaciones | `npm run test:e2e:notif` | Alerta de stock bajo y resumen por sucursal (16 pruebas) |
 | Planes y SuperAdmin | `npm run test:e2e:planes` | Ciclos, límites, vigencia, suspensión (32 pruebas) |
 | Interfaz | Playwright (verificación manual asistida) | Landing, tienda por empresa, panel, vestidor |
 | Coherencia documental | `python3 docs/uml/scripts/verificar_coherencia.py` | RNF-12: diagramas vs. código |
@@ -51,7 +51,7 @@ Defectos detectados y corregidos durante esta fase:
 | Jest (unitarias) | **24 / 24 aprobadas** |
 | E2E SaaS | **34 / 34 aprobadas** |
 | E2E tienda pública | **22 / 22 aprobadas** |
-| E2E notificaciones (stock bajo) | **11 / 11 aprobadas** |
+| E2E notificaciones (stock bajo) | **16 / 16 aprobadas** |
 | E2E planes y SuperAdmin | **32 / 32 aprobadas** |
 | `tsc` backend, frontend y móvil | Sin errores |
 | Coherencia documental | Todos los diagramas coherentes con el código |

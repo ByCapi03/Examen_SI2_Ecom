@@ -25,6 +25,14 @@ export class NotificationsController {
     return this.notificationsService.pushStatus(req.user.sub);
   }
 
+  /** Revisa el stock crítico de la empresa y genera las alertas pendientes (idempotente: máx. 1 cada 24 h). */
+  @Post('low-stock/sync')
+  syncLowStock(@Req() req: any) {
+    const roles: string[] = req.user.roles ?? [];
+    if (!roles.includes('ADMIN') && !roles.includes('ENCARGADO')) return { branches: 0, notified: 0 };
+    return this.notificationsService.syncLowStockAlerts(req.user.tenantId);
+  }
+
   @Patch('read-all')
   markAllAsRead(@Req() req: any) {
     return this.notificationsService.markAllAsRead(req.user.sub);

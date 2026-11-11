@@ -78,6 +78,6 @@ cd backend && npm install && npm run seed:demo && npm run build && npm run start
 npx jest                       # 24 pruebas unitarias
 npm run test:e2e:saas          # 34 pruebas E2E
 npm run test:e2e:tienda        # 22 pruebas E2E
-npm run test:e2e:notif         # 11 pruebas E2E
+npm run test:e2e:notif         # 16 pruebas E2E
 SUPERADMIN_EMAIL=... SUPERADMIN_PASSWORD=... npm run test:e2e:planes   # 32 pruebas E2E (el backend debe tener las mismas variables)
 ```

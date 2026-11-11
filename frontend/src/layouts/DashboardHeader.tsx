@@ -36,7 +36,9 @@ export const DashboardHeader = () => {
   };
 
   useEffect(() => {
-    fetchNotifications();
+    // Admin/encargado: primero se revisa el stock crítico para que su alerta aparezca de inmediato
+    const canSeeStock = user?.roles?.some((r) => r === 'ADMIN' || r === 'ENCARGADO');
+    (canSeeStock ? api.post('/notifications/low-stock/sync').catch(() => {}) : Promise.resolve()).finally(fetchNotifications);
     const interval = setInterval(() => {
       fetchNotifications();
     }, 30000); // Polling every 30 seconds
@@ -163,11 +165,11 @@ export const DashboardHeader = () => {
                       className={`notification-item ${!notif.read ? 'unread' : ''}`}
                       onClick={() => {
                         if (!notif.read) handleMarkAsRead(notif.id);
-                        if (notif.type === 'LOW_STOCK') navigate('/dashboard/inventory');
+                        if (notif.type === 'LOW_STOCK' || notif.type === 'LOW_STOCK_DIGEST') navigate('/dashboard/inventory');
                         else if (notif.reservationId) navigate('/dashboard/reservations'); // or specific detail
                       }}
                     >
-                      <div className="notification-title">{notif.type === 'LOW_STOCK' ? '⚠️ ' : ''}{notif.title}</div>
+                      <div className="notification-title">{notif.type.startsWith('LOW_STOCK') ? '⚠️ ' : ''}{notif.title}</div>
                       <div className="notification-msg">{notif.message}</div>
                       <div className="notification-time">{new Date(notif.createdAt).toLocaleString()}</div>
                     </div>

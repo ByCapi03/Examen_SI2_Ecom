@@ -17,6 +17,7 @@ async function call(method, path, { token, body } = {}) {
 }
 const check = (id, name, cond, extra = '') => { cond ? ok++ : fail++; console.log(`  ${cond ? '✔' : '✘'} ${id} ${name} ${cond ? '' : extra}`); };
 const login = async (email) => (await call('POST', '/auth/login', { body: { email, password: '123456' } })).data;
+const digest = async (token) => ((await call('GET', '/notifications/my', { token })).data || []).filter((n) => n.type === 'LOW_STOCK_DIGEST');
 const lowStock = async (token) => ((await call('GET', '/notifications/my', { token })).data || []).filter((n) => n.type === 'LOW_STOCK');
 
 (async () => {
@@ -25,6 +26,17 @@ const lowStock = async (token) => ((await call('GET', '/notifications/my', { tok
   const enc2 = await login('encargado2@luna.com');
   const cli = await login('cliente@luna.com');
   check('N01', 'Se pudo iniciar sesión con administrador y encargados', !!(admin?.accessToken && enc1?.accessToken && enc2?.accessToken));
+
+  // Resumen de stock YA crítico (aunque nadie lo haya movido): una notificación por sucursal y destinatario
+  const d0 = (await digest(enc1.accessToken)).length, a0 = (await digest(admin.accessToken)).length, e20 = (await digest(enc2.accessToken)).length;
+  const sy = await call('POST', '/notifications/low-stock/sync', { token: enc1.accessToken });
+  check('N12', 'La revisión de stock crítico responde', sy.status === 201 || sy.status === 200, JSON.stringify(sy.data));
+  const d1 = await digest(enc1.accessToken);
+  check('N13', 'El encargado recibe el resumen de su sucursal (productos críticos)', d1.length === d0 + 1 && /crítico/i.test(d1[0]?.title || ''), d1[0]?.title);
+  check('N14', 'El administrador también recibe el resumen', (await digest(admin.accessToken)).length >= a0 + 1);
+  await call('POST', '/notifications/low-stock/sync', { token: enc1.accessToken });
+  check('N15', 'No se repite el resumen dentro de 24 h', (await digest(enc1.accessToken)).length === d1.length);
+  check('N16', 'Un cliente no genera ni recibe resúmenes', (await call('POST', '/notifications/low-stock/sync', { token: cli.accessToken })).data?.notified === 0 && (await digest(cli.accessToken)).length === 0);
 
   const inv = (await call('GET', '/inventory', { token: enc1.accessToken })).data;
   const list = Array.isArray(inv) ? inv : inv?.data || [];
