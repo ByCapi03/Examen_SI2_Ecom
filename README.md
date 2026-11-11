@@ -177,6 +177,14 @@ $env:EXPO_PUBLIC_API_URL="https://URL-DEL-API.trycloudflare.com"
 npx expo start
 # si no conecta por la red local:  npx expo start --tunnel
 ```
+**En el navegador (Edge/Chrome), para pruebas rápidas:**
+```powershell
+cd "C:\Users\MSI CYBORG 15 A13V\Desktop\UNI\Examen_SI2_Ecom\mobile"
+$env:EXPO_PUBLIC_API_URL="http://localhost:3000"
+npx expo start --web --clear
+```
+Abre `http://localhost:8081`. En el navegador la sesión usa `localStorage` y no hay pago con tarjeta (Stripe) ni vestidor; el resto funciona.
+
 Escanea el QR con la cámara del iPhone (Expo Go instalado). Cuenta: `cliente@luna.com` / `123456`.
 La app exige iniciar sesión y muestra solo el catálogo de la empresa del cliente.
 

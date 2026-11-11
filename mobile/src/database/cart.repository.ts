@@ -68,7 +68,7 @@ export const cartRepository = {
     const db = await getDatabase();
     const now = Date.now();
 
-    await db.withExclusiveTransactionAsync(async (txn) => {
+    await db.withTransactionAsync(async () => { const txn = db;
       // 1. Guardar o actualizar cabecera
       await txn.runAsync(
         `INSERT INTO cart_header (id, branch_id, branch_name, updated_at)
@@ -112,7 +112,7 @@ export const cartRepository = {
     const db = await getDatabase();
     const now = Date.now();
 
-    await db.withExclusiveTransactionAsync(async (txn) => {
+    await db.withTransactionAsync(async () => { const txn = db;
       await txn.runAsync(
         `INSERT INTO cart_header (id, branch_id, branch_name, updated_at)
          VALUES (1, NULL, NULL, ?)

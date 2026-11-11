@@ -14,14 +14,29 @@ const HEAVY = [
 ];
 const stub = path.resolve(__dirname, 'src/stubs/tryon-unavailable.js');
 
-if (process.env.TRYON !== '1') {
-  const original = config.resolver.resolveRequest;
-  config.resolver.resolveRequest = (context, moduleName, platform) => {
-    if (HEAVY.some((re) => re.test(moduleName))) {
-      return { type: 'sourceFile', filePath: stub };
-    }
-    return original ? original(context, moduleName, platform) : context.resolveRequest(context, moduleName, platform);
+const stripeWeb = path.resolve(__dirname, 'src/stubs/stripe-web.js');
+const original = config.resolver.resolveRequest;
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (platform === 'web' && moduleName === '@stripe/stripe-react-native') {
+    return { type: 'sourceFile', filePath: stripeWeb };
+  }
+  if (process.env.TRYON !== '1' && HEAVY.some((re) => re.test(moduleName))) {
+    return { type: 'sourceFile', filePath: stub };
+  }
+  return original ? original(context, moduleName, platform) : context.resolveRequest(context, moduleName, platform);
+};
+
+// expo-sqlite en el navegador usa WebAssembly y necesita estas cabeceras
+config.resolver.assetExts.push('wasm');
+config.server = config.server || {};
+const prevEnhance = config.server.enhanceMiddleware;
+config.server.enhanceMiddleware = (middleware, server) => {
+  const base = prevEnhance ? prevEnhance(middleware, server) : middleware;
+  return (req, res, next) => {
+    res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    return base(req, res, next);
   };
-}
+};
 
 module.exports = config;
