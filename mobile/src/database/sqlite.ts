@@ -2,7 +2,7 @@ import * as SQLite from 'expo-sqlite';
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
 
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 /**
  * Obtiene o inicializa la conexión con la base de datos local SQLite.
@@ -157,6 +157,76 @@ const runMigrations = async (db: SQLite.SQLiteDatabase) => {
       await txn.execAsync(`PRAGMA user_version = 2;`);
     });
     console.log('[SQLite] Migración a versión 2 (cola offline) completada.');
+  }
+
+  if (currentVersion < 3) {
+    await db.withExclusiveTransactionAsync(async (txn) => {
+      // 9. Caja POS offline: sucursal autorizada, existencias conocidas, clientes mínimos
+      await txn.execAsync(`
+        CREATE TABLE IF NOT EXISTS pos_branches (
+          id INTEGER PRIMARY KEY,
+          name TEXT NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS pos_inventory (
+          variant_id INTEGER NOT NULL,
+          branch_id INTEGER NOT NULL,
+          product_id INTEGER,
+          product_name TEXT NOT NULL,
+          sku TEXT,
+          size TEXT,
+          color TEXT,
+          base_price REAL,
+          final_price REAL NOT NULL,
+          available INTEGER NOT NULL CHECK (available >= 0),
+          updated_at INTEGER NOT NULL,
+          PRIMARY KEY (variant_id, branch_id),
+          FOREIGN KEY (branch_id) REFERENCES pos_branches (id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS pos_clients (
+          id INTEGER PRIMARY KEY,
+          name TEXT NOT NULL,
+          last_name TEXT NOT NULL,
+          email TEXT,
+          phone TEXT,
+          updated_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_pos_inventory_branch ON pos_inventory (branch_id, product_name);
+      `);
+      // 10. Ventas locales y su detalle. El estado de sincronización NO se duplica:
+      //     se obtiene de offline_operations (misma operation_id).
+      await txn.execAsync(`
+        CREATE TABLE IF NOT EXISTS local_sales (
+          operation_id TEXT PRIMARY KEY,
+          tenant_id INTEGER NOT NULL,
+          branch_id INTEGER NOT NULL,
+          user_id INTEGER NOT NULL,
+          client_id INTEGER,
+          client_name TEXT,
+          payment_method TEXT NOT NULL DEFAULT 'EFECTIVO' CHECK (payment_method = 'EFECTIVO'),
+          total REAL NOT NULL,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (operation_id) REFERENCES offline_operations (operation_id) ON DELETE CASCADE,
+          FOREIGN KEY (branch_id) REFERENCES pos_branches (id)
+        );
+        CREATE TABLE IF NOT EXISTS local_sale_items (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          operation_id TEXT NOT NULL,
+          variant_id INTEGER NOT NULL,
+          product_name TEXT NOT NULL,
+          size TEXT,
+          color TEXT,
+          quantity INTEGER NOT NULL CHECK (quantity > 0),
+          unit_price REAL NOT NULL,
+          subtotal REAL NOT NULL,
+          FOREIGN KEY (operation_id) REFERENCES local_sales (operation_id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_local_sales_user ON local_sales (tenant_id, user_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_local_sale_items_op ON local_sale_items (operation_id);
+      `);
+      await txn.execAsync(`PRAGMA user_version = 3;`);
+    });
+    console.log('[SQLite] Migración a versión 3 (caja POS offline) completada.');
   }
 };
 

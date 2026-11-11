@@ -13,6 +13,7 @@ import { ReservationsScreen } from '../screens/reservations/ReservationsScreen';
 import { PurchasesScreen } from '../screens/purchases/PurchasesScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { CartScreen } from '../screens/store/CartScreen';
+import { PosScreen } from '../screens/pos/PosScreen';
 
 const Drawer = createDrawerNavigator<ClientDrawerParamList>();
 
@@ -57,6 +58,8 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
 
 export const ClientDrawer = () => {
   const { cart } = useCart();
+  const { user } = useAuth();
+  const isCashier = !!user?.roles?.includes('CAJERO');
   
   const cartItemsCount = cart.items.reduce((total, item) => total + item.quantity, 0);
 
@@ -106,6 +109,16 @@ export const ClientDrawer = () => {
           title: 'ATEMPORAL',
         }}
       />
+      {isCashier && (
+        <Drawer.Screen
+          name="PosTab"
+          component={PosScreen}
+          options={{
+            drawerLabel: '💵 Caja (POS)',
+            title: 'Caja POS',
+          }}
+        />
+      )}
       <Drawer.Screen
         name="ReservationsTab"
         component={ReservationsScreen}

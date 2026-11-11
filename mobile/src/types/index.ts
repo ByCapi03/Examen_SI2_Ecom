@@ -4,6 +4,7 @@ export interface User {
   email: string;
   roles: string[];
   branchId?: number | null;
+  tenantId?: number;
   mustChangePassword?: boolean;
 }
 
@@ -157,6 +158,7 @@ export type ClientDrawerParamList = {
   ReservationsTab: undefined;
   PurchasesTab: undefined;
   ProfileTab: undefined;
+  PosTab: undefined;
 };
 
 export type RootStackParamList = {

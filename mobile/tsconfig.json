@@ -4,5 +4,9 @@
     "strict": true,
     "esModuleInterop": true,
     "jsx": "react-native"
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "scripts"
+  ]
 }

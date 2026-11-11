@@ -32,7 +32,7 @@ export function isNetworkError(err: any): boolean {
   return !!err && !err.response && (err.message === 'Network Error' || err.code === 'ERR_NETWORK' || err.code === 'ECONNABORTED');
 }
 
-async function currentUser(): Promise<{ id: number; tenantId: number } | null> {
+export async function currentUser(): Promise<{ id: number; tenantId: number } | null> {
   try {
     const raw = await SecureStore.getItemAsync('userData');
     return raw ? JSON.parse(raw) : null;

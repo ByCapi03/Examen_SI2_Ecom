@@ -200,6 +200,16 @@ async function main() {
     } catch (e) { check('T13 PostgreSQL rechaza inventario de A en sucursal de B (fk_inventory_branch_tenant)', /fk_inventory_branch_tenant/.test(e.message), e.message); }
 
     // ======================================================== OFFLINE / SYNC
+    console.log('\n--- HU: App móvil — caja POS offline (contrato con el backend) ---');
+    r = await api('GET', '/cash-sessions/current', tok.cajeroA);
+    check('T59 El móvil descarga su sucursal y caja abierta (/cash-sessions/current)', r.status === 200 && r.data.status === 'OPEN' && r.data.session?.id === A.session && r.data.branch?.id === A.branch, r.data);
+    r = await api('GET', '/pos/products', tok.cajeroA);
+    const needed = ['productId', 'variantId', 'productName', 'sku', 'size', 'color', 'price', 'finalPrice', 'available'];
+    check('T60 /pos/products entrega las existencias de su sucursal con los campos que guarda el móvil',
+      r.status === 200 && r.data.length >= 1 && r.data.every((p) => needed.every((k) => p[k] !== undefined && p[k] !== null) && typeof p.available === 'number'), r.data);
+    r = await api('GET', '/pos/clients', tok.cajeroA);
+    check('T61 /pos/clients entrega clientes mínimos solo de su empresa', r.status === 200 && r.data.some((c) => c.id === A.client) && r.data.every((c) => c.id !== undefined && c.name && c.lastName !== undefined), r.data);
+
     console.log('\n--- HU: Operación offline y sincronización ---');
     const op1 = crypto.randomUUID();
     const saleOp = (id, qty, unitPrice, minutesAgo) => ({
@@ -319,6 +329,19 @@ async function main() {
     check('T46 Movimiento de inventario queda registrado con el tenant de A', r.status === 201 && mov?.tenantId === A.id, { status: r.status, mov });
     r = await api('POST', '/categories', tok.clienteA, { name: `Cliente ${RUN}` });
     check('T47 Un CLIENTE no puede modificar el catálogo de su empresa → 403', r.status === 403, r.status);
+
+    // La app móvil envía la venta con deviceId "mobile-app" y cliente; el servidor debe aceptarla una sola vez
+    const mobOp = crypto.randomUUID();
+    const mobBody = { deviceId: 'mobile-app', operations: [{ operationId: mobOp, type: 'POS_CASH_SALE', clientCreatedAt: new Date().toISOString(),
+      cashSessionId: A.session, clientId: A.client, items: [{ variantId: A.variant, quantity: 1, unitPrice: 100 }] }] };
+    r = await api('POST', '/sync/batch', tok.cajeroA, mobBody);
+    const mobRes = r.data?.results?.[0];
+    const mobSale = mobRes?.result?.saleId ? await one(`SELECT "clientId", "offlineOperationId", total FROM sales WHERE id = $1`, [mobRes.result.saleId]) : null;
+    check('T62 Venta del móvil (con cliente) sincroniza; el cliente y el UUID quedan en la venta',
+      r.status === 201 && ['APPLIED', 'APPLIED_WITH_CONFLICT'].includes(mobRes?.status) && mobSale?.clientId === A.client && mobSale?.offlineOperationId === mobOp, r.data);
+    r = await api('POST', '/sync/batch', tok.cajeroA, mobBody);
+    const mobCount = await one(`SELECT COUNT(*)::int AS n FROM sales WHERE "offlineOperationId" = $1`, [mobOp]);
+    check('T63 Reintento del móvil tras una respuesta perdida → DUPLICATE y una sola venta', r.data?.results?.[0]?.status === 'DUPLICATE' && mobCount.n === 1, { r: r.data, mobCount });
 
     // ======================================================== MISMO CORREO EN VARIAS EMPRESAS
     console.log('\n--- HU: Un mismo correo puede pertenecer a varias empresas ---');

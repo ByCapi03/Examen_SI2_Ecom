@@ -508,15 +508,16 @@ Pruebas: `T##` = `backend/scripts/test-saas-e2e.js` (API + PostgreSQL reales);
 cd backend && npm install
 npm run migrate:multitenant      # BD del Primer Parcial → SaaS (idempotente)
 npm run build && npm run start:prod
-npx jest                         # 24 pruebas unitarias
-npm run test:e2e:saas            # 34 pruebas E2E (crea y elimina 2 empresas de prueba)
+npx jest                         # 51 pruebas unitarias
+npm run test:e2e:saas            # 64 pruebas E2E (crea y elimina 2 empresas de prueba)
+npm run seed:synthetic           # (opcional) historial sintético para entrenar los modelos de ML
 ```
 
 Resultado obtenido:
 
 ```
-Tests: 24 passed, 24 total                       (Jest)
-=== RESULTADO: 34 pruebas aprobadas, 0 fallidas ===   (E2E)
+Tests: 51 passed, 51 total                       (Jest)
+=== RESULTADO: 64 pruebas aprobadas, 0 fallidas ===   (E2E)
 ```
 
 Variables para IA generativa (opcional; sin ellas se usa el intérprete local):
@@ -537,6 +538,7 @@ Variables para IA generativa (opcional; sin ellas se usa el intérprete local):
 ## 11. Limitaciones conocidas
 
 - Categorías, tallas, colores, temporadas y ciudades siguen siendo catálogos globales compartidos.
-- `users.email` y `clients.email` son únicos a nivel global (un correo pertenece a una sola empresa).
-- La app móvil es de clientes: su modo offline cubre reservas; las ventas offline se realizan en el POS web.
+- `users.email` y `clients.email` son únicos **por empresa** `(tenantId, email)`: una persona puede usar el mismo correo en varias empresas. El login acepta `tenantSlug` y, si el correo y la contraseña coinciden en más de una empresa, responde `409 MULTIPLE_TENANTS` con la lista para elegir (sin revelar en qué empresas existe el correo).
+- La app móvil tiene dos perfiles: el cliente (reservas offline) y el **cajero**, que ve la pantalla *Caja (POS)* y registra ventas de contado offline (SQLite: sucursal, existencias, clientes mínimos, ventas y detalle; el estado de sincronización se deriva de la cola `offline_operations`). Solo se admite efectivo sin conexión.
+- Los modelos de ML se entrenan con las ventas de la empresa y se persisten por versión (`ml_models`). Con `npm run seed:synthetic` se puede generar un historial **sintético** marcado (`@sintetico.local`, SKU `SYN-`); las métricas de entrenamiento informan cuántas ventas son reales y cuántas sintéticas. El modelo supervisado es una regresión lineal por producto: su mejora frente al baseline ingenuo es modesta (≈10 % en datos sintéticos) y debe reportarse tal cual.
 - Sin `AI_API_KEY` los reportes usan el intérprete local en español (cubre las consultas típicas, no lenguaje libre arbitrario).
