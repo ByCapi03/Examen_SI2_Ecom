@@ -14,7 +14,8 @@
  *   npm run seed:demo          crea las empresas demo si no existen (no toca nada más)
  *   npm run seed:demo:reset    borra SOLO las empresas demo (slugs "luna" y "sol") y las vuelve a crear
  *
- * Los productos se crean SIN imagen: se agregan después desde Catálogo > Productos.
+ * Los productos se crean SIN imagen la primera vez: se agregan después desde Catálogo > Productos.
+ * Al reiniciar (--reset) se CONSERVAN las fotos, la configuración del vestidor virtual y la de Mi tienda web.
  */
 import * as fs from 'fs';
 import * as path from 'path';
@@ -215,6 +216,14 @@ async function ensureGlobals(ds: DataSource): Promise<Globals> {
     return { roles, plans, cities, categories, sizes, colors, seasonId };
   });
 }
+
+/** Columnas de producto que se conservan al reiniciar los datos demo (fotos y configuración del vestidor virtual). */
+const KEEP_PRODUCT_COLUMNS = [
+  'imageUrl', 'imagePublicId', 'colorizable', 'sourceColor', 'arEnabled', 'arImageUrl', 'arImagePublicId',
+  'arTorsoUrl', 'arTorsoPublicId', 'arLeftSleeveUrl', 'arLeftSleevePublicId', 'arRightSleeveUrl', 'arRightSleevePublicId', 'arType',
+];
+const pickKept = (row?: Record<string, any>) =>
+  row ? Object.fromEntries(KEEP_PRODUCT_COLUMNS.filter((c) => row[c] !== null && row[c] !== undefined).map((c) => [c, row[c]])) : {};
 
 /* ───────────────────────── Limpieza de una empresa demo ───────────────────────── */
 
@@ -585,10 +594,18 @@ async function seedCompany(ds: DataSource, def: CompanyDef, g: Globals, password
   const r = rng(def.seed * 7919);
 
   await ds.transaction(async (m) => {
-    if (existing) { console.log(`  · ${def.name}: eliminando datos demo anteriores…`); await deleteTenantData(m, existing.id); }
+    // Lo que se subió a mano (fotos, vestidor virtual, Mi tienda web) se conserva al recrear la empresa demo
+    let keptProducts = new Map<string, Record<string, any>>();
+    const keptStoreConfig = existing?.storeConfig ?? null;
+    if (existing) {
+      const rows: Record<string, any>[] = await m.query(`SELECT name, ${KEEP_PRODUCT_COLUMNS.map((c) => `"${c}"`).join(', ')} FROM products WHERE "tenantId" = $1`, [existing.id]);
+      keptProducts = new Map(rows.map((row) => [row.name, row]));
+      console.log(`  · ${def.name}: eliminando datos demo anteriores (se conservan fotos y configuración de ${keptProducts.size} producto(s))…`);
+      await deleteTenantData(m, existing.id);
+    }
 
     const created = dayAt(14, 9, 0);
-    const T = (await m.insert(Tenant, { slug: def.slug, name: def.name, taxId: def.taxId, active: true, createdAt: created } as any)).identifiers[0].id as number;
+    const T = (await m.insert(Tenant, { slug: def.slug, name: def.name, taxId: def.taxId, active: true, createdAt: created, ...(keptStoreConfig ? { storeConfig: keptStoreConfig } : {}) } as any)).identifiers[0].id as number;
     // Luna: plan anual vigente; Sol: plan mensual que vence en 20 días (para mostrar vigencias en el panel SuperAdmin)
     const yearly = def.planCode === 'PROFESIONAL';
     await m.insert(Subscription, { tenantId: T, planId: g.plans[def.planCode], status: 'ACTIVE', billingCycle: yearly ? 'YEARLY' : 'MONTHLY', startDate: created, endDate: addMin(new Date(), (yearly ? 300 : 20) * 1440) } as any);
@@ -654,6 +671,7 @@ async function seedCompany(ds: DataSource, def: CompanyDef, g: Globals, password
       const productId = (await m.insert(Product, {
         tenantId: T, name: p.name, price: p.price, active: true, categoryId: g.categories[p.category], collectionId: collectionIds[p.collection],
         arEnabled: false, arType: AR_TYPE[p.category],
+        ...pickKept(keptProducts.get(p.name)),
       } as any)).identifiers[0].id as number;
       productIds.push(productId);
       const rows: any[] = [];

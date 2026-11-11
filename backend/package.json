@@ -22,6 +22,7 @@
     "seed": "ts-node src/database/seed-runner.ts",
     "seed:demo": "node scripts/seed-demo.js",
     "seed:demo:reset": "node scripts/seed-demo.js --reset",
+    "seed:demo:images": "node scripts/demo-images.js",
     "migrate:multitenant": "node scripts/migrate-multitenant.js",
     "test:e2e:saas": "node scripts/test-saas-e2e.js",
     "test:e2e:tienda": "node scripts/test-tienda-publica.js",
