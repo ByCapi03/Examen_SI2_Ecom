@@ -38,6 +38,15 @@ export class User {
   @Column({ default: false })
   emailVerified: boolean;
 
+  @Column({ type: 'varchar', nullable: true })
+  verificationCodeHash: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  verificationCodeExpiresAt: Date | null;
+
+  @Column({ type: 'int', default: 0 })
+  verificationAttempts: number;
+
   @CreateDateColumn()
   createdAt: Date;
 

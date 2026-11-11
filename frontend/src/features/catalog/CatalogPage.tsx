@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useStore } from '../store/StoreContext';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/axios';
 
@@ -17,6 +18,7 @@ interface Product {
 
 export const CatalogPage = () => {
   const navigate = useNavigate();
+  const { path } = useStore();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -120,7 +122,7 @@ export const CatalogPage = () => {
             <div
               key={p.id}
               className="product-card"
-              onClick={() => navigate(`/products/${p.id}`)}
+              onClick={() => navigate(path(`/products/${p.id}`))}
               style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}
             >
               <div className="product-image-placeholder" style={{ position: 'relative' }}>

@@ -1,5 +1,8 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useAuth } from '../features/auth/AuthContext';
 import { SettingsPage } from '../features/settings/SettingsPage';
+import { StoreBuilderPage } from '../features/store/StoreBuilderPage';
+import { AuditPage } from '../features/audit/AuditPage';
 
 // Layouts
 import { StoreLayout } from '../layouts/StoreLayout';
@@ -15,7 +18,6 @@ import { LoginPage } from '../features/auth/LoginPage';
 import { RegisterPage } from '../features/auth/RegisterPage';
 import { ActivateAccountPage } from '../features/auth/ActivateAccountPage';
 import { ChangePasswordPage } from '../features/auth/ChangePasswordPage';
-import { EmpresaRegistroPage } from '../features/tenants/EmpresaRegistroPage';
 // Store Pages
 import { HomePage } from '../features/home/HomePage';
 import { CatalogPage } from '../features/catalog/CatalogPage';
@@ -49,10 +51,24 @@ import { SyncConflictsPage } from '../features/sync/SyncConflictsPage';
 import { AiReportsPage } from '../features/ai-reports/AiReportsPage';
 import { AnalyticsPage } from '../features/analytics/AnalyticsPage';
 import { PricingPage } from '../features/saas/PricingPage';
+import { AccessNotice } from '../components/common/AccessNotice';
+import { PlatformPage } from '../features/platform/PlatformPage';
+import { SubscriptionPage } from '../features/platform/SubscriptionPage';
+import { LandingPage } from '../features/landing/LandingPage';
+import { TenantRegisterPage } from '../features/saas/TenantRegisterPage';
+
+/** Inicio del panel: el cajero no tiene dashboard, su inicio es su caja. */
+const DashboardIndex = () => {
+  const { user } = useAuth();
+  const cashierOnly = !!user?.roles?.includes('CAJERO') && !user.roles.includes('ADMIN') && !user.roles.includes('ENCARGADO');
+  if (user?.roles?.includes('SUPERADMIN')) return <Navigate to="/dashboard/platform" replace />;
+  return cashierOnly ? <Navigate to="/dashboard/pos" replace /> : <DashboardPage />;
+};
 
 export const AppRouter = () => {
   return (
     <BrowserRouter>
+      <AccessNotice />
       <Routes>
         {/* Auth Routes */}
         <Route element={<AuthLayout />}>
@@ -60,7 +76,6 @@ export const AppRouter = () => {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/activate-account" element={<ActivateAccountPage />} />
           <Route path="/change-password" element={<ChangePasswordPage />} />
-          <Route path="/empresa/registro" element={<EmpresaRegistroPage />} />
         </Route>
 
         {/* Public QR Payment Page */}
@@ -68,10 +83,11 @@ export const AppRouter = () => {
 
         {/* SaaS - Pricing & Tenant Registration */}
         <Route path="/pricing" element={<PricingPage />} />
-        <Route path="/saas/register" element={<EmpresaRegistroPage />} />
+        <Route path="/saas/register" element={<TenantRegisterPage />} />
 
         {/* Store Routes (Customer Facing) */}
-        <Route path="/" element={<StoreLayout />}>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/t/:slug" element={<StoreLayout />}>
           <Route index element={<HomePage />} />
           <Route path="catalog" element={<CatalogPage />} />
           <Route path="products/:id" element={<ProductDetailPage />} />
@@ -107,13 +123,14 @@ export const AppRouter = () => {
               allowedRoles={[
                 ROL.ADMIN,
                 ROL.ENCARGADO,
-                ROL.CAJERO
+                ROL.CAJERO,
+                ROL.SUPERADMIN
               ]}
             />
           }
         >
           <Route element={<DashboardLayout />}>
-            <Route index element={<DashboardPage />} />
+            <Route index element={<DashboardIndex />} />
             <Route path="products" element={<ProductsAdminPage />} />
             <Route path="inventory" element={<InventoryAdminPage />} />
             <Route path="branches" element={<BranchesPage />} />
@@ -129,6 +146,10 @@ export const AppRouter = () => {
             <Route path="analytics" element={<AnalyticsPage />} />
             <Route path="sync-conflicts" element={<SyncConflictsPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="store" element={<StoreBuilderPage />} />
+            <Route path="platform" element={<PlatformPage />} />
+            <Route path="subscription" element={<SubscriptionPage />} />
+            <Route path="audit" element={<AuditPage />} />
           </Route>
         </Route>
       </Routes>

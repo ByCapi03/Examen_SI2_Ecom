@@ -19,6 +19,10 @@ const MGMT = [ROL.ADMIN, ROL.ENCARGADO];
 
 export const DASHBOARD_NAVIGATION: NavGroup[] = [
   {
+    key: 'nav.platformGroup',
+    items: [{ key: 'nav.platform', path: '/dashboard/platform', allowedRoles: [ROL.SUPERADMIN] }],
+  },
+  {
     key: 'nav.general',
     items: [{ key: 'nav.dashboard', path: '/dashboard', allowedRoles: MGMT }],
   },
@@ -36,6 +40,7 @@ export const DASHBOARD_NAVIGATION: NavGroup[] = [
     items: [
       { key: 'nav.products', path: '/dashboard/products', allowedRoles: MGMT },
       { key: 'nav.inventory', path: '/dashboard/inventory', allowedRoles: MGMT },
+      { key: 'nav.store', path: '/dashboard/store', allowedRoles: [ROL.ADMIN] },
       { key: 'nav.suppliers', path: '/dashboard/suppliers', allowedRoles: [ROL.ADMIN] },
     ],
   },
@@ -53,7 +58,9 @@ export const DASHBOARD_NAVIGATION: NavGroup[] = [
       { key: 'nav.branches', path: '/dashboard/branches', allowedRoles: [ROL.ADMIN] },
       { key: 'nav.users', path: '/dashboard/users', allowedRoles: MGMT },
       { key: 'nav.sync', path: '/dashboard/sync-conflicts', allowedRoles: MGMT },
-      { key: 'nav.settings', path: '/dashboard/settings', allowedRoles: [ROL.ADMIN, ROL.ENCARGADO, ROL.CAJERO] },
+      { key: 'nav.subscription', path: '/dashboard/subscription', allowedRoles: [ROL.ADMIN] },
+      { key: 'nav.audit', path: '/dashboard/audit', allowedRoles: [ROL.ADMIN] },
+      { key: 'nav.settings', path: '/dashboard/settings', allowedRoles: [ROL.ADMIN, ROL.ENCARGADO, ROL.CAJERO, ROL.SUPERADMIN] },
     ],
   },
 ];

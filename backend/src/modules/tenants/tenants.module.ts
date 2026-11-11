@@ -5,19 +5,18 @@ import { Plan } from './plan.entity';
 import { Subscription } from './subscription.entity';
 import { SubscriptionHistory } from './subscription-history.entity';
 import { TenantsService } from './tenants.service';
+import { BillingService } from './billing.service';
 import { TenantsController } from './tenants.controller';
 import { AuthModule } from '../auth/auth.module';
-import { RegistrationVerification } from './registration-verification.entity';
-import { CompanyRegistrationService } from './company-registration.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Tenant, Plan, Subscription, SubscriptionHistory, RegistrationVerification]),
+    TypeOrmModule.forFeature([Tenant, Plan, Subscription, SubscriptionHistory]),
     AuthModule,
   ],
   controllers: [TenantsController],
-  providers: [TenantsService, CompanyRegistrationService],
-  exports: [TenantsService, TypeOrmModule],
+  providers: [TenantsService, BillingService],
+  exports: [TenantsService, BillingService, TypeOrmModule],
 })
 export class TenantsModule {}
 

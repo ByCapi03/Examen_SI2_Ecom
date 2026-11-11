@@ -5,7 +5,9 @@
  * descuenta el inventario físico y crea al vuelo un cliente nuevo si no existía.
  */
 import { getEffectiveTenantId } from '../../common/tenancy/tenant-context';
-import { Injectable, UnauthorizedException, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, NotFoundException, ConflictException, ForbiddenException, Logger, OnModuleInit } from '@nestjs/common';
+import * as jwt from 'jsonwebtoken';
+import * as qrcode from 'qrcode';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, ILike, Or } from 'typeorm';
 
@@ -24,8 +26,13 @@ import { CreatePosSaleDto, CreatePosClientDto } from './sales.dto';
 import { SaleChannel, SaleStatus, PaymentStatus, CashSessionStatus, PaymentMethod } from './sales.enums';
 import { MovementType } from '../inventory/inventory.enums';
 
+/** Minutos que el cliente tiene para pagar un QR de POS antes de liberar el stock reservado. */
+const POS_QR_TTL_MIN = 5;
+
 @Injectable()
-export class PosService {
+export class PosService implements OnModuleInit {
+  private readonly logger = new Logger(PosService.name);
+
   constructor(
     @InjectRepository(User) private userRepository: Repository<User>,
     @InjectRepository(Branch) private branchRepository: Repository<Branch>,
@@ -111,6 +118,7 @@ export class PosService {
   }
 
   async createPosSale(userId: number, dto: CreatePosSaleDto) {
+    const isQr = dto.paymentMethod === PaymentMethod.QR;
     // Basic verification without locking
     const branchId = await this.getValidCashierBranch(userId);
 
@@ -209,17 +217,17 @@ export class PosService {
         });
         saleItemsToSave.push(saleItem);
 
-        // Update inventory
-        inventory.stock -= item.quantity;
+        // Update inventory. Con QR el stock solo se RESERVA hasta que el cliente pague.
+        if (isQr) inventory.reserved += item.quantity; else inventory.stock -= item.quantity;
         inventoriesToUpdate.push(inventory);
 
         // Inventory movement preparation
         const movement = queryRunner.manager.create(InventoryMovement, {
           inventoryId: inventory.id,
-          type: MovementType.VENTA,
+          type: isQr ? MovementType.RESERVA : MovementType.VENTA,
           quantity: item.quantity,
           userId,
-          observation: 'Venta POS'
+          observation: isQr ? 'Reserva POS por pago QR' : 'Venta POS'
         });
         inventoryMovementsToSave.push(movement);
       }
@@ -227,7 +235,7 @@ export class PosService {
       // 4. Create Sale
       const sale = queryRunner.manager.create(Sale, {
         channel: SaleChannel.POS,
-        status: SaleStatus.COMPLETADA,
+        status: isQr ? SaleStatus.PENDIENTE : SaleStatus.COMPLETADA,
         branchId,
         userId,
         cashSessionId: openSession.id,
@@ -247,21 +255,31 @@ export class PosService {
         saleId: savedSale.id,
         amount: total,
         method: dto.paymentMethod,
-        status: PaymentStatus.APROBADO
-      });
-      await queryRunner.manager.save(Payment, payment);
+        status: isQr ? PaymentStatus.PENDIENTE : PaymentStatus.APROBADO,
+        ...(isQr ? { provider: 'DEMO_QR', expiresAt: new Date(Date.now() + POS_QR_TTL_MIN * 60_000), transactionReference: `POSQR-${savedSale.id}-${Date.now().toString(36).toUpperCase()}` } : {}),
+      } as any);
+      const savedPayment: any = await queryRunner.manager.save(Payment, payment);
 
       for (const inv of inventoriesToUpdate) {
         await queryRunner.manager.save(Inventory, inv);
       }
 
       for (const mov of inventoryMovementsToSave) {
-        mov.observation = `Venta POS #${savedSale.id}`;
+        mov.observation = isQr ? `Reserva POS por pago QR (venta #${savedSale.id})` : `Venta POS #${savedSale.id}`;
         await queryRunner.manager.save(InventoryMovement, mov);
       }
 
       await queryRunner.commitTransaction();
+
+      let qr: any = undefined;
+      if (isQr) {
+        const token = jwt.sign({ paymentId: savedPayment.id }, process.env.JWT_SECRET || 'secret', { expiresIn: `${POS_QR_TTL_MIN}m` } as any);
+        const base = process.env.QR_PUBLIC_WEB_URL || process.env.FRONTEND_URL || 'http://localhost:5173';
+        const confirmationUrl = `${base}/qr-payment/${token}`;
+        qr = { paymentId: savedPayment.id, confirmationUrl, qrImage: await qrcode.toDataURL(confirmationUrl, { margin: 1, width: 320 }), expiresAt: savedPayment.expiresAt, reference: savedPayment.transactionReference };
+      }
       return {
+        qr,
         id: savedSale.id,
         total: savedSale.total,
         subtotal: savedSale.subtotal,
@@ -364,5 +382,98 @@ export class PosService {
       phone: saved.phone,
       hasDigitalAccount: false,
     };
+  }
+
+  // ───────────────────────── Pago por QR en el POS ─────────────────────────
+
+  onModuleInit() {
+    // Libera el stock de los QR que nadie pagó (por si el cajero cierra la pantalla)
+    if (process.env.NODE_ENV !== 'test') {
+      const t = setInterval(() => { void this.expirePendingQrSales(); }, 60_000);
+      t.unref?.();
+    }
+  }
+
+  /**
+   * Cierra un pago QR de POS: APROBADO (descuenta el stock reservado) o FAIL (libera la reserva).
+   * Idempotente: si la venta ya no está PENDIENTE no hace nada.
+   */
+  async settleQrPayment(paymentId: number, result: 'SUCCESS' | 'FAIL') {
+    const qr = this.dataSource.createQueryRunner();
+    await qr.connect();
+    await qr.startTransaction();
+    try {
+      const payment = await qr.manager.findOne(Payment, { where: { id: paymentId } });
+      if (!payment || !payment.saleId) throw new NotFoundException('Pago no encontrado');
+      const sale = await qr.manager.findOne(Sale, { where: { id: payment.saleId }, relations: { items: true } });
+      if (!sale || sale.channel !== SaleChannel.POS) throw new NotFoundException('Venta POS no encontrada');
+      if (sale.status !== SaleStatus.PENDIENTE) {
+        await qr.rollbackTransaction();
+        return { status: payment.status, sale: sale.status, alreadyProcessed: true };
+      }
+
+      for (const item of sale.items) {
+        const inv = await qr.manager.findOne(Inventory, { where: { branchId: sale.branchId, variantId: item.variantId }, lock: { mode: 'pessimistic_write' } });
+        if (!inv) continue;
+        inv.reserved = Math.max(0, inv.reserved - item.quantity);
+        if (result === 'SUCCESS') inv.stock -= item.quantity;
+        await qr.manager.save(Inventory, inv);
+        await qr.manager.save(InventoryMovement, qr.manager.create(InventoryMovement, {
+          inventoryId: inv.id,
+          type: result === 'SUCCESS' ? MovementType.VENTA : MovementType.LIBERACION_RESERVA,
+          quantity: item.quantity,
+          userId: sale.userId,
+          observation: result === 'SUCCESS' ? `Venta POS #${sale.id} (pagada por QR)` : `Liberación: QR no pagado (venta #${sale.id})`,
+        }));
+      }
+
+      payment.status = result === 'SUCCESS' ? PaymentStatus.APROBADO : PaymentStatus.RECHAZADO;
+      sale.status = result === 'SUCCESS' ? SaleStatus.COMPLETADA : SaleStatus.CANCELADA;
+      await qr.manager.save(Payment, payment);
+      await qr.manager.save(Sale, sale);
+      await qr.commitTransaction();
+      return { status: payment.status, sale: sale.status, alreadyProcessed: false };
+    } catch (e) {
+      if (qr.isTransactionActive) await qr.rollbackTransaction();
+      throw e;
+    } finally {
+      await qr.release();
+    }
+  }
+
+  /** Estado del cobro QR para el cajero (con expiración perezosa). */
+  async getQrSaleStatus(userId: number, saleId: number) {
+    const sale = await this.dataSource.manager.findOne(Sale, { where: { id: saleId, userId, channel: SaleChannel.POS } });
+    if (!sale) throw new NotFoundException('Venta no encontrada');
+    let payment = await this.dataSource.manager.findOne(Payment, { where: { saleId } });
+    if (!payment) throw new NotFoundException('Pago no encontrado');
+    if (sale.status === SaleStatus.PENDIENTE && payment.expiresAt && new Date() > payment.expiresAt) {
+      await this.settleQrPayment(payment.id, 'FAIL');
+      payment = (await this.dataSource.manager.findOne(Payment, { where: { id: payment.id } }))!;
+    }
+    const fresh = await this.dataSource.manager.findOne(Sale, { where: { id: saleId } });
+    return { saleId, status: payment.status, saleStatus: fresh?.status, expired: payment.status === PaymentStatus.RECHAZADO && !!payment.expiresAt && new Date() > payment.expiresAt, amount: payment.amount };
+  }
+
+  /** El cajero cancela un cobro QR pendiente (libera el stock reservado). */
+  async cancelQrSale(userId: number, saleId: number) {
+    const sale = await this.dataSource.manager.findOne(Sale, { where: { id: saleId, userId, channel: SaleChannel.POS } });
+    if (!sale) throw new NotFoundException('Venta no encontrada');
+    const payment = await this.dataSource.manager.findOne(Payment, { where: { saleId } });
+    if (!payment) throw new NotFoundException('Pago no encontrado');
+    if (sale.status !== SaleStatus.PENDIENTE) throw new ConflictException('Esta venta ya no está pendiente de pago');
+    return this.settleQrPayment(payment.id, 'FAIL');
+  }
+
+  async expirePendingQrSales() {
+    try {
+      const rows = await this.dataSource.query(
+        `SELECT p.id FROM payments p JOIN sales s ON s.id = p."saleId"
+          WHERE s.channel = 'POS' AND s.status = 'PENDIENTE' AND p.provider = 'DEMO_QR' AND p."expiresAt" < NOW()`);
+      for (const r of rows) await this.settleQrPayment(r.id, 'FAIL').catch(() => {});
+      if (rows.length) this.logger.log(`QR de POS vencidos liberados: ${rows.length}`);
+    } catch (e) {
+      this.logger.warn(`No se pudo revisar QR vencidos: ${(e as any).message}`);
+    }
   }
 }

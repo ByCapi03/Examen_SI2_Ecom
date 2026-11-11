@@ -260,17 +260,7 @@ export const ProductsSection = () => {
   });
 
   return (
-    <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
-
-      {/* HEADER */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '30px' }}>
-        <div>
-          <h2 style={{ fontSize: '2rem', color: 'var(--atemporal-green)', margin: '0 0 5px 0' }}>PRODUCTOS</h2>
-          <p style={{ color: 'var(--atemporal-muted)', margin: 0, fontSize: '1rem' }}>
-            Gestiona catálogo, variantes, colecciones y funciones AR.
-          </p>
-        </div>
-      </div>
+    <div>
 
       {/* TOP FILTERS & ACTION */}
       <div style={{ display: 'flex', gap: '15px', marginBottom: '30px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -287,7 +277,7 @@ export const ProductsSection = () => {
             onChange={e => setFilterCategory(e.target.value)}
             style={{ padding: '10px 15px', border: '1px solid #ddd', borderRadius: '6px', backgroundColor: 'white', outline: 'none' }}
           >
-            <option value="">Categoría ▼</option>
+            <option value="">Todas las categorías</option>
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <select
@@ -295,7 +285,7 @@ export const ProductsSection = () => {
             onChange={e => setFilterSeason(e.target.value)}
             style={{ padding: '10px 15px', border: '1px solid #ddd', borderRadius: '6px', backgroundColor: 'white', outline: 'none' }}
           >
-            <option value="">Temporada ▼</option>
+            <option value="">Todas las temporadas</option>
             {uniqueSeasons.map(s => <option key={s as string} value={s as string}>{s as string}</option>)}
           </select>
           <select
@@ -303,7 +293,7 @@ export const ProductsSection = () => {
             onChange={e => setFilterStatus(e.target.value)}
             style={{ padding: '10px 15px', border: '1px solid #ddd', borderRadius: '6px', backgroundColor: 'white', outline: 'none' }}
           >
-            <option value="">Estado ▼</option>
+            <option value="">Todos los estados</option>
             <option value="active">Activo</option>
             <option value="inactive">Inactivo</option>
           </select>

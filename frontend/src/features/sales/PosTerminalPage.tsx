@@ -46,6 +46,12 @@ export const PosTerminalPage = () => {
   const { online, pending } = useOffline();
   const [fromCache, setFromCache] = useState<string | null>(null);
 
+  // Cobro por QR: el cliente escanea y paga; el POS espera la confirmación
+  interface QrSale { saleId: number; total: number; qrImage: string; url: string; expiresAt: string; reference?: string }
+  const [qrSale, setQrSale] = useState<QrSale | null>(null);
+  const [qrLeft, setQrLeft] = useState(0);
+  const [copied, setCopied] = useState(false);
+
   // Client states
   const [isAnonymousClient, setIsAnonymousClient] = useState(true);
   const [selectedClient, setSelectedClient] = useState<PosClient | null>(null);
@@ -188,6 +194,12 @@ export const PosTerminalPage = () => {
       }
 
       const res = await api.post('/pos/sales', payload);
+
+      // Pago por QR: se muestra el código y se espera a que el cliente pague
+      if (res.data?.qr) {
+        setQrSale({ saleId: res.data.id, total: Number(res.data.total), qrImage: res.data.qr.qrImage, url: res.data.qr.confirmationUrl, expiresAt: res.data.qr.expiresAt, reference: res.data.qr.reference });
+        return;
+      }
       
       setSuccessMessage(`Venta exitosa! ID: ${res.data.id} - Total: Bs. ${Number(res.data.total).toFixed(2)}`);
       setCart([]);
@@ -214,7 +226,7 @@ export const PosTerminalPage = () => {
    */
   const registerOfflineSale = async () => {
     if (paymentMethod !== 'EFECTIVO') {
-      setError('Sin conexión solo se pueden registrar ventas en EFECTIVO. Tarjeta y QR requieren Internet.');
+      setError('Sin conexión solo se pueden registrar ventas en EFECTIVO. El QR y la tarjeta necesitan Internet: cobra en efectivo o espera a recuperar la señal para generar el QR.');
       return;
     }
     try {
@@ -250,10 +262,69 @@ export const PosTerminalPage = () => {
     }
   };
 
+
+  const finishQr = async (message: string | null, err: string | null) => {
+    setQrSale(null);
+    if (message) {
+      setSuccessMessage(message);
+      setCart([]); setSelectedClient(null); setIsAnonymousClient(true); setPaymentMethod('EFECTIVO');
+    }
+    if (err) setError(err);
+    await fetchProducts();
+  };
+
+  // Consulta el estado del cobro cada 2 s y actualiza la cuenta regresiva
+  useEffect(() => {
+    if (!qrSale) return;
+    let stop = false;
+    const tick = async () => {
+      setQrLeft(Math.max(0, Math.round((new Date(qrSale.expiresAt).getTime() - Date.now()) / 1000)));
+      try {
+        const { data } = await api.get(`/pos/sales/${qrSale.saleId}/payment`);
+        if (stop) return;
+        if (data.status === 'APROBADO') { stop = true; await finishQr(`¡Pago por QR recibido! Venta #${qrSale.saleId} - Total: Bs. ${qrSale.total.toFixed(2)}`, null); }
+        else if (data.status === 'RECHAZADO') { stop = true; await finishQr(null, 'El pago por QR venció o fue rechazado. Se liberó el stock; puedes generar otro QR.'); }
+      } catch { /* sin conexión momentánea: se reintenta */ }
+    };
+    void tick();
+    const t = setInterval(tick, 2000);
+    return () => { stop = true; clearInterval(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qrSale?.saleId]);
+
+  const cancelQr = async () => {
+    if (!qrSale) return;
+    try { await api.post(`/pos/sales/${qrSale.saleId}/cancel-qr`); } catch { /* ya no estaba pendiente */ }
+    await finishQr(null, null);
+  };
+
+  const copyQrLink = async () => {
+    if (!qrSale) return;
+    try { await navigator.clipboard.writeText(qrSale.url); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch { /* sin portapapeles */ }
+  };
+
   if (loading && products.length === 0) return <div style={{ padding: '20px' }}>Cargando terminal...</div>;
 
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 64px)', overflow: 'hidden' }}>
+      {qrSale && (
+        <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.65)', display: 'grid', placeItems: 'center', padding: 16 }}>
+          <div style={{ background: '#fff', borderRadius: 16, maxWidth: 400, width: '100%', padding: '24px 22px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
+            <h2 style={{ margin: '0 0 4px' }}>Pago por QR</h2>
+            <p style={{ margin: '0 0 12px', color: '#555', fontSize: '0.9rem' }}>El cliente escanea el código con su teléfono y confirma el pago.</p>
+            <div style={{ fontSize: '1.9rem', fontWeight: 800, margin: '4px 0 10px' }}>Bs. {qrSale.total.toFixed(2)}</div>
+            <img src={qrSale.qrImage} alt="Código QR de pago" style={{ width: 260, maxWidth: '100%', height: 'auto', border: '1px solid #eee', borderRadius: 10 }} />
+            <div style={{ margin: '12px 0 4px', fontSize: '0.88rem', color: qrLeft <= 30 ? '#b91c1c' : '#444', fontWeight: 600 }}>
+              Esperando el pago… {Math.floor(qrLeft / 60)}:{String(qrLeft % 60).padStart(2, '0')}
+            </div>
+            {qrSale.reference && <div style={{ fontSize: '0.72rem', color: '#888' }}>Ref. {qrSale.reference}</div>}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 14, flexWrap: 'wrap' }}>
+              <button onClick={copyQrLink} style={{ padding: '9px 14px', borderRadius: 8, border: '1px solid #ccc', background: '#fff', cursor: 'pointer' }}>{copied ? 'Enlace copiado' : 'Copiar enlace de pago'}</button>
+              <button onClick={cancelQr} style={{ padding: '9px 14px', borderRadius: 8, border: 'none', background: '#dc3545', color: '#fff', cursor: 'pointer', fontWeight: 700 }}>Cancelar cobro</button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* LEFT: Catalog */}
       <div style={{ flex: 1, padding: '20px', overflowY: 'auto', backgroundColor: '#f5f7fa' }}>
@@ -277,7 +348,7 @@ export const PosTerminalPage = () => {
 
         {(!online || fromCache) && (
           <div style={{ padding: '10px', backgroundColor: '#fff3cd', color: '#856404', marginBottom: '15px', borderRadius: '4px' }}>
-            {!online ? 'Modo sin conexión: solo ventas en EFECTIVO. ' : ''}
+            {!online ? 'Modo sin conexión: solo ventas en EFECTIVO (el QR y la tarjeta necesitan Internet para que el cliente pague). ' : ''}
             {fromCache ? `Catálogo local guardado el ${new Date(fromCache).toLocaleString()}. ` : ''}
             {pending.length > 0 ? `${pending.length} venta(s) pendiente(s) de sincronizar.` : ''}
           </div>

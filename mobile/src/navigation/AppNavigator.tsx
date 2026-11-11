@@ -12,7 +12,13 @@ import { RegisterScreen } from '../screens/auth/RegisterScreen';
 import { ActivateAccountScreen } from '../screens/auth/ActivateAccountScreen';
 import { CreateReservationScreen } from '../screens/store/CreateReservationScreen';
 import { CheckoutScreen } from '../screens/store/CheckoutScreen';
-import { TryOnScreen } from '../screens/store/TryOnScreen';
+// El vestidor usa librerías nativas de TensorFlow que no existen en Expo Go: se cargan solo al abrirlo,
+// así la app inicia normalmente aunque esa pantalla no pueda funcionar en Expo Go.
+const TryOnScreen = (props: any) => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { TryOnScreen: Screen } = require('../screens/store/TryOnScreen');
+  return <Screen {...props} />;
+};
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -29,6 +35,8 @@ export const AppNavigator = () => {
         contentStyle: { backgroundColor: '#ffffff' },
       }}
     >
+      {isAuthenticated ? (
+        <>
       <Stack.Screen
         name="MainTabs"
         component={ClientDrawer}
@@ -71,7 +79,8 @@ export const AppNavigator = () => {
         options={{ title: 'Vestidor Virtual', headerShown: false }}
       />
 
-      {!isAuthenticated && (
+        </>
+      ) : (
         <>
           <Stack.Screen
             name="Login"

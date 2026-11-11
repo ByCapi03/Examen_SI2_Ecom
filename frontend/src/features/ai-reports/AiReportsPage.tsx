@@ -1,4 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Mic, Square } from 'lucide-react';
+import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
+import { useSettings } from '../../config/SettingsContext';
 import { api } from '../../api/axios';
 import { BarChart, LineChart } from './ReportChart';
 import { DashStyles, PageHeader, PlanBadge, PlanGate } from '../../components/dashboard/ui';
@@ -43,6 +46,12 @@ const AiReportsContent = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const { settings } = useSettings();
+  const voice = useSpeechRecognition(settings.lang === 'en' ? 'en-US' : 'es-BO');
+  const [autoSend, setAutoSend] = useState(true);
+  const autoSendRef = useRef(true);
+  autoSendRef.current = autoSend;
+
   const loadHistory = () => api.get('/ai-reports/history').then((r) => setHistory(r.data)).catch(() => {});
 
   useEffect(() => {
@@ -68,6 +77,15 @@ const AiReportsContent = () => {
     }
   };
 
+  const toggleMic = () => {
+    if (voice.listening) { voice.stop(); return; }
+    setError(null);
+    voice.start({
+      onInterim: (t) => setQuestion(t),
+      onFinal: (t) => { setQuestion(t); if (autoSendRef.current) void ask(t); },
+    });
+  };
+
   const exportCsv = () => {
     if (!result) return;
     const lines = [result.columns.join(','), ...result.rows.map((r) => `"${r.label.replace(/"/g, '""')}",${r.value}`)];
@@ -85,14 +103,36 @@ const AiReportsContent = () => {
       </p>
 
       <form onSubmit={(e) => { e.preventDefault(); void ask(question); }} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <input value={question} onChange={(e) => setQuestion(e.target.value)} maxLength={500}
-          placeholder="Ej.: ¿Cuáles fueron los 3 vestidos más vendidos este mes en la sucursal central?"
-          style={{ flex: '1 1 320px', padding: '12px 14px', borderRadius: 8, border: '1px solid #ccc', fontSize: 15 }} />
+        <div style={{ position: 'relative', flex: '1 1 320px', minWidth: 0 }}>
+          <input value={question} onChange={(e) => setQuestion(e.target.value)} maxLength={500}
+            placeholder={voice.listening ? 'Escuchando… habla ahora' : 'Ej.: ¿Cuáles fueron los 3 vestidos más vendidos este mes en la sucursal central?'}
+            style={{ width: '100%', boxSizing: 'border-box', padding: '12px 52px 12px 14px', borderRadius: 10, border: `1.5px solid ${voice.listening ? '#DC2626' : 'var(--atemporal-border)'}`, background: 'var(--atemporal-white)', color: 'var(--atemporal-text)', fontSize: 15, fontFamily: 'inherit', outline: 'none' }} />
+          <button type="button" onClick={toggleMic} disabled={!voice.supported}
+            aria-label={voice.listening ? 'Detener dictado' : 'Dictar pregunta por voz'}
+            title={voice.supported ? (voice.listening ? 'Detener dictado' : 'Dictar por voz') : 'Tu navegador no admite dictado por voz. Usa Chrome, Edge o Safari.'}
+            className={voice.listening ? 'mic-live' : ''}
+            style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: '50%', border: 'none', cursor: voice.supported ? 'pointer' : 'not-allowed', display: 'grid', placeItems: 'center',
+              background: voice.listening ? '#DC2626' : 'var(--chart-track, #EEEAE1)', color: voice.listening ? '#fff' : 'var(--atemporal-text)', opacity: voice.supported ? 1 : 0.45 }}>
+            {voice.listening ? <Square size={14} fill="currentColor" /> : <Mic size={17} />}
+          </button>
+        </div>
         <button type="submit" disabled={loading}
           style={{ padding: '12px 22px', borderRadius: 8, border: 'none', background: 'var(--atemporal-green)', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>
           {loading ? 'Generando…' : 'Generar reporte'}
         </button>
       </form>
+
+      <style>{'@keyframes micPulse { 0% { box-shadow: 0 0 0 0 rgba(220,38,38,.5) } 100% { box-shadow: 0 0 0 12px rgba(220,38,38,0) } } .mic-live { animation: micPulse 1.2s infinite }'}</style>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginTop: 8, minHeight: 22, fontSize: 12.5 }}>
+        {voice.listening && <span style={{ color: '#DC2626', fontWeight: 600 }}>● Escuchando… pulsa el cuadro para terminar</span>}
+        {voice.error && <span role="alert" style={{ color: '#B91C1C' }}>{voice.error}</span>}
+        {!voice.supported && <span style={{ color: 'var(--atemporal-muted)' }}>El dictado por voz requiere Chrome, Edge o Safari.</span>}
+        {voice.supported && (
+          <label style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--atemporal-muted)', cursor: 'pointer' }}>
+            <input type="checkbox" checked={autoSend} onChange={(e) => setAutoSend(e.target.checked)} /> Generar el reporte al terminar de hablar
+          </label>
+        )}
+      </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '12px 0 20px' }}>
         {suggestions.map((s) => (

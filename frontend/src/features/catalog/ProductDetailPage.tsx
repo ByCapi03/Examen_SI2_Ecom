@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useStore } from '../store/StoreContext';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../api/axios';
 import { useCart } from '../cart/CartContext';
@@ -45,6 +46,7 @@ interface Availability {
 export const ProductDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { path, slug } = useStore();
   const { addToCart } = useCart();
   const { isAuthenticated } = useAuth();
 
@@ -180,9 +182,9 @@ export const ProductDetailPage = () => {
 
     if (!isAuthenticated) {
       sessionStorage.setItem('pendingReservation', JSON.stringify(reservationState));
-      navigate('/login');
+      navigate(`/login?tenant=${slug}`);
     } else {
-      navigate('/reservations/new', { state: reservationState });
+      navigate(path('/reservations/new'), { state: reservationState });
     }
   };
 
@@ -237,7 +239,7 @@ export const ProductDetailPage = () => {
 
       {/* Product Info & Selection */}
       <div style={{ flex: '1 1 400px' }}>
-        <button onClick={() => navigate('/catalog')} style={{ background: 'none', border: 'none', color: 'var(--atemporal-gold)', cursor: 'pointer', padding: 0, marginBottom: '20px', fontWeight: 'bold' }}>&larr; Volver al catálogo</button>
+        <button onClick={() => navigate(path('/catalog'))} style={{ background: 'none', border: 'none', color: 'var(--atemporal-gold)', cursor: 'pointer', padding: 0, marginBottom: '20px', fontWeight: 'bold' }}>&larr; Volver al catálogo</button>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ display: 'block', fontSize: '0.9rem', color: 'var(--atemporal-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>{product.categoryName}</span>
           <div style={{ display: 'flex', gap: '5px' }}>
@@ -466,7 +468,7 @@ export const ProductDetailPage = () => {
           <div style={{ borderTop: '1px solid var(--atemporal-border)', marginTop: '25px', paddingTop: '20px' }}>
             <button 
               style={{ width: '100%', padding: '15px', backgroundColor: 'var(--atemporal-gold)', color: 'var(--atemporal-white)', border: 'none', borderRadius: '4px', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer', transition: 'background-color 0.3s' }}
-              onClick={() => navigate(`/try-on/${selectedVariant.id}`)}
+              onClick={() => navigate(path(`/try-on/${selectedVariant.id}`))}
               onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = 'var(--atemporal-beige)'}
               onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = 'var(--atemporal-gold)'}
             >

@@ -31,6 +31,13 @@ export class Notification {
   @Column({ nullable: true })
   reservationId: number;
 
+  /** Para alertas de stock: inventario y sucursal afectados (permite no repetir avisos). */
+  @Column({ type: 'int', nullable: true })
+  inventoryId: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  branchId: number | null;
+
   @Column({ default: false })
   read: boolean;
 

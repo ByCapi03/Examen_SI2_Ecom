@@ -194,7 +194,7 @@ export const BranchesSection = () => {
         <tbody>
           {branches.map(b => (
             <tr key={b.id}>
-              <td>{b.name}</td>
+              <td style={{ fontWeight: 700 }}>{b.name}</td>
               <td>{b.city?.name || cities.find(c => c.id === b.cityId)?.name || b.cityId}</td>
               <td>{b.address}</td>
               <td>{b.phone}</td>
@@ -205,7 +205,7 @@ export const BranchesSection = () => {
               </td>
               <td>
                 <div className="crud-actions">
-                  <button className="btn-action" onClick={() => handleEdit(b)}>Editar</button>
+                  <button className="btn-secondary" onClick={() => handleEdit(b)}>Editar</button>
                   <button className="btn-danger" onClick={() => handleDelete(b.id)}>Eliminar</button>
                 </div>
               </td>

@@ -5,54 +5,44 @@ import { AttributesSection } from './components/AttributesSection';
 import { SeasonsSection } from './components/SeasonsSection';
 import { CollectionsSection } from './components/CollectionsSection';
 import { PromotionsSection } from './components/PromotionsSection';
+import { DashStyles, PageHeader, PlanBadge } from '../../components/dashboard/ui';
+import '../../styles/admin.css';
+
+type Tab = 'products' | 'variants' | 'attributes' | 'seasons' | 'collections' | 'promotions';
+
+const TABS: { key: Tab; label: string }[] = [
+  { key: 'products', label: 'Productos' },
+  { key: 'variants', label: 'Variantes' },
+  { key: 'attributes', label: 'Categorías · Tallas · Colores' },
+  { key: 'seasons', label: 'Temporadas' },
+  { key: 'collections', label: 'Colecciones' },
+  { key: 'promotions', label: 'Promociones' },
+];
 
 export const ProductsAdminPage = () => {
-  const [activeTab, setActiveTab] = useState<'products' | 'variants' | 'attributes' | 'seasons' | 'collections' | 'promotions'>('products');
+  const [activeTab, setActiveTab] = useState<Tab>('products');
 
   return (
-    <div className="dashboard-container">
-      <div className="page-header">
-        <h1 className="page-title">Catálogo de Productos</h1>
-        <p className="page-subtitle">Administra los productos, variantes y atributos disponibles</p>
-      </div>
+    <div className="dz-page adm-scope">
+      <DashStyles />
+      <PageHeader
+        title="Catálogo de productos"
+        subtitle="Administra los productos, variantes y atributos disponibles"
+        badge={<PlanBadge />}
+      />
 
-      <div className="tabs" style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        <button 
-          className={activeTab === 'products' ? 'btn-primary' : 'btn-secondary'}
-          onClick={() => setActiveTab('products')}
-        >
-          Productos
-        </button>
-        <button 
-          className={activeTab === 'variants' ? 'btn-primary' : 'btn-secondary'}
-          onClick={() => setActiveTab('variants')}
-        >
-          Variantes
-        </button>
-        <button 
-          className={activeTab === 'attributes' ? 'btn-primary' : 'btn-secondary'}
-          onClick={() => setActiveTab('attributes')}
-        >
-          Categorías / Tallas / Colores
-        </button>
-        <button 
-          className={activeTab === 'seasons' ? 'btn-primary' : 'btn-secondary'}
-          onClick={() => setActiveTab('seasons')}
-        >
-          Temporadas
-        </button>
-        <button 
-          className={activeTab === 'collections' ? 'btn-primary' : 'btn-secondary'}
-          onClick={() => setActiveTab('collections')}
-        >
-          Colecciones
-        </button>
-        <button 
-          className={activeTab === 'promotions' ? 'btn-primary' : 'btn-secondary'}
-          onClick={() => setActiveTab('promotions')}
-        >
-          Promociones
-        </button>
+      <div className="adm-tabs" role="tablist">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            role="tab"
+            aria-selected={activeTab === t.key}
+            className={`adm-tab${activeTab === t.key ? ' on' : ''}`}
+            onClick={() => setActiveTab(t.key)}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
       {activeTab === 'products' && <ProductsSection />}

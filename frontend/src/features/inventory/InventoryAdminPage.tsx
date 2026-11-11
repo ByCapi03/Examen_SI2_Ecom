@@ -30,6 +30,7 @@ export const InventoryAdminPage = () => {
   // Filters
   const [filterBranch, setFilterBranch] = useState<number | ''>(isAdmin ? '' : (user?.branchId || ''));
   const [filterSearch, setFilterSearch] = useState('');
+  const [filterLevel, setFilterLevel] = useState<'ALL' | 'CRITICO' | 'BAJO' | 'NORMAL'>('ALL');
 
   // Modals
   const [showLimitsForm, setShowLimitsForm] = useState<Inventory | null>(null);
@@ -112,6 +113,14 @@ export const InventoryAdminPage = () => {
     }
   };
 
+  /** Nivel de stock: Crítico = disponible <= mínimo; Bajo = hasta 5 unidades sobre el mínimo; Normal = el resto. */
+  const levelOf = (inv: Inventory): 'CRITICO' | 'BAJO' | 'NORMAL' => {
+    const available = inv.stock - inv.reserved;
+    if (available <= inv.stockMin) return 'CRITICO';
+    if (available <= inv.stockMin + 5) return 'BAJO';
+    return 'NORMAL';
+  };
+
   const getStockStatus = (inv: Inventory) => {
     const available = inv.stock - inv.reserved;
     if (available <= inv.stockMin) return '🔴 Critico';
@@ -119,7 +128,7 @@ export const InventoryAdminPage = () => {
     return '🟢 Normal';
   };
 
-  const filteredInventory = inventoryList.filter(inv => {
+  const baseFiltered = inventoryList.filter(inv => {
     if (filterBranch && inv.branchId !== Number(filterBranch)) return false;
     if (filterSearch) {
       const search = filterSearch.toLowerCase();
@@ -129,6 +138,17 @@ export const InventoryAdminPage = () => {
     }
     return true;
   });
+
+  const counts = {
+    ALL: baseFiltered.length,
+    CRITICO: baseFiltered.filter((i) => levelOf(i) === 'CRITICO').length,
+    BAJO: baseFiltered.filter((i) => levelOf(i) === 'BAJO').length,
+    NORMAL: baseFiltered.filter((i) => levelOf(i) === 'NORMAL').length,
+  };
+  const ORDER = { CRITICO: 0, BAJO: 1, NORMAL: 2 } as const;
+  const filteredInventory = baseFiltered
+    .filter((i) => filterLevel === 'ALL' || levelOf(i) === filterLevel)
+    .sort((x, y) => ORDER[levelOf(x)] - ORDER[levelOf(y)] || (x.stock - x.reserved) - (y.stock - y.reserved));
 
   return (
     <div className="dashboard-container">
@@ -270,6 +290,23 @@ export const InventoryAdminPage = () => {
             </form>
           </div>
         )}
+
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
+          {([
+            ['ALL', 'Todos', '#182D2A'],
+            ['CRITICO', '🔴 Crítico', '#C2410C'],
+            ['BAJO', '🟡 Bajo', '#B7791F'],
+            ['NORMAL', '🟢 Normal', '#15803D'],
+          ] as const).map(([key, label, color]) => (
+            <button key={key} type="button" onClick={() => setFilterLevel(key)}
+              style={{
+                padding: '9px 16px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: '0.86rem',
+                border: `2px solid ${color}`, background: filterLevel === key ? color : '#fff', color: filterLevel === key ? '#fff' : color,
+              }}>
+              {label} <span style={{ opacity: 0.85 }}>({counts[key]})</span>
+            </button>
+          ))}
+        </div>
 
         {loading ? (
           <div className="loading-state">Cargando inventario...</div>

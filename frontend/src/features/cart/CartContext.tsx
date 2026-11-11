@@ -39,10 +39,10 @@ const initialCart: Cart = {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const CartProvider: React.FC<{ children: React.ReactNode; storageKey?: string }> = ({ children, storageKey = CART_STORAGE_KEY }) => {
   const [cart, setCart] = useState<Cart>(() => {
     try {
-      const saved = localStorage.getItem(CART_STORAGE_KEY);
+      const saved = localStorage.getItem(storageKey);
       if (saved) {
         return JSON.parse(saved);
       }
@@ -54,11 +54,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     try {
-      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+      localStorage.setItem(storageKey, JSON.stringify(cart));
     } catch (e) {
       console.error('Failed to save cart to localStorage', e);
     }
-  }, [cart]);
+  }, [cart, storageKey]);
 
   const addToCart = (newItem: CartItem, branchId: number, branchName: string) => {
     // Single branch rule:

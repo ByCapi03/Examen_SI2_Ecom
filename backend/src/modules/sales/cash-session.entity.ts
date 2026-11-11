@@ -12,11 +12,14 @@ import { Branch } from '../branches/branch.entity';
 import { User } from '../auth/user.entity';
 import { CashSessionStatus } from './sales.enums';
 import { Sale } from './sale.entity';
+import { CashRegister } from './cash-register.entity';
 import { OneToMany } from 'typeorm';
 
 @Entity('cash_sessions')
 // Postgres partial index to guarantee only one OPEN session per cashier
 @Index('IDX_UNIQUE_OPEN_SESSION_PER_CASHIER', ['cashierId'], { unique: true, where: "status = 'OPEN'" })
+// ...y una sola sesión OPEN por caja
+@Index('IDX_UNIQUE_OPEN_SESSION_PER_REGISTER', ['registerId'], { unique: true, where: "status = 'OPEN'" })
 export class CashSession {
   @PrimaryGeneratedColumn()
   id: number;
@@ -29,6 +32,14 @@ export class CashSession {
 
   @Column()
   cashierId: number;
+
+  /** Caja sobre la que se abrió el turno (null en turnos anteriores a las cajas). */
+  @Column({ type: 'int', nullable: true })
+  registerId: number | null;
+
+  @ManyToOne(() => CashRegister, { nullable: true })
+  @JoinColumn({ name: 'registerId' })
+  register: CashRegister | null;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   openingAmount: number;
@@ -47,6 +58,13 @@ export class CashSession {
 
   @Column({ type: 'timestamp', nullable: true })
   closedAt: Date;
+
+  /** Quién abrió/cerró la caja (puede ser un ADMIN/ENCARGADO actuando por el cajero). */
+  @Column({ type: 'int', nullable: true })
+  openedById: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  closedById: number | null;
 
   @Column({ type: 'enum', enum: CashSessionStatus, default: CashSessionStatus.OPEN })
   status: CashSessionStatus;

@@ -15,6 +15,8 @@ import {
   CreatePromotionDto, UpdatePromotionDto
 } from './catalog.dto';
 
+import { DataSource } from 'typeorm';
+import { assertPlanLimit } from '../../common/tenancy/plan-features';
 import { Category } from './category.entity';
 import { Size } from './size.entity';
 import { Color } from './color.entity';
@@ -38,7 +40,8 @@ export class CatalogService {
     @InjectRepository(Collection) private readonly collectionRepository: Repository<Collection>,
     @InjectRepository(Promotion) private readonly promotionRepository: Repository<Promotion>,
     private cloudinaryService: CloudinaryService,
-    private catalogPricingService: CatalogPricingService
+    private catalogPricingService: CatalogPricingService,
+    private readonly dataSource: DataSource,
   ) {}
 
   /** Tenant autenticado (JWT). Todos los catálogos de negocio son por empresa. */
@@ -153,6 +156,9 @@ export class CatalogService {
     const category = await this.categoryRepository.findOneBy({ id: createProductDto.categoryId, tenantId: tenantId ?? this.tenant() });
     if (!category) throw new NotFoundException(`Categoría #${createProductDto.categoryId} no encontrada`);
     if (createProductDto.collectionId) await this.findOneCollection(createProductDto.collectionId);
+
+    // Límite de productos según el plan (y vigencia de la suscripción)
+    if (tenantId) await assertPlanLimit(this.dataSource, tenantId, 'products');
 
     const product = this.productRepository.create({
       ...createProductDto,

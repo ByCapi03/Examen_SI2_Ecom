@@ -32,6 +32,13 @@ const isCacheable = (config?: InternalAxiosRequestConfig) =>
   !!config && (config.method ?? 'get').toLowerCase() === 'get' &&
   OFFLINE_CACHEABLE.some((p) => (config.url ?? '').startsWith(p));
 
+// La empresa de la tienda pública sale de la URL (/t/<slug>). Con sesión iniciada manda el token.
+api.interceptors.request.use((config) => {
+  const m = typeof window !== 'undefined' ? window.location.pathname.match(/^\/t\/([a-z0-9-]+)/i) : null;
+  if (m && config.headers && !config.headers['X-Tenant-Slug']) config.headers['X-Tenant-Slug'] = m[1].toLowerCase();
+  return config;
+});
+
 // Interceptor para inyectar el token
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
@@ -49,7 +56,16 @@ api.interceptors.response.use(
     return response;
   },
   async (error) => {
-    if (error.response && error.response.status === 401) {
+    const status = error.response?.status;
+    const msg: string = String(error.response?.data?.message ?? '');
+    // Empresa suspendida o suscripción vencida: se avisa al usuario con un mensaje claro (ver AccessNotice)
+    if (status === 403 && /suspendid/i.test(msg)) {
+      window.dispatchEvent(new CustomEvent('dressed:access', { detail: { kind: 'SUSPENDED', message: msg } }));
+    } else if (status === 402) {
+      window.dispatchEvent(new CustomEvent('dressed:access', { detail: { kind: 'EXPIRED', message: msg } }));
+    }
+    // Un 401 en el propio login (credenciales incorrectas, empresa suspendida…) se muestra en el formulario
+    if (error.response && error.response.status === 401 && !String(error.config?.url ?? '').includes('/auth/')) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useStore } from '../store/StoreContext';
 import { useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { api } from '../../api/axios';
 import { useAuth } from '../auth/AuthContext';
@@ -8,6 +9,7 @@ import '../../styles/store.css';
 export const CreateReservationPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { path, slug } = useStore();
   const { isAuthenticated } = useAuth();
   
   let state = location.state as any;
@@ -30,7 +32,7 @@ export const CreateReservationPage = () => {
 
   if (!state) {
     alert('No se encontraron los datos de la reserva. Por favor selecciona el producto nuevamente.');
-    return <Navigate to="/catalog" />;
+    return <Navigate to={path('/catalog')} />;
   }
 
   const { productName, price, variantId, sizeName, colorName, branchId, branchName } = state;
@@ -345,14 +347,14 @@ export const CreateReservationPage = () => {
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button 
-                onClick={() => navigate('/register')}
+                onClick={() => navigate(`/register?tenant=${slug}`)}
                 className="btn-primary"
                 style={{ width: '100%' }}
               >
                 CREAR CUENTA
               </button>
               <button 
-                onClick={() => navigate('/login')}
+                onClick={() => navigate(`/login?tenant=${slug}`)}
                 className="btn-outline"
                 style={{ width: '100%', padding: '10px', borderRadius: '4px', cursor: 'pointer', border: '1px solid #0056b3', color: '#0056b3', backgroundColor: 'transparent' }}
               >

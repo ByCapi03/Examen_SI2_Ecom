@@ -9,8 +9,9 @@ import { Role } from './role.entity';
 import { UserRole } from './user-role.entity';
 import { Client } from '../clients/client.entity';
 import { MailService } from '../../common/mail.service';
+import { requireTenantId } from '../../common/tenancy/tenant-context';
 import { LoginDto, SetupAdminDto } from './auth.dto';
-import { DEFAULT_TENANT_ID, getTenantStore } from '../../common/tenancy/tenant-context';
+import { getTenantStore } from '../../common/tenancy/tenant-context';
 
 @Injectable()
 export class AuthService {
@@ -148,6 +149,19 @@ export class AuthService {
     }
     const user = matches[0];
 
+    // Empresa suspendida por el SuperAdmin: no se permite iniciar sesión
+    const [tn] = await this.dataSource.query('SELECT active FROM tenants WHERE id=$1', [user.tenantId]);
+    if (tn && tn.active === false) {
+      throw new UnauthorizedException({ message: 'Tu empresa está suspendida. Contacta al soporte de la plataforma.', code: 'TENANT_SUSPENDED' });
+    }
+
+    if (!user.emailVerified && user.verificationCodeHash) {
+      throw new UnauthorizedException({
+        message: 'Debes verificar tu correo antes de iniciar sesión.',
+        code: 'EMAIL_NOT_VERIFIED',
+      });
+    }
+
     if (user.mustChangePassword && user.temporaryPasswordExpiresAt) {
       if (new Date() > user.temporaryPasswordExpiresAt) {
         throw new UnauthorizedException('La contraseña temporal ha expirado. Solicita una nueva.');
@@ -189,9 +203,10 @@ export class AuthService {
   }
 
   async registerClient(registerDto: any) {
+    // El cliente pertenece a la empresa de la tienda desde la que se registra (X-Tenant-Slug); nunca a una por defecto.
+    const tenantId = requireTenantId();
     const { name, lastName, password, phone } = registerDto;
     const email = (registerDto.email as string).trim().toLowerCase();
-    const tenantId = (await this.resolveTenantId(registerDto.tenantSlug)) ?? DEFAULT_TENANT_ID;
 
     // Case C: User with that email already exists → duplicate
     const existingUser = await this.userRepository.findOne({ where: { email, tenantId } });
@@ -227,6 +242,7 @@ export class AuthService {
 
       const passwordHash = await bcrypt.hash(password, 10);
       const user = queryRunner.manager.create(User, {
+        tenantId,
         name: `${name}${lastName ? ' ' + lastName : ''}`,
         email,
         passwordHash,
@@ -234,7 +250,6 @@ export class AuthService {
         mustChangePassword: false,
         temporaryPasswordExpiresAt: null,
         emailVerified: true,
-        tenantId,
       } as any);
       const savedUser = await queryRunner.manager.save(user);
 
@@ -247,6 +262,7 @@ export class AuthService {
 
       // Create Client entity linked to User
       const client = queryRunner.manager.create(Client, {
+        tenantId,
         name,
         lastName: lastName || '',
         email,
@@ -255,7 +271,6 @@ export class AuthService {
         active: true,
         activationCodeHash: null,
         activationCodeExpiresAt: null,
-        tenantId,
       } as any);
       await queryRunner.manager.save(Client, client);
 

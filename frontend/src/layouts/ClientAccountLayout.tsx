@@ -1,10 +1,12 @@
-import { Outlet, NavLink } from 'react-router-dom';
+import { Outlet, NavLink, Link } from 'react-router-dom';
 import { useAuth } from '../features/auth/AuthContext';
 import { Navbar } from './Navbar';
 import { Footer } from './Footer';
+import { StoreProvider, useStore } from '../features/store/StoreContext';
 
-export const ClientAccountLayout = () => {
+const AccountContent = () => {
   const { logout } = useAuth();
+  const { path, store } = useStore();
 
   return (
     <div className="store-layout" style={{ backgroundColor: '#f9f9f9', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -14,7 +16,10 @@ export const ClientAccountLayout = () => {
           
           {/* Account Sidebar */}
           <aside style={{ width: '250px', backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', height: 'fit-content' }}>
-            <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#1c2a28' }}>Mi Cuenta</h3>
+            <h3 style={{ marginTop: 0, marginBottom: '8px', color: '#1c2a28' }}>Mi Cuenta</h3>
+            <Link to={path('/')} style={{ display: 'inline-block', marginBottom: '16px', fontSize: '0.85rem', color: '#ba8141', textDecoration: 'none' }}>
+              ← Volver a {store?.name ?? 'la tienda'}
+            </Link>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <NavLink 
                 to="/account" 
@@ -55,3 +60,9 @@ export const ClientAccountLayout = () => {
     </div>
   );
 };
+
+export const ClientAccountLayout = () => (
+  <StoreProvider>
+    <AccountContent />
+  </StoreProvider>
+);

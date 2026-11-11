@@ -1,0 +1,113 @@
+/* Estilos de pantallas de administración (catálogo, etc.). Acotados a .adm-scope para no afectar la tienda.
+   Sobrescriben las definiciones duplicadas de global.css y usan las variables del tema. */
+.adm-scope { color: var(--atemporal-text); font-family: inherit; min-width: 0; }
+.adm-scope *, .adm-scope *::before, .adm-scope *::after { box-sizing: border-box; }
+
+/* Campos */
+.adm-scope input:not([type='checkbox']):not([type='radio']):not([type='color']):not([type='file']):not([type='range']),
+.adm-scope select,
+.adm-scope textarea {
+  padding: 9px 12px;
+  border: 1.5px solid var(--atemporal-border);
+  border-radius: 9px;
+  background: var(--atemporal-white);
+  color: var(--atemporal-text);
+  font: inherit;
+  font-size: 0.88rem;
+  line-height: 1.3;
+  outline: none;
+  max-width: 100%;
+  min-width: 0;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.adm-scope input:focus, .adm-scope select:focus, .adm-scope textarea:focus {
+  border-color: var(--atemporal-gold);
+  box-shadow: 0 0 0 3px rgba(201, 144, 74, 0.14);
+}
+.adm-scope input::placeholder { color: var(--atemporal-muted); opacity: 0.8; }
+.adm-scope input[type='checkbox'] { accent-color: var(--atemporal-green); width: 16px; height: 16px; flex-shrink: 0; }
+.adm-scope input[type='color'] { width: 40px; height: 36px; padding: 2px; border: 1.5px solid var(--atemporal-border); border-radius: 9px; background: var(--atemporal-white); cursor: pointer; }
+.adm-scope select { cursor: pointer; }
+
+/* Botones (anulan los duplicados de global.css) */
+.adm-scope .btn-primary,
+.adm-scope .btn-secondary,
+.adm-scope .btn-danger,
+.adm-scope .btn-outline {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px 16px; border-radius: 9px; font: inherit; font-size: 0.85rem; font-weight: 700;
+  line-height: 1.2; cursor: pointer; white-space: nowrap; border: 1.5px solid transparent; text-transform: none; letter-spacing: 0;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
+}
+.adm-scope .btn-primary { background: var(--atemporal-green); color: #fff; }
+.adm-scope .btn-primary:hover:not(:disabled) { background: var(--atemporal-green-dark); }
+.adm-scope .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.adm-scope .btn-secondary, .adm-scope .btn-outline {
+  background: transparent; color: var(--atemporal-text); border-color: var(--atemporal-border);
+}
+.adm-scope .btn-secondary:hover, .adm-scope .btn-outline:hover { background: var(--chart-track, rgba(0, 0, 0, 0.05)); color: var(--atemporal-text); border-color: var(--atemporal-gold); }
+.adm-scope .btn-danger { background: rgba(220, 38, 38, 0.08); color: #dc2626; border-color: rgba(220, 38, 38, 0.3); }
+.adm-scope .btn-danger:hover { background: rgba(220, 38, 38, 0.16); }
+.adm-scope td .btn-primary, .adm-scope td .btn-secondary, .adm-scope td .btn-danger,
+.adm-scope .crud-actions .btn-primary, .adm-scope .crud-actions .btn-secondary, .adm-scope .crud-actions .btn-danger { padding: 5px 11px !important; font-size: 0.76rem !important; }
+
+/* Pestañas */
+.adm-tabs { display: inline-flex; gap: 4px; padding: 4px; background: var(--atemporal-white); border: 1px solid var(--atemporal-border); border-radius: 12px; flex-wrap: wrap; max-width: 100%; margin-bottom: 22px; }
+.adm-tab { border: none; background: transparent; padding: 9px 16px; border-radius: 9px; cursor: pointer; font: inherit; font-size: 0.86rem; font-weight: 600; color: var(--atemporal-muted); white-space: nowrap; transition: background 0.15s, color 0.15s; }
+.adm-tab:hover { color: var(--atemporal-text); background: var(--chart-track, rgba(0, 0, 0, 0.04)); }
+.adm-tab.on { background: var(--atemporal-green); color: #fff; }
+
+/* Tarjetas y formularios */
+.adm-scope .crud-card, .adm-scope .content-card {
+  background: var(--atemporal-white); border: 1px solid var(--atemporal-border); border-radius: 16px;
+  padding: 20px; box-shadow: 0 1px 2px rgba(16, 36, 33, 0.04), 0 6px 22px rgba(16, 36, 33, 0.05);
+  min-width: 0; overflow-x: auto;
+}
+.adm-scope .crud-card h3 { margin: 0 0 14px; font-size: 1rem; font-weight: 700; color: var(--atemporal-text); }
+.adm-scope .crud-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid var(--atemporal-border); padding-bottom: 14px; margin-bottom: 18px; }
+.adm-scope .crud-header h2 { margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--atemporal-text); }
+.adm-scope .crud-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.adm-scope .crud-form { background: var(--chart-track, #f5f5f5); border: 1px solid var(--atemporal-border); border-radius: 12px; padding: 18px; margin-bottom: 20px; }
+.adm-scope .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: 14px; margin-bottom: 14px; }
+.adm-scope .form-group { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.adm-scope .form-group label { font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--atemporal-muted); }
+.adm-scope .form-group input, .adm-scope .form-group select, .adm-scope .form-group textarea { width: 100%; }
+.adm-scope .form-group.checkbox { flex-direction: row; align-items: center; gap: 8px; padding-top: 22px; height: auto; }
+.adm-scope .form-group.checkbox label { text-transform: none; letter-spacing: 0; font-size: 0.88rem; font-weight: 600; color: var(--atemporal-text); margin: 0; }
+.adm-scope .empty-state { padding: 36px 16px; text-align: center; color: var(--atemporal-muted); }
+
+/* Tablas */
+.adm-scope .data-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; background: transparent; }
+.adm-scope .data-table th {
+  padding: 10px 12px; text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700;
+  color: var(--atemporal-muted); background: transparent; border-bottom: 1px solid var(--atemporal-border); white-space: nowrap;
+}
+.adm-scope .data-table td { padding: 11px 12px; border-bottom: 1px solid var(--atemporal-border); color: var(--atemporal-text); vertical-align: middle; }
+.adm-scope .data-table tbody tr:last-child td { border-bottom: none; }
+.adm-scope .data-table tbody tr:hover td { background: var(--chart-track, rgba(0, 0, 0, 0.03)); }
+
+/* Insignias */
+.adm-scope .badge-active, .adm-scope .badge-inactive {
+  display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.03em; white-space: nowrap;
+}
+.adm-scope .badge-active { background: rgba(22, 163, 74, 0.14); color: #15803d; }
+.adm-scope .badge-inactive { background: rgba(220, 38, 38, 0.12); color: #dc2626; }
+
+/* Cuadrícula de tarjetas de atributos */
+.adm-attrs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 18px; align-items: start; }
+.adm-attr-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+.adm-attr-form input[type='text'] { flex: 1 1 150px; }
+.adm-attr-form .adm-check { display: inline-flex; align-items: center; gap: 6px; font-size: 0.84rem; color: var(--atemporal-text); white-space: nowrap; }
+.adm-scope .adm-color-dot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--atemporal-border); flex-shrink: 0; display: inline-block; }
+
+@media (max-width: 640px) {
+  .adm-tabs { display: flex; flex-wrap: nowrap; overflow-x: auto; width: 100%; scrollbar-width: none; }
+  .adm-tabs::-webkit-scrollbar { display: none; }
+  .adm-tab { flex-shrink: 0; }
+}
+
+.adm-scope .btn-action { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 9px; font: inherit; font-size: 0.76rem; font-weight: 700; cursor: pointer; background: transparent; color: var(--atemporal-text); border: 1.5px solid var(--atemporal-border); text-transform: none; letter-spacing: 0; }
+.adm-scope .btn-action:hover { border-color: var(--atemporal-gold); }
+.adm-scope .error-message { background: rgba(220, 38, 38, 0.08); color: #dc2626; border: 1px solid rgba(220, 38, 38, 0.3); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; font-size: 0.86rem; }
+.adm-scope .warning-message { background: rgba(217, 119, 6, 0.1); color: #b45309; border: 1px solid rgba(217, 119, 6, 0.3); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; font-size: 0.86rem; }
+.adm-scope .loading-state { padding: 32px; text-align: center; color: var(--atemporal-muted); }

@@ -29,7 +29,11 @@
     },
     "plugins": [
       "expo-secure-store",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      ["@stripe/stripe-react-native", {
+        "merchantIdentifier": "merchant.com.dressed.demo",
+        "enableGooglePay": false
+      }]
     ],
     "extra": {
       "eas": {

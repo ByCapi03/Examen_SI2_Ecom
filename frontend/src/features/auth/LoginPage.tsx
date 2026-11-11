@@ -40,6 +40,39 @@ export const LoginPage = () => {
   const [choices, setChoices]   = useState<{ slug: string; name: string }[]>([]);
   const [chosenSlug, setChosenSlug] = useState('');
   const [focusedField, setFocusedField] = useState('');
+  const [needsVerify, setNeedsVerify] = useState(false);
+  const [code, setCode] = useState('');
+  const [verifyInfo, setVerifyInfo] = useState<string | null>(null);
+
+  // El cajero no tiene dashboard: entra directo a su caja.
+  const staffHome = (roles: string[]) => (roles.includes('SUPERADMIN') ? '/dashboard/platform' : roles.includes('ADMIN') || roles.includes('ENCARGADO') ? '/dashboard' : '/dashboard/pos');
+
+  const goAfterLogin = (user: any) => {
+    if (['SUPERADMIN','ADMIN','ENCARGADO','CAJERO'].some(r => user.roles.includes(r))) navigate(staffHome(user.roles), { replace:true });
+    else navigate('/account', { replace:true });
+  };
+
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true); setError(null); setVerifyInfo(null);
+    try {
+      const { data } = await api.post('/saas/tenants/verify-email', { email, code });
+      login(data.accessToken, data.user);
+      goAfterLogin(data.user);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'No se pudo verificar el código');
+    } finally { setIsSubmitting(false); }
+  };
+
+  const handleResend = async () => {
+    setError(null); setVerifyInfo(null);
+    try {
+      const { data } = await api.post('/saas/tenants/resend-code', { email });
+      setVerifyInfo(data.devCode ? `Modo desarrollo: tu código es ${data.devCode}` : 'Si existe una verificación pendiente, enviamos un nuevo código a tu correo.');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'No se pudo reenviar el código');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,11 +81,16 @@ export const LoginPage = () => {
       const { data } = await api.post('/auth/login', { email, password, tenantSlug: chosenSlug || tenantSlug || undefined });
       login(data.accessToken, data.user);
       if (data.user.mustChangePassword) { navigate('/change-password', { replace:true }); return; }
-      if (['ADMIN','ENCARGADO','CAJERO'].some(r => data.user.roles.includes(r))) {
-        navigate('/dashboard', { replace:true });
+      if (['SUPERADMIN','ADMIN','ENCARGADO','CAJERO'].some(r => data.user.roles.includes(r))) {
+        navigate(staffHome(data.user.roles), { replace:true });
       } else {
         const pr = sessionStorage.getItem('pendingReservation');
-        if (pr) { try { navigate('/reservations/new', { state:JSON.parse(pr), replace:true }); return; } catch {} }
+        if (pr) {
+          try {
+            const me = await api.get('/saas/tenants/me', { headers: { Authorization: `Bearer ${data.accessToken}` } });
+            navigate(`/t/${me.data.slug}/reservations/new`, { state:JSON.parse(pr), replace:true }); return;
+          } catch {}
+        }
         const redir = sessionStorage.getItem('redirectUrl');
         if (redir) { sessionStorage.removeItem('redirectUrl'); navigate(redir, { replace:true }); return; }
         navigate('/account', { replace:true });
@@ -62,6 +100,11 @@ export const LoginPage = () => {
         setChoices(err.response.data.tenants ?? []);
         setChosenSlug('');
         setError(err.response.data.message);
+        return;
+      }
+      if (err.response?.data?.code === 'EMAIL_NOT_VERIFIED') {
+        setNeedsVerify(true);
+        setError(null);
         return;
       }
       setError(err.response?.status === 401
@@ -247,6 +290,30 @@ export const LoginPage = () => {
                 </div>
               )}
 
+              {needsVerify && (
+                <form onSubmit={handleVerify} style={{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:12, padding:14, marginBottom:18 }}>
+                  <p style={{ margin:'0 0 10px', fontSize:'0.82rem', color:'#92400e', lineHeight:1.45 }}>
+                    Tu correo aún no está verificado. Ingresa el código de 6 dígitos que enviamos a <b>{email}</b>.
+                  </p>
+                  <input
+                    value={code} onChange={e => setCode(e.target.value.replace(/\D/g,'').slice(0,6))}
+                    inputMode="numeric" autoComplete="one-time-code" placeholder="••••••"
+                    style={{ width:'100%', boxSizing:'border-box', padding:'10px', border:'1.5px solid #fcd34d', borderRadius:9, fontSize:'1.2rem', fontFamily:'monospace', letterSpacing:'0.4em', textAlign:'center', outline:'none', marginBottom:10 }}
+                  />
+                  {verifyInfo && <p style={{ margin:'0 0 10px', fontSize:'0.78rem', color:'#15803d' }}>{verifyInfo}</p>}
+                  <div style={{ display:'flex', gap:8 }}>
+                    <button type="submit" disabled={isSubmitting || code.length !== 6}
+                      style={{ flex:1, padding:'10px 0', background:'#182D2A', color:'#fff', border:'none', borderRadius:9, fontWeight:700, fontSize:'0.84rem', cursor:'pointer', opacity: code.length === 6 ? 1 : 0.5 }}>
+                      Verificar y entrar
+                    </button>
+                    <button type="button" onClick={handleResend}
+                      style={{ padding:'10px 12px', background:'transparent', color:'#92400e', border:'1.5px solid #fcd34d', borderRadius:9, fontWeight:600, fontSize:'0.8rem', cursor:'pointer' }}>
+                      Reenviar
+                    </button>
+                  </div>
+                </form>
+              )}
+
               {/* Form */}
               <form onSubmit={handleSubmit}>
                 <div style={{ marginBottom:14 }}>
@@ -306,6 +373,12 @@ export const LoginPage = () => {
                   ¿No tienes una cuenta?{' '}
                   <Link to="/pricing" style={{ color:'#C9904A', fontWeight:600, textDecoration:'none' }}>Registra tu empresa</Link>
                 </p>
+                {tenantSlug && (
+                  <p style={{ margin:0, fontSize:'0.81rem', color:'#6b7280' }}>
+                    ¿Eres cliente de {tenantName ?? 'esta tienda'}?{' '}
+                    <Link to={`/register?tenant=${tenantSlug}`} style={{ color:'#C9904A', fontWeight:600, textDecoration:'none' }}>Crear cuenta de cliente</Link>
+                  </p>
+                )}
                 <p style={{ margin:0, fontSize:'0.81rem', color:'#6b7280' }}>
                   ¿Ya compraste en nuestra tienda?{' '}
                   <Link to="/activate-account" style={{ color:'#182D2A', fontWeight:600, textDecoration:'none' }}>Activa tu cuenta</Link>

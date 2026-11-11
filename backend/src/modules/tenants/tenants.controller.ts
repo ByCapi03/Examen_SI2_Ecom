@@ -1,7 +1,6 @@
-import { Controller, Get, Post, Patch, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, UseGuards, Headers, Req, HttpException, HttpStatus } from '@nestjs/common';
+import { BillingService } from './billing.service';
 import { TenantsService } from './tenants.service';
-import { CompanyRegistrationService } from './company-registration.service';
-import type { CompleteRegistrationDto } from './company-registration.service';
 import { AuthGuard } from '../../common/guards/auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { TenantGuard } from '../../common/guards/tenant.guard';
@@ -11,10 +10,7 @@ import { CurrentTenant } from '../../common/decorators/current-tenant.decorator'
 
 @Controller('saas')
 export class TenantsController {
-  constructor(
-    private readonly tenantsService: TenantsService,
-    private readonly registration: CompanyRegistrationService,
-  ) {}
+  constructor(private readonly tenantsService: TenantsService, private readonly billing: BillingService) {}
 
   /** Plataforma: solo el SUPERADMIN del SaaS puede ver todas las empresas. */
   @Get('tenants')
@@ -35,8 +31,77 @@ export class TenantsController {
   @Patch('tenants/me/plan')
   @UseGuards(AuthGuard, TenantGuard, RolesGuard)
   @Roles('ADMIN')
-  changePlan(@CurrentTenant() tenantId: number, @Body() body: { planCode: string }) {
-    return this.tenantsService.changePlan(tenantId, body.planCode);
+  async changePlan(@CurrentTenant() tenantId: number, @Body() body: { planCode: string; billingCycle?: string }) {
+    // Con Stripe activo, un plan de pago solo se aplica tras pagar (POST /saas/billing/checkout)
+    const plan = (await this.tenantsService.findAllPlans()).find((p) => p.code === body.planCode);
+    if (plan && this.billing.requiresPayment(plan)) {
+      throw new HttpException('Este plan requiere pago. Usa el pago con tarjeta para contratarlo.', HttpStatus.PAYMENT_REQUIRED);
+    }
+    return this.tenantsService.changePlan(tenantId, body.planCode, body.billingCycle);
+  }
+
+  // ───── Cobro de la suscripción (Stripe) ─────
+  @Get('billing/config')
+  billingConfig() { return this.billing.config(); }
+
+  @Post('billing/checkout')
+  @UseGuards(AuthGuard, TenantGuard, RolesGuard)
+  @Roles('ADMIN')
+  billingCheckout(@CurrentTenant() tenantId: number, @Body() body: { planCode: string; billingCycle?: string }) {
+    return this.billing.startCheckout(tenantId, body.planCode, body.billingCycle);
+  }
+
+  @Post('billing/confirm')
+  @UseGuards(AuthGuard, TenantGuard, RolesGuard)
+  @Roles('ADMIN')
+  billingConfirm(@CurrentTenant() tenantId: number, @Body() body: { sessionId: string }) {
+    return this.billing.confirm(tenantId, body.sessionId);
+  }
+
+  /** Webhook de Stripe (firma verificada con STRIPE_WEBHOOK_SECRET). */
+  @Post('billing/webhook')
+  billingWebhook(@Req() req: any, @Headers('stripe-signature') signature: string) {
+    return this.billing.handleWebhook(req.rawBody, signature);
+  }
+
+  // ───── Panel de plataforma (solo SUPERADMIN) ─────
+  @Get('admin/overview')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('SUPERADMIN')
+  adminOverview() { return this.tenantsService.adminOverview(); }
+
+  @Get('admin/tenants')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('SUPERADMIN')
+  adminTenants() { return this.tenantsService.adminTenants(); }
+
+  @Patch('admin/tenants/:id/active')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('SUPERADMIN')
+  adminSetActive(@Param('id') id: string, @Body() body: { active: boolean }) {
+    return this.tenantsService.adminSetActive(+id, !!body.active);
+  }
+
+  @Patch('admin/tenants/:id/plan')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('SUPERADMIN')
+  adminChangePlan(@Param('id') id: string, @Body() body: { planCode: string; billingCycle?: string }) {
+    return this.tenantsService.adminChangePlan(+id, body.planCode, body.billingCycle);
+  }
+
+  @Patch('admin/tenants/:id/extend')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('SUPERADMIN')
+  adminExtend(@Param('id') id: string, @Body() body: { days: number }) {
+    return this.tenantsService.adminExtend(+id, body.days);
+  }
+
+  /** El ADMIN personaliza la web pública de su empresa. */
+  @Patch('tenants/me/store')
+  @UseGuards(AuthGuard, TenantGuard, RolesGuard)
+  @Roles('ADMIN')
+  updateStore(@CurrentTenant() tenantId: number, @Body() body: any) {
+    return this.tenantsService.updateStoreConfig(tenantId, body);
   }
 
   @Get('plans')
@@ -61,36 +126,21 @@ export class TenantsController {
   @Post('tenants/register')
   @Public()
   createTenant(@Body() body: {
-    name: string; slug: string; taxId?: string; planCode?: string;
+    name: string; slug: string; taxId?: string; planCode?: string; billingCycle?: string;
     adminName?: string; adminEmail?: string; adminPassword?: string;
   }) {
     return this.tenantsService.createTenant(body);
   }
 
-  /** Registro público de empresa: slug sugerido único + disponibilidad del correo. */
-  @Post('register/check')
+  @Post('tenants/verify-email')
   @Public()
-  checkRegistration(@Body() body: { name: string; email?: string }) {
-    return this.registration.checkAvailability(body.name);
+  verifyEmail(@Body() body: { email: string; code: string }) {
+    return this.tenantsService.verifyEmail(body.email, body.code);
   }
 
-  /** Paso previo al pago: envía el código OTP al correo del administrador. */
-  @Post('register/send-code')
+  @Post('tenants/resend-code')
   @Public()
-  sendCode(@Body() body: { email: string }) {
-    return this.registration.sendCode(body.email);
-  }
-
-  @Post('register/verify-code')
-  @Public()
-  verifyCode(@Body() body: { email: string; code: string }) {
-    return this.registration.verifyCode(body.email, body.code);
-  }
-
-  /** Cobra (simulado) y crea empresa + suscripción + administrador en una transacción. */
-  @Post('register/complete')
-  @Public()
-  completeRegistration(@Body() body: CompleteRegistrationDto) {
-    return this.registration.complete(body);
+  resendCode(@Body() body: { email: string }) {
+    return this.tenantsService.resendVerificationCode(body.email);
   }
 }

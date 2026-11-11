@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useStore, DEFAULT_STORE_CONFIG } from '../store/StoreContext';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useCart } from '../cart/CartContext';
 import { api } from '../../api/axios';
-import atemporalLogo from '../../assets/ATEMPORAL.png';
 import '../../styles/store.css';
 
 interface Product {
@@ -31,6 +31,8 @@ export const HomePage = () => {
   const { user } = useAuth();
   const { cart } = useCart();
   const navigate = useNavigate();
+  const { path, store } = useStore();
+  const cfg = { ...DEFAULT_STORE_CONFIG, ...(store?.config ?? {}) };
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -73,19 +75,21 @@ export const HomePage = () => {
       {/* HERO SECTION */}
       <section className="hero-section">
         <div className="hero-content" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <img 
-            src={atemporalLogo} 
-            alt="ATEMPORAL - Moda que trasciende épocas" 
-            style={{ maxWidth: '280px', width: '100%', height: 'auto', objectFit: 'contain', marginBottom: '20px', borderRadius: '12px' }} 
-          />
-          <span className="hero-subtitle">NUEVA COLECCIÓN</span>
-          <h1 className="hero-title">Moda que trasciende épocas</h1>
+          {cfg.logoUrl ? (
+            <img src={cfg.logoUrl} alt={store?.name} style={{ maxHeight: 96, maxWidth: 220, objectFit: 'contain', marginBottom: 20 }} />
+          ) : (
+            <div style={{ width: 84, height: 84, borderRadius: 22, background: 'rgba(255,255,255,0.12)', color: cfg.accentColor, display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '2rem', letterSpacing: 2, marginBottom: 20 }}>
+              {(store?.name ?? '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase()}
+            </div>
+          )}
+          <span className="hero-subtitle" style={{ color: cfg.accentColor }}>{cfg.tagline || 'BIENVENIDO A'}</span>
+          <h1 className="hero-title">{cfg.heroTitle || store?.name}</h1>
 
-          <p className="hero-text">Descubre nuestra nueva colección diseñada para resaltar tu estilo en cualquier ocasión.</p>
+          <p className="hero-text">{cfg.heroText || 'Explora nuestro catálogo, prueba las prendas con el vestidor virtual y reserva en la sucursal que prefieras.'}</p>
           <button
             className="btn-secondary"
-            onClick={() => navigate('/catalog')}
-            style={{ marginTop: '10px' }}
+            onClick={() => navigate(path('/catalog'))}
+            style={{ marginTop: '10px', background: cfg.accentColor, color: '#fff' }}
           >
             Ver Catálogo
           </button>
@@ -110,7 +114,7 @@ export const HomePage = () => {
                 <div key={rec.product.id} className="product-card" style={{ border: '1px solid #eee' }}>
                   <div
                     className="product-image-placeholder"
-                    onClick={() => navigate(`/products/${rec.product.id}`)}
+                    onClick={() => navigate(path(`/products/${rec.product.id}`))}
                     style={{ padding: rec.product.imageUrl ? 0 : undefined, overflow: 'hidden', position: 'relative' }}
                   >
                     {rec.product.discount && (
@@ -140,7 +144,7 @@ export const HomePage = () => {
                   </p>
                   <button
                     className="btn-outline"
-                    onClick={() => navigate(`/products/${rec.product.id}`)}
+                    onClick={() => navigate(path(`/products/${rec.product.id}`))}
                   >
                     Ver Producto
                   </button>
@@ -156,7 +160,7 @@ export const HomePage = () => {
       )}
 
       {/* FEATURED PRODUCTS */}
-      <section className="featured-section">
+      {cfg.showFeatured && <section className="featured-section">
         <div className="section-header">
           <h2 className="section-title">Productos Destacados</h2>
           <div className="section-divider"></div>
@@ -170,7 +174,7 @@ export const HomePage = () => {
               <div key={p.id} className="product-card">
                 <div
                   className="product-image-placeholder"
-                  onClick={() => navigate(`/products/${p.id}`)}
+                  onClick={() => navigate(path(`/products/${p.id}`))}
                   style={{ padding: p.imageUrl ? 0 : undefined, overflow: 'hidden' }}
                 >
                   {p.imageUrl ? (
@@ -183,7 +187,7 @@ export const HomePage = () => {
                 <p className="product-price">Bs. {Number(p.price).toFixed(2)}</p>
                 <button
                   className="btn-outline"
-                  onClick={() => navigate(`/products/${p.id}`)}
+                  onClick={() => navigate(path(`/products/${p.id}`))}
                 >
                   Ver
                 </button>
@@ -191,7 +195,7 @@ export const HomePage = () => {
             ))}
           </div>
         )}
-      </section>
+      </section>}
     </div>
   );
 };

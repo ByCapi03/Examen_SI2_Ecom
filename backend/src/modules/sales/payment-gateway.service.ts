@@ -1,11 +1,13 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import Stripe from 'stripe';
+import { DataSource } from 'typeorm';
+import { getEffectiveTenantId } from '../../common/tenancy/tenant-context';
 
 @Injectable()
 export class PaymentGatewayService {
   private stripe: Stripe;
 
-  constructor() {
+  constructor(private readonly dataSource: DataSource) {
     this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_mock', {
       apiVersion: '2025-01-27.acacia' as any, // Ignore type error for acacia version if it happens
     });
@@ -45,6 +47,8 @@ export class PaymentGatewayService {
   async createCheckoutSession(amount: number, metadata: any) {
     const amountInCents = Math.round(amount * 100);
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const [tenant] = await this.dataSource.query('SELECT slug, name FROM tenants WHERE id = $1', [getEffectiveTenantId()]);
+    const storeUrl = tenant?.slug ? `${frontendUrl}/t/${tenant.slug}` : frontendUrl;
     
     const session = await this.stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -54,7 +58,7 @@ export class PaymentGatewayService {
           price_data: {
             currency: process.env.STRIPE_CURRENCY || 'bob',
             product_data: {
-              name: 'Reserva Atemporal',
+              name: tenant?.name ? `Compra en ${tenant.name}` : 'Compra en la tienda',
             },
             unit_amount: amountInCents,
           },
@@ -66,10 +70,10 @@ export class PaymentGatewayService {
         metadata,
       },
       success_url: metadata.flowType === 'PURCHASE' 
-        ? `${frontendUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}` 
+        ? `${storeUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}` 
         : `${frontendUrl}/account/reservations?payment=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: metadata.flowType === 'PURCHASE'
-        ? `${frontendUrl}/checkout`
+        ? `${storeUrl}/checkout`
         : `${frontendUrl}/account/reservations?payment=cancelled`,
     });
 

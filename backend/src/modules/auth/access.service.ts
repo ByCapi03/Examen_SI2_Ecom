@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, NotFoundException, UnauthorizedExcepti
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { assertPlanLimit } from '../../common/tenancy/plan-features';
 import * as crypto from 'crypto';
 import { User } from './user.entity';
 import { Role } from './role.entity';
@@ -41,6 +42,9 @@ export class AccessService {
     if ((roleName === 'ENCARGADO' || roleName === 'CAJERO') && !branchId) {
       throw new BadRequestException(`${roleName} must have a branch assigned`);
     }
+
+    // Límite de usuarios internos según el plan (y vigencia de la suscripción)
+    if (currentUser.tenantId) await assertPlanLimit(this.dataSource, currentUser.tenantId, 'users');
 
     // Check if user already exists
     const existingUser = await this.userRepository.findOneBy({ email, tenantId: getEffectiveTenantId() });

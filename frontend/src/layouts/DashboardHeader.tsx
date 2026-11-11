@@ -5,6 +5,7 @@ import { Bell } from 'lucide-react';
 import { api } from '../api/axios';
 import { messaging, onMessage } from '../config/firebase';
 import { useFirebaseNotifications } from '../hooks/useFirebaseNotifications';
+import { useMyBranchName } from '../features/branches/useMyBranchName';
 interface Notification {
   id: number;
   type: string;
@@ -23,6 +24,7 @@ export const DashboardHeader = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { permission, requestPermissionAndRegister, isSupported } = useFirebaseNotifications();
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const branchName = useMyBranchName();
 
   const fetchNotifications = async () => {
     try {
@@ -34,7 +36,9 @@ export const DashboardHeader = () => {
   };
 
   useEffect(() => {
-    fetchNotifications();
+    // Admin/encargado: primero se revisa el stock crítico para que su alerta aparezca de inmediato
+    const canSeeStock = user?.roles?.some((r) => r === 'ADMIN' || r === 'ENCARGADO');
+    (canSeeStock ? api.post('/notifications/low-stock/sync').catch(() => {}) : Promise.resolve()).finally(fetchNotifications);
     const interval = setInterval(() => {
       fetchNotifications();
     }, 30000); // Polling every 30 seconds
@@ -48,6 +52,9 @@ export const DashboardHeader = () => {
         console.log('[DashboardHeader] onMessage received: ', payload);
         fetchNotifications();
         
+        if (payload.data?.type === 'LOW_STOCK') {
+          window.dispatchEvent(new CustomEvent('LOW_STOCK'));
+        }
         if (payload.data?.type === 'RESERVATION_CREATED') {
           window.dispatchEvent(new CustomEvent('RESERVATION_CREATED'));
         }
@@ -72,9 +79,10 @@ export const DashboardHeader = () => {
 
   const getDisplayRole = () => {
     if (!user) return 'PERSONAL';
+    if (user.roles?.includes('SUPERADMIN')) return 'SUPERADMIN';
     if (user.roles?.includes('ADMIN')) return 'ADMINISTRADOR';
-    if (user.roles?.includes('ENCARGADO')) return `ENCARGADO - SUCURSAL ${user.branchId || ''}`;
-    if (user.roles?.includes('CAJERO')) return `CAJERO - SUCURSAL ${user.branchId || ''}`;
+    if (user.roles?.includes('ENCARGADO')) return `ENCARGADO${branchName ? ` · ${branchName}` : ''}`.toUpperCase();
+    if (user.roles?.includes('CAJERO')) return `CAJERO${branchName ? ` · ${branchName}` : ''}`.toUpperCase();
     return 'PERSONAL';
   };
 
@@ -137,7 +145,7 @@ export const DashboardHeader = () => {
               
               {isSupported && permission === 'default' && (
                 <div style={{ padding: '10px 15px', backgroundColor: '#f0f8ff', borderBottom: '1px solid #eee', textAlign: 'center' }}>
-                  <p style={{ fontSize: '0.85rem', color: '#555', margin: '0 0 8px 0' }}>Activa las notificaciones de escritorio para no perder ninguna reserva.</p>
+                  <p style={{ fontSize: '0.85rem', color: '#555', margin: '0 0 8px 0' }}>Activa las notificaciones del navegador para recibir reservas y alertas de stock bajo.</p>
                   <button 
                     onClick={requestPermissionAndRegister}
                     style={{ backgroundColor: '#1c2a28', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
@@ -157,10 +165,11 @@ export const DashboardHeader = () => {
                       className={`notification-item ${!notif.read ? 'unread' : ''}`}
                       onClick={() => {
                         if (!notif.read) handleMarkAsRead(notif.id);
-                        if (notif.reservationId) navigate('/dashboard/reservations'); // or specific detail
+                        if (notif.type === 'LOW_STOCK' || notif.type === 'LOW_STOCK_DIGEST') navigate('/dashboard/inventory');
+                        else if (notif.reservationId) navigate('/dashboard/reservations'); // or specific detail
                       }}
                     >
-                      <div className="notification-title">{notif.title}</div>
+                      <div className="notification-title">{notif.type.startsWith('LOW_STOCK') ? '⚠️ ' : ''}{notif.title}</div>
                       <div className="notification-msg">{notif.message}</div>
                       <div className="notification-time">{new Date(notif.createdAt).toLocaleString()}</div>
                     </div>

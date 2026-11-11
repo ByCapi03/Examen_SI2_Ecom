@@ -13,6 +13,9 @@ import { Sale } from './sale.entity';
 import { SaleItem } from './sale-item.entity';
 import { Payment } from './payment.entity';
 import { CashSession } from './cash-session.entity';
+import { CashRegister } from './cash-register.entity';
+import { CashRegistersService } from './cash-registers.service';
+import { CashRegistersController } from './cash-registers.controller';
 import { Branch } from '../branches/branch.entity';
 import { User } from '../auth/user.entity';
 import { Inventory } from '../inventory/inventory.entity';
@@ -32,12 +35,12 @@ import { CatalogModule } from '../catalog/catalog.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Sale, SaleItem, Payment, CashSession, Branch, User, Inventory, Product, Variant, Client]),
+    TypeOrmModule.forFeature([Sale, SaleItem, Payment, CashSession, CashRegister, Branch, User, Inventory, Product, Variant, Client]),
     AuthModule,
     CatalogModule
   ],
-  controllers: [SalesController, CashSessionsController, PosController, PaymentGatewayController],
-  providers: [SalesService, CashSessionsService, PosService, PaymentGatewayService],
+  controllers: [SalesController, CashSessionsController, CashRegistersController, PosController, PaymentGatewayController],
+  providers: [SalesService, CashSessionsService, CashRegistersService, PosService, PaymentGatewayService],
   exports: [SalesService, CashSessionsService, PosService, PaymentGatewayService]
 })
 export class SalesModule {}

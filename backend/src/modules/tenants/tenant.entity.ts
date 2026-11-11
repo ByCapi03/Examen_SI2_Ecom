@@ -20,6 +20,10 @@ export class Tenant {
   @Column({ default: true })
   active: boolean;
 
+  /** Personalización de la web pública de la empresa (/t/<slug>). */
+  @Column({ type: 'jsonb', nullable: true })
+  storeConfig: Record<string, any> | null;
+
   @OneToOne(() => Subscription, (sub) => sub.tenant)
   subscription: Subscription;
 

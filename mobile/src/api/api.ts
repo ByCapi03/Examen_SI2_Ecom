@@ -3,6 +3,11 @@ import * as SecureStore from 'expo-secure-store';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://172.20.10.2:3000';
 
+/** Aviso de acceso (empresa suspendida / suscripción vencida): lo registra la app para mostrar un mensaje. */
+type AccessHandler = (kind: 'SUSPENDED' | 'EXPIRED') => void;
+let accessHandler: AccessHandler | null = null;
+export const setAccessHandler = (fn: AccessHandler | null) => { accessHandler = fn; };
+
 export const api = axios.create({
   baseURL: API_URL,
   headers: {
@@ -33,6 +38,10 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    const status = error.response?.status;
+    const message = String(error.response?.data?.message ?? '');
+    if (status === 403 && (/suspendid/i.test(message) || error.response?.data?.code === 'TENANT_SUSPENDED')) accessHandler?.('SUSPENDED');
+    else if (status === 402) accessHandler?.('EXPIRED');
     console.log({
       url: error.config?.url,
       method: error.config?.method,

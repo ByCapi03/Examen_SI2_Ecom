@@ -2,12 +2,13 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import {
   LogOut, LayoutDashboard, Calendar, Box, Package, Users, ShoppingCart, DollarSign, Store,
-  BarChart3, Sparkles, BrainCircuit, Truck, Building2, RefreshCcw, Settings, Lock,
+  BarChart3, Sparkles, BrainCircuit, Truck, Building2, RefreshCcw, Settings, Lock, ScrollText, Globe, ShieldCheck, CreditCard,
 } from 'lucide-react';
 import { DASHBOARD_NAVIGATION } from '../config/navigation';
 import { useAuth } from '../features/auth/AuthContext';
 import { usePlan } from '../features/saas/PlanContext';
 import { useSettings } from '../config/SettingsContext';
+import { useMyBranchName } from '../features/branches/useMyBranchName';
 
 const ICONS: Record<string, ReactNode> = {
   '/dashboard': <LayoutDashboard size={18} />,
@@ -24,13 +25,18 @@ const ICONS: Record<string, ReactNode> = {
   '/dashboard/branches': <Building2 size={18} />,
   '/dashboard/users': <Users size={18} />,
   '/dashboard/sync-conflicts': <RefreshCcw size={18} />,
+  '/dashboard/audit': <ScrollText size={18} />,
   '/dashboard/settings': <Settings size={18} />,
+  '/dashboard/store': <Globe size={18} />,
+  '/dashboard/platform': <ShieldCheck size={18} />,
+  '/dashboard/subscription': <CreditCard size={18} />,
 };
 
-export const DashboardSidebar = () => {
+export const DashboardSidebar = ({ open = false, onNavigate }: { open?: boolean; onNavigate?: () => void }) => {
   const { user, logout } = useAuth();
   const { tenant, can } = usePlan();
   const { t, settings } = useSettings();
+  const branchName = useMyBranchName();
   const navigate = useNavigate();
   const compact = settings.compactSidebar;
 
@@ -39,7 +45,7 @@ export const DashboardSidebar = () => {
     .filter((g) => g.items.length > 0);
 
   return (
-    <aside className="dashboard-sidebar" style={{ width: compact ? 78 : 264, padding: '22px 0 16px', height: '100vh', position: 'sticky', top: 0, flexShrink: 0, transition: 'width .2s' }}>
+    <aside className={`dashboard-sidebar${open ? ' open' : ''}`} style={{ width: compact ? 78 : 264, padding: '22px 0 16px', height: '100vh', position: 'sticky', top: 0, flexShrink: 0, transition: 'width .2s' }}>
       <style>{`
         .sb-nav { flex: 1; overflow-y: auto; padding: 0 12px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.12) transparent; }
         .sb-group { margin-bottom: 14px; }
@@ -62,6 +68,11 @@ export const DashboardSidebar = () => {
           {!compact && tenant && (
             <div style={{ marginTop: 8 }}>
               <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tenant.name}</div>
+              {branchName && (
+                <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.76rem', color: 'rgba(245,242,235,0.75)' }}>
+                  <Building2 size={12} color="var(--atemporal-gold)" /> Sucursal <b style={{ color: '#fff' }}>{branchName}</b>
+                </div>
+              )}
               {tenant.plan && (
                 <span style={{ display: 'inline-block', marginTop: 5, fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '3px 8px', borderRadius: 6, background: 'rgba(201,144,74,0.16)', color: 'var(--atemporal-gold)' }}>
                   {tenant.plan.name}
@@ -83,6 +94,7 @@ export const DashboardSidebar = () => {
                     to={item.path}
                     end={item.path === '/dashboard'}
                     title={t(item.key)}
+                    onClick={onNavigate}
                     className={({ isActive }) => `sb-link${isActive ? ' active' : ''}${locked ? ' locked' : ''}`}
                   >
                     {ICONS[item.path]}
@@ -98,7 +110,7 @@ export const DashboardSidebar = () => {
 
         <div style={{ padding: '10px 12px 0', borderTop: '1px solid rgba(245,242,235,0.08)' }}>
           <button
-            onClick={() => { logout(); navigate('/login'); }}
+            onClick={() => { onNavigate?.(); logout(); navigate('/login'); }}
             className="sb-link"
             style={{ width: '100%', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
             title={t('nav.logout')}

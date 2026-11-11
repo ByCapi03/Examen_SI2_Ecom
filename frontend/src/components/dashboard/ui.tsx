@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Lock, Sparkles, TrendingDown, TrendingUp, Minus } from 'lucide-react';
@@ -36,6 +36,15 @@ export const DashStyles = () => (
     .dz-tab.on { background: var(--atemporal-green); color: #fff; }
     .dz-skel { background: linear-gradient(90deg, var(--chart-track, #eee) 25%, transparent 50%, var(--chart-track, #eee) 75%); background-size: 200% 100%; animation: dzsk 1.3s infinite; border-radius: 10px; }
     @keyframes dzsk { to { background-position: -200% 0; } }
+    .dz-modal-back { position: fixed; inset: 0; z-index: 90; background: rgba(8,16,15,0.55); display: grid; place-items: center; padding: 16px; }
+    .dz-modal { background: var(--atemporal-white); color: var(--atemporal-text); border: 1px solid var(--atemporal-border); border-radius: 18px; width: 100%; max-width: 460px; max-height: calc(100vh - 32px); display: flex; flex-direction: column; box-shadow: 0 24px 70px rgba(0,0,0,0.35); }
+    .dz-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 18px 20px 4px; }
+    .dz-modal-head h3 { margin: 0; font-size: 1.05rem; font-weight: 800; }
+    .dz-modal-head button { border: none; background: transparent; color: var(--atemporal-muted); font-size: 1.5rem; line-height: 1; cursor: pointer; padding: 2px 8px; border-radius: 8px; }
+    .dz-modal-body { padding: 12px 20px 8px; overflow-y: auto; }
+    .dz-modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px 18px; flex-wrap: wrap; }
+    .dz-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--atemporal-muted); }
+    .dz-field .dz-input { width: 100%; text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 0.92rem; }
     @media (max-width: 1000px) { .dz-2-1 { grid-template-columns: 1fr; } }
   `}</style>
 );
@@ -71,7 +80,7 @@ export const PlanBadge = () => {
 export const Card = ({ title, subtitle, actions, children, style }: { title?: string; subtitle?: string; actions?: ReactNode; children: ReactNode; style?: CSSProperties }) => (
   <section className="dz-card" style={style}>
     {(title || actions) && (
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
         <div style={{ minWidth: 0 }}>
           {title && <h3>{title}</h3>}
           {subtitle && <p className="dz-sub">{subtitle}</p>}
@@ -365,4 +374,21 @@ export const downloadCsv = (filename: string, header: string[], rows: (string | 
   a.download = filename;
   a.click();
   URL.revokeObjectURL(a.href);
+};
+
+export const Modal = ({ title, onClose, children, footer }: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode }) => {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div className="dz-modal-back" role="dialog" aria-modal="true" aria-label={title} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="dz-modal">
+        <div className="dz-modal-head"><h3>{title}</h3><button onClick={onClose} aria-label="Cerrar">×</button></div>
+        <div className="dz-modal-body">{children}</div>
+        {footer && <div className="dz-modal-foot">{footer}</div>}
+      </div>
+    </div>
+  );
 };
