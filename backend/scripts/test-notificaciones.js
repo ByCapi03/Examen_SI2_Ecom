@@ -21,6 +21,14 @@ const digest = async (token) => ((await call('GET', '/notifications/my', { token
 const lowStock = async (token) => ((await call('GET', '/notifications/my', { token })).data || []).filter((n) => n.type === 'LOW_STOCK');
 
 (async () => {
+  // Repetible: el resumen se limita a 1 cada 24 h, así que se parte siempre de cero
+  const path = require('path');
+  require('dotenv').config({ path: path.join(__dirname, '..', '.env'), quiet: true });
+  const { Client } = require('pg');
+  const db = new Client({ host: process.env.DB_HOST, port: +process.env.DB_PORT || 5432, user: process.env.DB_USERNAME, password: process.env.DB_PASSWORD, database: process.env.DB_DATABASE });
+  await db.connect();
+  const cleanAlerts = () => db.query(`DELETE FROM notifications WHERE type LIKE 'LOW_STOCK%'`);
+  await cleanAlerts();
   const admin = await login('admin@luna.com');
   const enc1 = await login('encargado1@luna.com');
   const enc2 = await login('encargado2@luna.com');
@@ -80,6 +88,7 @@ const lowStock = async (token) => ((await call('GET', '/notifications/my', { tok
   const st = await call('GET', '/notifications/status', { token: admin.accessToken });
   check('N11', 'GET /notifications/status responde con el diagnóstico', st.status === 200 && typeof st.data?.serverPushReady === 'boolean');
   console.log(`  ℹ push del servidor listo: ${st.data?.serverPushReady} · dispositivos del usuario: ${st.data?.devices} · ${st.data?.hint}`);
+  await cleanAlerts(); await db.end();
   console.log(`\n=== RESULTADO: ${ok} pruebas aprobadas, ${fail} fallidas ===`);
   process.exit(fail ? 1 : 0);
 })();
