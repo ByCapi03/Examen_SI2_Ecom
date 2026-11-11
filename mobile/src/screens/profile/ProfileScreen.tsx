@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { colors, radius, spacing, typography } from '../../theme/theme';
+import { PushDiagnostics } from '../../components/PushDiagnostics';
 
 export const ProfileScreen: React.FC = () => {
   const { user, logout } = useAuth();
@@ -42,6 +43,8 @@ export const ProfileScreen: React.FC = () => {
           </Text>
         </View>
       </View>
+
+      <PushDiagnostics />
 
       <View style={styles.logoutContainer}>
         <Pressable style={styles.logoutButton} onPress={logout}>

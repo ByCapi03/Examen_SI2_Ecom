@@ -7,7 +7,8 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cinthia03.dressed"
     },
     "android": {
       "adaptiveIcon": {
@@ -30,15 +31,20 @@
     "plugins": [
       "expo-secure-store",
       "@react-native-community/datetimepicker",
-      ["@stripe/stripe-react-native", {
-        "merchantIdentifier": "merchant.com.dressed.demo",
-        "enableGooglePay": false
-      }]
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.dressed.demo",
+          "enableGooglePay": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#C9904A"
+        }
+      ]
     ],
-    "extra": {
-      "eas": {
-        "projectId": "12345678-1234-4234-a234-1234567890ab"
-      }
-    }
+    "extra": {}
   }
 }

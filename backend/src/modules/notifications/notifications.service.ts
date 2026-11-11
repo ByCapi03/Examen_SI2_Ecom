@@ -103,13 +103,23 @@ export class NotificationsService implements OnModuleInit {
   /** Estado de la configuración de push para el usuario (diagnóstico). */
   async pushStatus(userId: number) {
     const devices = await this.deviceRepo.find({ where: { userId, active: true } });
+    const isExpo = (t: string) => t.startsWith('ExponentPushToken') || t.startsWith('ExpoPushToken');
+    const expoDevices = devices.filter((d) => isExpo(d.token)).length;
+    const webDevices = devices.length - expoDevices;
+    // Los teléfonos (token de Expo) se envían por el servicio de Expo y no necesitan Firebase en el servidor;
+    // solo los navegadores (token FCM) lo requieren.
+    const needsFirebase = webDevices > 0;
     return {
       serverPushReady: this.firebaseAdmin.isReady(),
       devices: devices.length,
+      expoDevices,
+      webDevices,
       platforms: [...new Set(devices.map((d) => d.platform))],
-      hint: !this.firebaseAdmin.isReady()
-        ? 'Falta configurar Firebase en el servidor (GOOGLE_APPLICATION_CREDENTIALS). Las notificaciones internas (campana) funcionan igual.'
-        : devices.length === 0 ? 'Este usuario no tiene dispositivos registrados: active las notificaciones en la web o inicie sesión en la app móvil.' : 'OK',
+      hint: devices.length === 0
+        ? 'Este usuario no tiene dispositivos registrados: active las notificaciones en la web o inicie sesión en la app móvil compilada (no Expo Go).'
+        : needsFirebase && !this.firebaseAdmin.isReady()
+          ? 'Hay navegadores registrados pero falta configurar Firebase en el servidor (GOOGLE_APPLICATION_CREDENTIALS). Los teléfonos no lo necesitan.'
+          : 'OK',
     };
   }
 
@@ -247,6 +257,8 @@ export class NotificationsService implements OnModuleInit {
         const messages = expoTokens.map(token => ({
           to: token,
           sound: 'default',
+          channelId: 'default',
+          priority: 'high',
           title: payload.title,
           body: payload.message,
           data: payload.data || {},
@@ -262,8 +274,16 @@ export class NotificationsService implements OnModuleInit {
           body: JSON.stringify(messages),
         });
         const data = await res.json();
-        this.logger.log(`[PUSH EXPO] Sent ${expoTokens.length} notifications. Status: ${res.status}`);
-        results.expo.push({ status: res.status, data, tokens: expoTokens });
+        // Expo responde 200 aunque la entrega falle: el resultado real está en cada "ticket".
+        const tickets: any[] = Array.isArray(data?.data) ? data.data : [];
+        const errors = tickets
+          .map((t, i) => (t?.status === 'error' ? { token: expoTokens[i], error: t.details?.error ?? 'error', message: t.message } : null))
+          .filter(Boolean) as { token: string; error: string; message: string }[];
+        this.logger.log(`[PUSH EXPO] Enviadas ${expoTokens.length}, con error ${errors.length}. HTTP ${res.status}`);
+        for (const e of errors) this.logger.warn(`[PUSH EXPO] ${e.error}: ${e.message}`);
+        const dead = errors.filter((e) => e.error === 'DeviceNotRegistered').map((e) => e.token);
+        if (dead.length) await this.deviceRepo.update({ token: In(dead) }, { active: false });
+        results.expo.push({ status: res.status, data, tokens: expoTokens, errors });
       } catch (err) {
         this.logger.error('Failed to send push notification via Expo', err);
         results.expo.push({ error: (err as any).message || err });
@@ -570,7 +590,7 @@ export class NotificationsService implements OnModuleInit {
   // TEMPORARY FOR TESTING
   async testPushNotification(userId: number) {
     const title = 'Prueba de notificación';
-    const message = 'Firebase Cloud Messaging está funcionando.';
+    const message = 'Las notificaciones push están funcionando.';
 
     const notification = this.notificationRepo.create({
       userId,
@@ -595,7 +615,16 @@ export class NotificationsService implements OnModuleInit {
           route: '/dashboard'
         }
       });
-      return { success: true, message: `Attempted to send to ${tokens.length} devices`, details: results };
+      const expoErrors: { token: string; error: string; message: string }[] = (results.expo ?? []).flatMap((x: any) => x.errors ?? []);
+      const sendFailed = (results.expo ?? []).some((x: any) => x.error) || (results.fcm ?? []).some((x: any) => x.error);
+      const delivered = !sendFailed && expoErrors.length === 0;
+      return {
+        success: delivered,
+        message: delivered
+          ? `Notificación enviada a ${tokens.length} dispositivo(s)`
+          : `No se pudo entregar: ${expoErrors[0] ? `${expoErrors[0].error} — ${expoErrors[0].message}` : 'error al contactar el servicio de push'}`,
+        details: results,
+      };
     }
 
     return { success: false, message: 'No active devices found' };
