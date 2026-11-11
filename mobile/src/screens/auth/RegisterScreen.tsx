@@ -67,9 +67,8 @@ export const RegisterScreen: React.FC<Props> = ({ navigation, route }) => {
       const pendingReservation = route.params?.pendingReservation;
       if (pendingReservation) {
         navigation.replace('CreateReservation', pendingReservation);
-      } else {
-        navigation.navigate('MainTabs');
       }
+      // Sin reserva pendiente no se navega: al iniciar sesión el navegador cambia solo a MainTabs.
     } catch (err: any) {
       const responseData = err.response?.data;
       if (responseData?.code === 'CLIENT_EXISTS_WITHOUT_DIGITAL_ACCOUNT') {

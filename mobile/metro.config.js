@@ -3,6 +3,9 @@ const path = require('path');
 
 const config = getDefaultConfig(__dirname);
 
+// La app lee esta bandera (EXPO_PUBLIC_*) para saber si el vestidor con cámara está incluido en el bundle.
+process.env.EXPO_PUBLIC_TRYON = process.env.TRYON === '1' ? '1' : '0';
+
 // El vestidor virtual usa TensorFlow y librerías nativas que NO existen en Expo Go y hacen que Metro
 // se quede sin memoria. En modo normal (Expo Go) se reemplazan por un stub; con TRYON=1 se incluyen
 // (solo para una compilación propia con `expo run:ios` / EAS).

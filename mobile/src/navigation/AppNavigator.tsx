@@ -17,11 +17,13 @@ import { CheckoutScreen } from '../screens/store/CheckoutScreen';
 // así la app inicia normalmente aunque esa pantalla no pueda funcionar en Expo Go.
 const TryOnScreen = (props: any) => {
   let Screen: any = null;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    Screen = require('../screens/store/TryOnScreen').TryOnScreen;
-  } catch {
-    Screen = null;
+  if (process.env.EXPO_PUBLIC_TRYON === '1') {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      Screen = require('../screens/store/TryOnScreen').TryOnScreen;
+    } catch {
+      Screen = null;
+    }
   }
   if (!Screen) {
     return (
