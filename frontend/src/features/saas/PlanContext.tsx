@@ -11,6 +11,7 @@ interface TenantInfo {
   name: string;
   slug: string;
   plan: { code: PlanCode; name: string; aiGenerativeReports: boolean; maxBranches: number } | null;
+  subscription?: { status: string; billingCycle: string; endDate: string | null; daysLeft: number | null } | null;
 }
 
 interface Ctx {

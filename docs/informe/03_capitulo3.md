@@ -47,6 +47,7 @@ Se elaboraron para los casos de uso nuevos o modificados:
 | `04f_sec_tienda_web` | Personalización y visita de la tienda web. |
 | `04g_sec_reporte_ia` | Reporte en lenguaje natural sin SQL generado por la IA. |
 | `04h_sec_alerta_stock` | Alerta de stock bajo: subscriber, notificación interna y push. |
+| `04i_sec_plataforma_suscripcion` | SuperAdmin cambia el plan y suspende una empresa. |
 
 ![Secuencia: inicio de sesión](../uml/out/04a_sec_login_multitenant.png){width=95%}
 
@@ -63,6 +64,8 @@ Se elaboraron para los casos de uso nuevos o modificados:
 ![Secuencia: reporte IA](../uml/out/04g_sec_reporte_ia.png){width=95%}
 
 ![Secuencia: alerta de stock](../uml/out/04h_sec_alerta_stock.png){width=95%}
+
+![Secuencia: plataforma y suscripción](../uml/out/04i_sec_plataforma_suscripcion.png){width=95%}
 
 ## 3.4. Diagrama de clases UML
 

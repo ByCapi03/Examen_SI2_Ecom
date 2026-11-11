@@ -113,6 +113,12 @@ export class AuthService {
       throw new UnauthorizedException('Correo o contraseña incorrectos');
     }
 
+    // Empresa suspendida por el SuperAdmin: no se permite iniciar sesión
+    const [tn] = await this.dataSource.query('SELECT active FROM tenants WHERE id=$1', [user.tenantId]);
+    if (tn && tn.active === false) {
+      throw new UnauthorizedException({ message: 'Tu empresa está suspendida. Contacta al soporte de la plataforma.', code: 'TENANT_SUSPENDED' });
+    }
+
     if (!user.emailVerified && user.verificationCodeHash) {
       throw new UnauthorizedException({
         message: 'Debes verificar tu correo antes de iniciar sesión.',

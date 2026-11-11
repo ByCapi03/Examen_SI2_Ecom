@@ -1,7 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { getActivePlan } from '../../common/tenancy/plan-features';
+import { assertPlanLimit } from '../../common/tenancy/plan-features';
 import { Branch } from './branch.entity';
 import { City } from './city.entity';
 import { CreateBranchDto, UpdateBranchDto } from './branches.dto';
@@ -23,16 +23,8 @@ export class BranchesService {
     }
 
     const tenantId = createBranchDto.tenantId!;
-    // Límite de sucursales según el plan contratado
-    const plan = await getActivePlan(this.dataSource, tenantId);
-    if (plan) {
-      const current = await this.branchRepository.count({ where: { tenantId, active: true } });
-      if (current >= plan.maxBranches) {
-        throw new ForbiddenException(
-          `El plan ${plan.name} permite como máximo ${plan.maxBranches} sucursales activas.`,
-        );
-      }
-    }
+    // Límite de sucursales según el plan contratado (y vigencia de la suscripción)
+    await assertPlanLimit(this.dataSource, tenantId, 'branches');
 
     const branch = this.branchRepository.create({
       ...createBranchDto,

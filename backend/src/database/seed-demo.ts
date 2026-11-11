@@ -188,10 +188,10 @@ async function ensureGlobals(ds: DataSource): Promise<Globals> {
 
     const plans: Record<string, number> = {};
     for (const p of [
-      { code: 'BASICO', name: 'Plan Básico', priceMonthly: 0, maxBranches: 1, aiGenerativeReports: false },
-      { code: 'STARTER', name: 'Plan Starter', priceMonthly: 29, maxBranches: 3, aiGenerativeReports: false },
-      { code: 'PROFESIONAL', name: 'Plan Profesional', priceMonthly: 79, maxBranches: 10, aiGenerativeReports: true },
-      { code: 'EMPRESARIAL', name: 'Plan Empresarial', priceMonthly: 199, maxBranches: 99, aiGenerativeReports: true },
+      { code: 'BASICO', name: 'Plan Básico', priceMonthly: 0, priceYearly: 0, maxBranches: 1, maxProducts: 50, maxUsers: 3, aiGenerativeReports: false },
+      { code: 'STARTER', name: 'Plan Starter', priceMonthly: 29, priceYearly: 290, maxBranches: 3, maxProducts: 500, maxUsers: 10, aiGenerativeReports: false },
+      { code: 'PROFESIONAL', name: 'Plan Profesional', priceMonthly: 79, priceYearly: 790, maxBranches: 10, maxProducts: null, maxUsers: 50, aiGenerativeReports: true },
+      { code: 'EMPRESARIAL', name: 'Plan Empresarial', priceMonthly: 199, priceYearly: 1990, maxBranches: 99, maxProducts: null, maxUsers: null, aiGenerativeReports: true },
     ]) plans[p.code] = await findOrCreate(m, Plan, { code: p.code }, { ...p, offlineOperations: true });
 
     const cities: Record<string, number> = {};
@@ -512,7 +512,9 @@ async function seedCompany(ds: DataSource, def: CompanyDef, g: Globals, password
 
     const created = dayAt(14, 9, 0);
     const T = (await m.insert(Tenant, { slug: def.slug, name: def.name, taxId: def.taxId, active: true, createdAt: created } as any)).identifiers[0].id as number;
-    await m.insert(Subscription, { tenantId: T, planId: g.plans[def.planCode], status: 'ACTIVE', startDate: created } as any);
+    // Luna: plan anual vigente; Sol: plan mensual que vence en 20 días (para mostrar vigencias en el panel SuperAdmin)
+    const yearly = def.planCode === 'PROFESIONAL';
+    await m.insert(Subscription, { tenantId: T, planId: g.plans[def.planCode], status: 'ACTIVE', billingCycle: yearly ? 'YEARLY' : 'MONTHLY', startDate: created, endDate: addMin(new Date(), (yearly ? 300 : 20) * 1440) } as any);
     await m.insert(SubscriptionHistory, { tenantId: T, planId: g.plans[def.planCode], action: 'SUBSCRIBE', notes: 'Alta de empresa demo', changedAt: created } as any);
 
     // Sucursales

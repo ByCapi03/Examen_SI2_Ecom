@@ -5,6 +5,7 @@
 | Requisito | Caso de uso | Implementación principal | Pruebas |
 |---|---|---|---|
 | RF-01, RF-02 | CU-01, CU-02 | `tenants.service.ts` (`createTenant`, `verifyEmail`, `changePlan`) | T-SaaS, T10, T30, T33 |
+| RF-26, RF-27 | CU-28, CU-29 | `tenants.service.ts` (`adminOverview`, `adminTenants`, `adminSetActive`, `adminChangePlan`, `adminExtend`), `plan-features.ts` (`assertPlanLimit`), `PlatformPage.tsx`, `SubscriptionPage.tsx` | S01–S31 (+S24b) |
 | RF-03 | CU-03 | `auth.service.ts` (`login`, `activateAccount`, `changePassword`) | TC-01, P06 |
 | RF-04 | CU-05 | `branches.service.ts` (límite `maxBranches`) | T10 |
 | RF-05 | CU-06 | `access.service.ts`, `UsersPage.tsx` | TC-18 |
@@ -77,4 +78,6 @@ cd backend && npm install && npm run seed:demo && npm run build && npm run start
 npx jest                       # 24 pruebas unitarias
 npm run test:e2e:saas          # 34 pruebas E2E
 npm run test:e2e:tienda        # 22 pruebas E2E
+npm run test:e2e:notif         # 11 pruebas E2E
+SUPERADMIN_EMAIL=... SUPERADMIN_PASSWORD=... npm run test:e2e:planes   # 32 pruebas E2E (el backend debe tener las mismas variables)
 ```

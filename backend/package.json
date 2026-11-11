@@ -25,7 +25,8 @@
     "migrate:multitenant": "node scripts/migrate-multitenant.js",
     "test:e2e:saas": "node scripts/test-saas-e2e.js",
     "test:e2e:tienda": "node scripts/test-tienda-publica.js",
-    "test:e2e:notif": "node scripts/test-notificaciones.js"
+    "test:e2e:notif": "node scripts/test-notificaciones.js",
+    "test:e2e:planes": "node scripts/test-planes-superadmin.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",

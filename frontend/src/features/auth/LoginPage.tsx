@@ -43,10 +43,10 @@ export const LoginPage = () => {
   const [verifyInfo, setVerifyInfo] = useState<string | null>(null);
 
   // El cajero no tiene dashboard: entra directo a su caja.
-  const staffHome = (roles: string[]) => (roles.includes('ADMIN') || roles.includes('ENCARGADO') ? '/dashboard' : '/dashboard/pos');
+  const staffHome = (roles: string[]) => (roles.includes('SUPERADMIN') ? '/dashboard/platform' : roles.includes('ADMIN') || roles.includes('ENCARGADO') ? '/dashboard' : '/dashboard/pos');
 
   const goAfterLogin = (user: any) => {
-    if (['ADMIN','ENCARGADO','CAJERO'].some(r => user.roles.includes(r))) navigate(staffHome(user.roles), { replace:true });
+    if (['SUPERADMIN','ADMIN','ENCARGADO','CAJERO'].some(r => user.roles.includes(r))) navigate(staffHome(user.roles), { replace:true });
     else navigate('/account', { replace:true });
   };
 
@@ -79,7 +79,7 @@ export const LoginPage = () => {
       const { data } = await api.post('/auth/login', { email, password });
       login(data.accessToken, data.user);
       if (data.user.mustChangePassword) { navigate('/change-password', { replace:true }); return; }
-      if (['ADMIN','ENCARGADO','CAJERO'].some(r => data.user.roles.includes(r))) {
+      if (['SUPERADMIN','ADMIN','ENCARGADO','CAJERO'].some(r => data.user.roles.includes(r))) {
         navigate(staffHome(data.user.roles), { replace:true });
       } else {
         const pr = sessionStorage.getItem('pendingReservation');

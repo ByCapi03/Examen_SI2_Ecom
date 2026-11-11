@@ -5,6 +5,7 @@ import { DashboardSidebar } from './DashboardSidebar';
 import { DashboardHeader } from './DashboardHeader';
 import '../styles/dashboard.css';
 import { ErrorBoundary } from '../components/common/ErrorBoundary';
+import { SubscriptionBanner } from '../components/common/SubscriptionBanner';
 import { OfflineStatusBar } from '../components/common/OfflineStatusBar';
 
 export const DashboardLayout = () => {
@@ -41,6 +42,7 @@ export const DashboardLayout = () => {
         </div>
         <DashboardHeader />
         <main className="dashboard-main" style={{ padding: '0 32px 32px 32px' }}>
+          <SubscriptionBanner />
           <ErrorBoundary key={pathname}>
             <Outlet />
           </ErrorBoundary>

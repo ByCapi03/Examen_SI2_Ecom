@@ -38,7 +38,7 @@ gestionar su operación comercial y publicar su catálogo en línea para sus cli
 1. Modelar el sistema con ICONIX (requisitos, casos de uso, robustez, secuencia y clases) manteniendo los
    modelos coherentes con el código (RNF12).
 2. Implementar el aislamiento multitenant en tres capas: API, ORM y base de datos.
-3. Ofrecer planes de suscripción que habiliten o limiten funciones (sucursales, IA, operación offline).
+3. Ofrecer planes de suscripción mensuales o anuales, con límites (sucursales, productos, usuarios) y funciones (IA, ML, reportes) según el plan, y un panel de plataforma para administrarlas.
 4. Implementar el flujo operativo de la tienda: sucursales, personal con roles, catálogo, inventario, cajas,
    sesiones de caja, POS y reservas.
 5. Permitir operar sin conexión (ventas en efectivo y reservas) con sincronización idempotente y gestión de conflictos.

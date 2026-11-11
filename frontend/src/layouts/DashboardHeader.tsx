@@ -77,6 +77,7 @@ export const DashboardHeader = () => {
 
   const getDisplayRole = () => {
     if (!user) return 'PERSONAL';
+    if (user.roles?.includes('SUPERADMIN')) return 'SUPERADMIN';
     if (user.roles?.includes('ADMIN')) return 'ADMINISTRADOR';
     if (user.roles?.includes('ENCARGADO')) return `ENCARGADO${branchName ? ` · ${branchName}` : ''}`.toUpperCase();
     if (user.roles?.includes('CAJERO')) return `CAJERO${branchName ? ` · ${branchName}` : ''}`.toUpperCase();

@@ -21,8 +21,13 @@ export class Subscription {
   @JoinColumn({ name: 'plan_id' })
   plan: Plan;
 
+  /** ACTIVE | EXPIRED | SUSPENDED */
   @Column({ default: 'ACTIVE' })
   status: string;
+
+  /** MONTHLY (1 mes) | YEARLY (1 año, con precio anual del plan). */
+  @Column({ name: 'billing_cycle', default: 'MONTHLY' })
+  billingCycle: string;
 
   @Column({ type: 'timestamp', name: 'start_date' })
   startDate: Date;

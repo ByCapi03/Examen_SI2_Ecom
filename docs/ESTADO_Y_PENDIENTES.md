@@ -18,7 +18,18 @@ Leyenda: ✅ implementado y probado · 🟡 implementado, con prueba parcial o c
 | 8 | ML supervisado y no supervisado | ✅ | Regresión lineal (demanda) y K-Means RFM; T31–T33; Jest `ml.spec` | Faltan métricas de calidad del modelo para la defensa (ver sugerencias) |
 | 9 | Documentación ICONIX | 🟡 | `docs/uml`, `docs/informe` (Cap. I–VI), verificador RNF12 | Falta renderizar los diagramas y regenerar el informe; revisar fecha y bibliografía |
 
-## 2. Qué falta IMPLEMENTAR
+## 1.b Actualización (11/11/2026): SuperAdmin y planes
+
+| Tema | Estado |
+|---|---|
+| Panel y usuario SuperAdmin (empresas, plan, vigencia, MRR/ARR, suspender, extender) | ✅ 32 pruebas E2E (`npm run test:e2e:planes`) |
+| Planes con precio mensual y anual (10 meses) y vigencia por ciclo | ✅ |
+| Límites por plan: sucursales, productos, usuarios internos | ✅ aplicados en backend, visibles en precios y *Mi suscripción* |
+| Vencimiento: bloquea altas y funciones del plan; la sincronización offline sigue aceptándose | ✅ |
+| Suspensión de empresas (login, sesiones activas y tienda pública) | ✅ |
+| Cobro real del plan (pasarela, facturas, recordatorios por correo) | ❌ el cambio de plan es simulado |
+
+## 2. Qué falta IMPLEMENTAR (lista previa; los puntos 1 y 2 ya se resolvieron)
 
 1. **Panel y usuario SuperAdmin.** El endpoint `GET /saas/tenants` existe, pero no hay usuario SuperAdmin sembrado ni pantalla. Es lo que haría quien vende el SaaS: ver empresas, plan y estado, y suspender.
 2. **Límites del plan además de sucursales.** Solo se aplica `maxBranches`. La página de precios menciona límites (p. ej. productos del plan Básico) que el backend no aplica.

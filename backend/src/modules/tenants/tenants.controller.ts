@@ -30,8 +30,40 @@ export class TenantsController {
   @Patch('tenants/me/plan')
   @UseGuards(AuthGuard, TenantGuard, RolesGuard)
   @Roles('ADMIN')
-  changePlan(@CurrentTenant() tenantId: number, @Body() body: { planCode: string }) {
-    return this.tenantsService.changePlan(tenantId, body.planCode);
+  changePlan(@CurrentTenant() tenantId: number, @Body() body: { planCode: string; billingCycle?: string }) {
+    return this.tenantsService.changePlan(tenantId, body.planCode, body.billingCycle);
+  }
+
+  // ───── Panel de plataforma (solo SUPERADMIN) ─────
+  @Get('admin/overview')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('SUPERADMIN')
+  adminOverview() { return this.tenantsService.adminOverview(); }
+
+  @Get('admin/tenants')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('SUPERADMIN')
+  adminTenants() { return this.tenantsService.adminTenants(); }
+
+  @Patch('admin/tenants/:id/active')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('SUPERADMIN')
+  adminSetActive(@Param('id') id: string, @Body() body: { active: boolean }) {
+    return this.tenantsService.adminSetActive(+id, !!body.active);
+  }
+
+  @Patch('admin/tenants/:id/plan')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('SUPERADMIN')
+  adminChangePlan(@Param('id') id: string, @Body() body: { planCode: string; billingCycle?: string }) {
+    return this.tenantsService.adminChangePlan(+id, body.planCode, body.billingCycle);
+  }
+
+  @Patch('admin/tenants/:id/extend')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('SUPERADMIN')
+  adminExtend(@Param('id') id: string, @Body() body: { days: number }) {
+    return this.tenantsService.adminExtend(+id, body.days);
   }
 
   /** El ADMIN personaliza la web pública de su empresa. */
@@ -64,7 +96,7 @@ export class TenantsController {
   @Post('tenants/register')
   @Public()
   createTenant(@Body() body: {
-    name: string; slug: string; taxId?: string; planCode?: string;
+    name: string; slug: string; taxId?: string; planCode?: string; billingCycle?: string;
     adminName?: string; adminEmail?: string; adminPassword?: string;
   }) {
     return this.tenantsService.createTenant(body);

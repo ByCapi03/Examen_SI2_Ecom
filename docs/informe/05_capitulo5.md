@@ -11,6 +11,7 @@ la seguridad por rol y por plan, la sincronización offline y el comportamiento 
 | Integración / sistema (API + BD reales) | `npm run test:e2e:saas` | Aislamiento, offline, conflictos, IA, ML, planes |
 | Integración / sistema (tienda) | `npm run test:e2e:tienda` | Tienda pública, registro por empresa, Mi tienda web |
 | Notificaciones | `npm run test:e2e:notif` | Alerta de stock bajo (11 pruebas) |
+| Planes y SuperAdmin | `npm run test:e2e:planes` | Ciclos, límites, vigencia, suspensión (32 pruebas) |
 | Interfaz | Playwright (verificación manual asistida) | Landing, tienda por empresa, panel, vestidor |
 | Coherencia documental | `python3 docs/uml/scripts/verificar_coherencia.py` | RNF-12: diagramas vs. código |
 
@@ -51,6 +52,7 @@ Defectos detectados y corregidos durante esta fase:
 | E2E SaaS | **34 / 34 aprobadas** |
 | E2E tienda pública | **22 / 22 aprobadas** |
 | E2E notificaciones (stock bajo) | **11 / 11 aprobadas** |
+| E2E planes y SuperAdmin | **32 / 32 aprobadas** |
 | `tsc` backend, frontend y móvil | Sin errores |
 | Coherencia documental | Todos los diagramas coherentes con el código |
 
@@ -77,6 +79,12 @@ Defectos detectados y corregidos durante esta fase:
 | TC-15 | Tienda web | CU-10 | Cliente intenta `PATCH /saas/tenants/me/store`. | 403 (P21). |
 | TC-16 | Móvil | CU-22 | Abrir la app sin sesión. | Solo Login, Registro y Activar cuenta. |
 | TC-17 | Vestidor | CU-23 | Prenda con márgenes transparentes y rodillas fuera de cámara. | La prenda se ajusta a caderas con proporción real. |
+| TC-19 | Planes | CU-06/07 | Plan Básico: crear la 2.ª sucursal, el producto 51 o el 4.º usuario interno. | 403 con el límite del plan (S13, S14, S16). |
+| TC-20 | Planes | CU-29 | Contratar Starter anual. | Vence en ~1 año; el historial guarda ciclo y precio (S17, S18, S22). |
+| TC-21 | Planes | CU-29 | Bajar a Básico usando más de lo permitido. | 409 sin cambios (S20). |
+| TC-22 | Planes | CU-28 | Suscripción pasada de fecha. | Estado EXPIRED y 402 al crear recursos (S23, S24). |
+| TC-23 | SuperAdmin | CU-28 | ADMIN de empresa llama a `/saas/admin/overview`. | 403 (S06). |
+| TC-24 | SuperAdmin | CU-28 | Suspender una empresa. | No inicia sesión, su sesión previa recibe 403 y su tienda 404 (S27–S29). |
 | TC-18 | Auditoría | CU-11 | Crear un usuario desde el panel. | Registro en bitácora con usuario, IP y ruta. |
 
 *Los casos TC-01 a TC-15 están respaldados por pruebas automáticas o por la verificación de reglas del servidor citadas entre paréntesis. TC-16 (móvil) y TC-17 (vestidor) se verificaron solo por compilación y revisión de código; requieren validación en dispositivo y con cámara. TC-18 se verificó manualmente con la bitácora de datos demo.*

@@ -18,7 +18,7 @@ prenda en el vestidor virtual, la reserva o la compra y paga en línea o en sucu
 
 | Actor | Tipo | Responsabilidad |
 |---|---|---|
-| SuperAdmin | Humano (plataforma) | Consulta y administra todas las empresas del SaaS. |
+| SuperAdmin | Humano (plataforma) | Dueño del SaaS: panel de empresas, planes, vigencias, ingresos y suspensiones. Se crea con `SUPERADMIN_EMAIL` / `SUPERADMIN_PASSWORD`; nunca con una contraseña por defecto. |
 | Administrador | Humano (empresa) | Dueño: sucursales, personal, catálogo, plan, tienda web, reportes, auditoría. Administra cajas y sesiones desde su panel. |
 | Encargado | Humano (sucursal) | Gestiona su sucursal: inventario, cajas, ventas, reservas, conflictos, reportes de su sucursal. |
 | Cajero | Humano (sucursal) | Abre/cierra su sesión de caja, vende en POS, entrega reservas. |
@@ -58,6 +58,8 @@ prenda en el vestidor virtual, la reserva o la compra y paga en línea o en sucu
 | RF-22 | Bitácora de auditoría filtrable y exportable. | audit |
 | RF-23 | Configuración de apariencia: tema, idioma, moneda, sidebar compacto. | frontend |
 | RF-24 | Notificaciones internas y push: reservas (encargado/cliente) y **alerta de stock bajo** (encargado de la sucursal y administrador). | notifications |
+| RF-26 | **Panel de plataforma (SuperAdmin):** ver empresas, plan, ciclo, vigencia y consumo; ingresos recurrentes (MRR/ARR); cambiar plan o ciclo, extender vigencia y suspender o reactivar empresas. | tenants |
+| RF-27 | **Suscripción por ciclo:** cada plan de pago tiene precio mensual y anual (10 meses); la suscripción vence al terminar el período y el administrador la renueva o cambia desde *Mi suscripción*. | tenants |
 | RF-25 | Generar datos demostrativos (2 empresas, personal, cajas, ventas, bitácora). | scripts |
 
 ### Requisitos no funcionales
@@ -84,7 +86,11 @@ prenda en el vestidor virtual, la reserva o la compra y paga en línea o en sucu
 | RN-01 | Toda entidad operativa pertenece a una sola empresa; ninguna consulta puede cruzar empresas. |
 | RN-02 | Un correo electrónico solo puede pertenecer a una empresa. |
 | RN-03 | El número de sucursales activas no puede superar el máximo del plan. |
-| RN-04 | Plan Básico ($0): 1 sucursal, sin reportes. Starter ($29): 3 sucursales y reportes básicos. Profesional ($79): 10 sucursales, reportes con IA y analítica ML. Empresarial ($199): ilimitadas. |
+| RN-04 | Límites por plan (sucursales / productos / usuarios internos) y precio mensual / anual: **Básico** $0 — 1 / 50 / 3, sin reportes · **Starter** $29 / $290 — 3 / 500 / 10, reportes básicos · **Profesional** $79 / $790 — 10 / ilimitado / 50, reportes IA y analítica ML · **Empresarial** $199 / $1990 — ilimitado en todo. |
+| RN-17 | El plan anual cuesta 10 meses (2 meses gratis). Cada contratación o renovación reinicia el período (+1 mes o +1 año); el plan Básico no vence. |
+| RN-18 | Con la suscripción **vencida** no se pueden crear sucursales, productos ni usuarios y se pierden las funciones del plan (IA, ML, reportes). |
+| RN-19 | No se puede bajar a un plan cuyos límites la empresa ya excede (se pide reducir el uso primero). |
+| RN-20 | Solo el SuperAdmin suspende empresas: su personal no puede iniciar sesión, sus sesiones activas se rechazan y su tienda pública deja de mostrarse. |
 | RN-05 | Encargado y Cajero deben estar asignados a una sucursal. |
 | RN-06 | El administrador **no entra a una sucursal como espacio de trabajo aparte**: administra todo desde su propio panel lateral; el encargado tiene un panel equivalente, adaptado y limitado a su sucursal. |
 | RN-07 | Primero se **crea** una caja (única por sucursal y nombre); después un cajero **abre una sesión** sobre ella. |
@@ -162,6 +168,18 @@ verifica si su UUID ya fue aplicado; si es nueva, la ejecuta en una transacción
 
 *Curso básico:* 1) Abre «Mi tienda web». 2) Edita frase, título, descripción, logo (URL https), color de acento, WhatsApp, Instagram y qué secciones mostrar. 3) Guarda; el sistema sanea los valores.
 4) Revisa la vista previa. 5) Copia o comparte el enlace por WhatsApp/menú del dispositivo. *Alternos:* 2a) Desactiva «Tienda publicada» → el enlace muestra «no disponible».
+
+### CU-28 Administrar empresas y suscripciones
+**Actor:** SuperAdmin.
+
+*Curso básico:* 1) Abre **Plataforma**. 2) Ve empresas, plan, ciclo, vigencia, estado y consumo, más MRR/ARR. 3) Pulsa **Gestionar** en una empresa. 4) Cambia plan y ciclo (mensual/anual), extiende días de cortesía o suspende/reactiva. 5) El sistema registra el cambio en el historial.
+
+*Alternos:* 4a) La empresa excede los límites del plan destino → 409. 4b) Suspender → el personal de esa empresa pierde acceso.
+
+### CU-29 Gestionar mi suscripción
+**Actor:** Administrador.
+
+*Curso básico:* 1) Abre **Mi suscripción**. 2) Ve plan, vigencia y consumo frente a los límites. 3) Elige ciclo y plan (o **Renovar**). 4) El sistema reinicia el período y muestra la nueva fecha de vencimiento. *Alternos:* 3a) Excede los límites del plan elegido → 409. 3b) Suscripción vencida → aviso permanente y bloqueo de altas hasta renovar.
 
 ### CU-23 Probar prenda en el vestidor virtual
 **Actor:** Cliente. **Precondición:** el producto tiene realidad aumentada habilitada.

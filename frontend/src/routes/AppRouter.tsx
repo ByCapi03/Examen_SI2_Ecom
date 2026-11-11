@@ -51,6 +51,8 @@ import { SyncConflictsPage } from '../features/sync/SyncConflictsPage';
 import { AiReportsPage } from '../features/ai-reports/AiReportsPage';
 import { AnalyticsPage } from '../features/analytics/AnalyticsPage';
 import { PricingPage } from '../features/saas/PricingPage';
+import { PlatformPage } from '../features/platform/PlatformPage';
+import { SubscriptionPage } from '../features/platform/SubscriptionPage';
 import { LandingPage } from '../features/landing/LandingPage';
 import { TenantRegisterPage } from '../features/saas/TenantRegisterPage';
 
@@ -58,6 +60,7 @@ import { TenantRegisterPage } from '../features/saas/TenantRegisterPage';
 const DashboardIndex = () => {
   const { user } = useAuth();
   const cashierOnly = !!user?.roles?.includes('CAJERO') && !user.roles.includes('ADMIN') && !user.roles.includes('ENCARGADO');
+  if (user?.roles?.includes('SUPERADMIN')) return <Navigate to="/dashboard/platform" replace />;
   return cashierOnly ? <Navigate to="/dashboard/pos" replace /> : <DashboardPage />;
 };
 
@@ -118,7 +121,8 @@ export const AppRouter = () => {
               allowedRoles={[
                 ROL.ADMIN,
                 ROL.ENCARGADO,
-                ROL.CAJERO
+                ROL.CAJERO,
+                ROL.SUPERADMIN
               ]}
             />
           }
@@ -141,6 +145,8 @@ export const AppRouter = () => {
             <Route path="sync-conflicts" element={<SyncConflictsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="store" element={<StoreBuilderPage />} />
+            <Route path="platform" element={<PlatformPage />} />
+            <Route path="subscription" element={<SubscriptionPage />} />
             <Route path="audit" element={<AuditPage />} />
           </Route>
         </Route>

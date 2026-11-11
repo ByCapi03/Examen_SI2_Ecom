@@ -19,6 +19,8 @@ rectangle "DRESSED" {
     usecase "CU-02 Gestionar plan de suscripción" as CU02
     usecase "CU-03 Iniciar sesión / cambiar contraseña" as CU03
     usecase "CU-04 Presentar la plataforma\n(landing y planes)" as CU04
+    usecase "CU-28 Administrar empresas y suscripciones\n(plan, ciclo, vigencia, suspensión)" as CU28
+    usecase "CU-29 Gestionar mi suscripción\n(cambiar de plan, mensual / anual)" as CU29
   }
   package "Administración de la empresa" {
     usecase "CU-05 Administrar sucursales" as CU05
@@ -55,6 +57,8 @@ rectangle "DRESSED" {
 
 SA --> CU01
 SA --> CU02
+SA --> CU28
+AD --> CU29
 AD --> CU01
 AD --> CU02
 AD --> CU05

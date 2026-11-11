@@ -1,13 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../../api/axios';
+import { money, limitText, yearlySaving } from '../platform/planUtils';
+import type { Cycle } from '../platform/planUtils';
 
 interface Plan {
   id: number;
   code: string;
   name: string;
   priceMonthly: number;
+  priceYearly: number;
   maxBranches: number;
+  maxProducts: number | null;
+  maxUsers: number | null;
   aiGenerativeReports: boolean;
   offlineOperations: boolean;
 }
@@ -43,16 +48,17 @@ const Check = () => (
 );
 
 const STATIC_PLANS: Plan[] = [
-  { id: 1, code: 'BASICO', name: 'Plan Básico', priceMonthly: 0, maxBranches: 1, aiGenerativeReports: false, offlineOperations: true },
-  { id: 2, code: 'STARTER', name: 'Plan Starter', priceMonthly: 29, maxBranches: 3, aiGenerativeReports: false, offlineOperations: true },
-  { id: 3, code: 'PROFESIONAL', name: 'Plan Profesional', priceMonthly: 79, maxBranches: 10, aiGenerativeReports: true, offlineOperations: true },
-  { id: 4, code: 'EMPRESARIAL', name: 'Plan Empresarial', priceMonthly: 199, maxBranches: 99, aiGenerativeReports: true, offlineOperations: true },
+  { id: 1, code: 'BASICO', name: 'Plan Básico', priceMonthly: 0, priceYearly: 0, maxBranches: 1, maxProducts: 50, maxUsers: 3, aiGenerativeReports: false, offlineOperations: true },
+  { id: 2, code: 'STARTER', name: 'Plan Starter', priceMonthly: 29, priceYearly: 290, maxBranches: 3, maxProducts: 500, maxUsers: 10, aiGenerativeReports: false, offlineOperations: true },
+  { id: 3, code: 'PROFESIONAL', name: 'Plan Profesional', priceMonthly: 79, priceYearly: 790, maxBranches: 10, maxProducts: null, maxUsers: 50, aiGenerativeReports: true, offlineOperations: true },
+  { id: 4, code: 'EMPRESARIAL', name: 'Plan Empresarial', priceMonthly: 199, priceYearly: 1990, maxBranches: 99, maxProducts: null, maxUsers: null, aiGenerativeReports: true, offlineOperations: true },
 ];
 
 export const PricingPage = () => {
   const navigate = useNavigate();
   const [plans, setPlans] = useState<Plan[]>(STATIC_PLANS);
   const [loading, setLoading] = useState(false);
+  const [cycle, setCycle] = useState<Cycle>('MONTHLY');
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -103,8 +109,17 @@ export const PricingPage = () => {
           Elige el plan perfecto<br />para tu negocio
         </h1>
         <p style={{ color: '#94a3a0', fontSize: '1.05rem', margin: 0 }}>
-          Comienza gratis. Escala cuando lo necesites. Sin permanencia mínima.
+          Comienza gratis. Escala cuando lo necesites. Paga cada mes o ahorra con el plan anual.
         </p>
+        <div style={{ display: 'inline-flex', marginTop: 26, padding: 4, borderRadius: 999, background: 'rgba(255,255,255,0.1)' }}>
+          {(['MONTHLY', 'YEARLY'] as Cycle[]).map((c) => (
+            <button key={c} onClick={() => setCycle(c)} style={{
+              border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: '0.86rem',
+              padding: '9px 22px', borderRadius: 999,
+              background: cycle === c ? 'var(--atemporal-gold, #C9904A)' : 'transparent', color: '#fff',
+            }}>{c === 'MONTHLY' ? 'Mensual' : 'Anual · 2 meses gratis'}</button>
+          ))}
+        </div>
       </div>
 
       {/* Cards */}
@@ -171,22 +186,28 @@ export const PricingPage = () => {
 
                   {/* Price */}
                   <div style={{ margin: '20px 0 24px' }}>
-                    {plan.priceMonthly === 0 ? (
+                    {Number(plan.priceMonthly) === 0 ? (
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
                         <span style={{ fontSize: '2.6rem', fontWeight: 900, lineHeight: 1 }}>Gratis</span>
                       </div>
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
                         <span style={{ fontSize: '1rem', opacity: 0.6, alignSelf: 'flex-start', marginTop: 6 }}>$</span>
-                        <span style={{ fontSize: '2.8rem', fontWeight: 900, lineHeight: 1 }}>{plan.priceMonthly}</span>
-                        <span style={{ fontSize: '0.85rem', opacity: 0.6 }}>/mes</span>
+                        <span style={{ fontSize: '2.8rem', fontWeight: 900, lineHeight: 1 }}>{cycle === 'YEARLY' ? plan.priceYearly : plan.priceMonthly}</span>
+                        <span style={{ fontSize: '0.85rem', opacity: 0.6 }}>{cycle === 'YEARLY' ? '/año' : '/mes'}</span>
                       </div>
                     )}
                   </div>
 
+                  {Number(plan.priceMonthly) !== 0 && cycle === 'YEARLY' && (
+                    <div style={{ margin: '-14px 0 16px', fontSize: '0.78rem', color: meta.accent ? 'var(--atemporal-gold, #C9904A)' : '#15803D', fontWeight: 600 }}>
+                      Ahorras {money(yearlySaving(plan))} al año ({money(Number(plan.priceYearly) / 12)}/mes)
+                    </div>
+                  )}
+
                   {/* Features */}
                   <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 28px', flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {meta.features.map(f => (
+                    {[limitText(plan.maxBranches, 'sucursales'), limitText(plan.maxProducts, 'productos'), limitText(plan.maxUsers, 'usuarios internos'), ...meta.features.filter((f) => !/sucursal|producto/i.test(f))].map(f => (
                       <li key={f} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.85rem' }}>
                         <span style={{ color: meta.accent ? 'var(--atemporal-gold, #C9904A)' : '#22c55e' }}>
                           <Check />
@@ -197,7 +218,7 @@ export const PricingPage = () => {
                   </ul>
 
                   <button
-                    onClick={() => navigate('/saas/register', { state: { plan } })}
+                    onClick={() => navigate('/saas/register', { state: { plan, cycle } })}
                     style={{
                       width: '100%',
                       padding: '13px 0',
@@ -216,7 +237,7 @@ export const PricingPage = () => {
                     onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.88'; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; }}
                   >
-                    {plan.priceMonthly === 0 ? 'Comenzar gratis' : `Contratar — $${plan.priceMonthly}/mes`}
+                    {Number(plan.priceMonthly) === 0 ? 'Comenzar gratis' : `Contratar — $${cycle === 'YEARLY' ? plan.priceYearly : plan.priceMonthly}${cycle === 'YEARLY' ? '/año' : '/mes'}`}
                   </button>
                 </div>
               );
