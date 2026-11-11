@@ -254,6 +254,8 @@ Más detalles en [`docs/README.md`](docs/README.md).
 
 Guía completa, gratis y paso a paso (Neon + Render, con HTTPS y PWA offline sin túneles): [`docs/DESPLIEGUE.md`](docs/DESPLIEGUE.md). El archivo `render.yaml` describe la API y la web.
 
+En AWS (consola: App Runner para la API y Amplify para la web): [`docs/DESPLIEGUE_AWS.md`](docs/DESPLIEGUE_AWS.md).
+
 ---
 
 ## 10. Mapa del repositorio

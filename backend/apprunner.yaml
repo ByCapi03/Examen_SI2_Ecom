@@ -1,0 +1,15 @@
+# AWS App Runner (despliegue desde GitHub). En la consola, "Source directory" = backend
+# Las variables de entorno (DATABASE_URL, JWT_SECRET, etc.) se escriben en la consola, no aquí.
+version: 1.0
+runtime: nodejs22
+build:
+  commands:
+    pre-build:
+      - npm ci --include=dev
+    build:
+      - npm run build
+run:
+  runtime-version: latest
+  command: node dist/main
+  network:
+    port: 3000
