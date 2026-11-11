@@ -20,6 +20,16 @@ export const StoreShell = ({ children }: { children?: React.ReactNode }) => {
 
   if (status === 'loading') return <Centered><p style={{ margin: 0, color: '#6b7280' }}>Cargando tienda…</p></Centered>;
 
+  if (status === 'offline') {
+    return (
+      <Centered>
+        <h2 style={{ margin: '0 0 8px', color: '#182D2A' }}>Sin conexión</h2>
+        <p style={{ margin: '0 0 22px', color: '#6b7280', lineHeight: 1.5 }}>No pudimos cargar la tienda y aún no está guardada en este dispositivo. Conéctate una vez para usarla sin conexión.</p>
+        <button onClick={() => window.location.reload()} style={{ ...linkBtn, border: 'none', cursor: 'pointer' }}>Reintentar</button>
+      </Centered>
+    );
+  }
+
   if (status === 'notfound') {
     return (
       <Centered>

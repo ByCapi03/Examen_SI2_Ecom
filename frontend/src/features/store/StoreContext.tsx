@@ -19,7 +19,7 @@ export interface StoreInfo { name: string; slug: string; branches: StoreBranch[]
 interface Ctx {
   slug: string;
   store: StoreInfo | null;
-  status: 'loading' | 'ready' | 'notfound';
+  status: 'loading' | 'ready' | 'notfound' | 'offline';
   /** Empresa de la sesión iniciada (si no coincide con la tienda de la URL, la API devolvería datos de otra). */
   sessionStore: { slug: string; name: string } | null;
   mismatch: boolean;
@@ -59,8 +59,19 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     let stale = false;
     setStatus('loading');
     api.get(`/saas/tenants/by-slug/${encodeURIComponent(slug)}`)
-      .then((r) => { if (!stale) { setStore(r.data); setStatus('ready'); } })
-      .catch(() => { if (!stale) { setStore(null); setStatus('notfound'); } });
+      .then((r) => {
+        if (stale) return;
+        setStore(r.data); setStatus('ready');
+        try { localStorage.setItem(`store_info:${slug}`, JSON.stringify(r.data)); } catch { /* sin almacenamiento */ }
+      })
+      .catch((err) => {
+        if (stale) return;
+        // 404 = la tienda no existe. Sin respuesta (offline / red caída) = usar la última copia guardada.
+        if (err?.response?.status === 404) { setStore(null); setStatus('notfound'); return; }
+        let cached: StoreInfo | null = null;
+        try { cached = JSON.parse(localStorage.getItem(`store_info:${slug}`) || 'null'); } catch { /* ignorar */ }
+        if (cached) { setStore(cached); setStatus('ready'); } else { setStore(null); setStatus('offline'); }
+      });
     return () => { stale = true; };
   }, [slug, sessionLoaded]);
 

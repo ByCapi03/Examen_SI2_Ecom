@@ -17,8 +17,8 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
       manifest: {
-        name: 'FASHIONSTORE',
-        short_name: 'FashionStore',
+        name: 'DRESSED',
+        short_name: 'DRESSED',
         description: 'Boutique y Tienda de Ropa Online con Vestidor Virtual',
         theme_color: '#000000',
         background_color: '#ffffff',
