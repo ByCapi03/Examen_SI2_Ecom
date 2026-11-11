@@ -1,3 +1,4 @@
+import { jwtSecret } from '../../common/config/jwt-secret';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
@@ -22,7 +23,7 @@ import { AuthGuard } from '../../common/guards/auth.guard';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET') || 'defaultSecret',
+        secret: jwtSecret(),
         signOptions: {
           expiresIn: configService.get<string>('JWT_EXPIRES_IN', '8h') as any,
         },

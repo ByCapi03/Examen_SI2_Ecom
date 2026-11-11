@@ -35,11 +35,17 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
-        host: configService.get<string>('DB_HOST'),
-        port: configService.get<number>('DB_PORT'),
-        username: configService.get<string>('DB_USERNAME'),
-        password: configService.get<string>('DB_PASSWORD'),
-        database: configService.get<string>('DB_DATABASE'),
+        // En la nube (Neon, Supabase, Render…) basta con DATABASE_URL; en local se usan DB_HOST, DB_PORT, etc.
+        ...(configService.get<string>('DATABASE_URL')
+          ? { url: configService.get<string>('DATABASE_URL') }
+          : {
+              host: configService.get<string>('DB_HOST'),
+              port: configService.get<number>('DB_PORT'),
+              username: configService.get<string>('DB_USERNAME'),
+              password: configService.get<string>('DB_PASSWORD'),
+              database: configService.get<string>('DB_DATABASE'),
+            }),
+        ssl: configService.get<string>('DB_SSL') === 'true' ? { rejectUnauthorized: false } : false,
         autoLoadEntities: true,
         subscribers: [TenantSubscriber, StockAlertSubscriber],
         // SOLO DESARROLLO. En producción utilizar migrations (DB_SYNCHRONIZE=false).

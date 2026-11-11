@@ -7,6 +7,7 @@
 import { getEffectiveTenantId } from '../../common/tenancy/tenant-context';
 import { Injectable, UnauthorizedException, BadRequestException, NotFoundException, ConflictException, ForbiddenException, Logger, OnModuleInit } from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
+import { jwtSecret } from '../../common/config/jwt-secret';
 import * as qrcode from 'qrcode';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, ILike, Or } from 'typeorm';
@@ -273,7 +274,7 @@ export class PosService implements OnModuleInit {
 
       let qr: any = undefined;
       if (isQr) {
-        const token = jwt.sign({ paymentId: savedPayment.id }, process.env.JWT_SECRET || 'secret', { expiresIn: `${POS_QR_TTL_MIN}m` } as any);
+        const token = jwt.sign({ paymentId: savedPayment.id }, jwtSecret(), { expiresIn: `${POS_QR_TTL_MIN}m` } as any);
         const base = process.env.QR_PUBLIC_WEB_URL || process.env.FRONTEND_URL || 'http://localhost:5173';
         const confirmationUrl = `${base}/qr-payment/${token}`;
         qr = { paymentId: savedPayment.id, confirmationUrl, qrImage: await qrcode.toDataURL(confirmationUrl, { margin: 1, width: 320 }), expiresAt: savedPayment.expiresAt, reference: savedPayment.transactionReference };

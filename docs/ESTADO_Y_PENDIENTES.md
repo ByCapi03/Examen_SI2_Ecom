@@ -42,7 +42,7 @@ Leyenda: ✅ implementado y probado · 🟡 implementado, con prueba parcial o c
 | Generador de datos sintéticos marcado (`npm run seed:synthetic`, `--clean` para borrarlo) | ✅ verificado; con k=6 el K-Means recupera los 6 comportamientos generados |
 | Caja POS offline en la app móvil (rol CAJERO): migración SQLite v3, sucursal/existencias/clientes mínimos, ventas y detalle locales, descuento de existencias, estado derivado de la cola | 🟡 lógica y SQLite verificados contra SQLite real (`mobile/scripts`), contrato con el backend en E2E T59–T63; **la pantalla no se ejecutó en dispositivo/emulador** |
 
-Límite a declarar: en datos sintéticos el modelo supervisado (regresión lineal) mejora ≈10 % al baseline ingenuo; no se presenta como un modelo potente.
+Límite a declarar: el modelo supervisado es una regresión lineal. En datos sintéticos mejora ≈10 % al baseline ingenuo (repetir el promedio reciente) y en los datos demo con estacionalidad semanal **no lo supera** (error 16,6 contra 9,7); el panel lo muestra tal cual. Sería el siguiente paso mejorarlo (estacionalidad, promedio móvil).
 
 ## 2. Qué falta IMPLEMENTAR (lista previa; los puntos 1 y 2 ya se resolvieron)
 
@@ -81,7 +81,7 @@ Límite a declarar: en datos sintéticos el modelo supervisado (regresión linea
 ## 5. Sugerencias dentro de los parámetros del parcial
 
 **Para lucirse en la defensa (bajo esfuerzo, alto impacto)**
-1. **Métricas del ML:** mostrar error del pronóstico (MAE/MAPE con prueba hacia atrás) y el tamaño de cada segmento RFM. Justifica el modelo.
+1. **Métricas del ML:** ✅ hecho para el pronóstico (R², MAE con prueba hacia atrás, confianza alta/media/baja, días de stock y explicación en pantalla; verificado 74/74 contra un recálculo independiente). Pendiente: mostrar el tamaño y la calidad de cada segmento RFM.
 2. **IA transparente:** indicar en el reporte qué motor respondió (LLM o reglas) y mostrar la especificación validada. Refuerza que la IA no genera SQL.
 3. **Pantalla de estado offline:** contador de operaciones pendientes y último sincronizado en el POS y en la app móvil.
 4. **Demo guiada:** un guion de 5 minutos con las cuentas demo (`luna` y `sol`): aislamiento, venta offline, conflicto, reporte IA, segmento RFM.

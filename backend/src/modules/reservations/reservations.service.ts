@@ -1,3 +1,4 @@
+import { jwtSecret } from '../../common/config/jwt-secret';
 import { Injectable, NotFoundException, BadRequestException, UnauthorizedException, ForbiddenException, ConflictException, OnModuleInit } from '@nestjs/common';
 import { getCurrentTenantId } from '../../common/tenancy/tenant-context';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -353,8 +354,7 @@ export class ReservationsService implements OnModuleInit {
       let responsePayload: any = {};
 
       if (method === PaymentMethod.QR) {
-        const jwtSecret = process.env.JWT_SECRET || 'secret';
-        const token = jwt.sign({ paymentId: payment.id }, jwtSecret, { expiresIn: '5m' });
+        const token = jwt.sign({ paymentId: payment.id }, jwtSecret(), { expiresIn: '5m' });
         const qrUrl = process.env.QR_PUBLIC_WEB_URL || 'http://localhost:5173';
         const confirmationUrl = `${qrUrl}/qr-payment/${token}`;
         const qrImage = await qrcode.toDataURL(confirmationUrl);

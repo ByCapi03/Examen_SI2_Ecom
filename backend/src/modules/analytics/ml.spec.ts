@@ -1,4 +1,4 @@
-import { assignCluster, evaluateForecast, fitLinearRegression, forecastDemand, kmeans, labelRfmClusters, naiveMae, silhouette, standardize } from './ml';
+import { assignCluster, daysOfStock, evaluateForecast, fitLinearRegression, forecastConfidence, forecastDemand, kmeans, labelRfmClusters, naiveMae, silhouette, standardize } from './ml';
 
 describe('Regresión lineal (supervisado)', () => {
   it('recupera una tendencia lineal exacta', () => {
@@ -52,6 +52,41 @@ describe('K-Means (no supervisado)', () => {
       { recencyDays: 1, frequency: 9, monetary: 3000 },
     ]);
     expect(names).toEqual(['Clientes leales', 'Potenciales', 'Campeones']);
+  });
+});
+
+describe('Confianza y días de stock del pronóstico', () => {
+  it('serie estable con poco ruido tiene confianza ALTA', () => {
+    const y = [20, 21, 19, 20, 22, 20, 19, 21, 20, 20, 21, 19];
+    expect(forecastDemand(y).confidence).toBe('ALTA');
+  });
+
+  it('un solo pico entre ceros tiene confianza BAJA (pocas semanas con ventas)', () => {
+    const y = [0, 0, 0, 0, 0, 0, 0, 0, 0, 40, 0, 0];
+    expect(forecastDemand(y).confidence).toBe('BAJA');
+  });
+
+  it('ventas muy erráticas tienen confianza BAJA', () => {
+    const y = [5, 40, 3, 38, 2, 45, 6, 30, 4, 50, 1, 35];
+    expect(forecastConfidence(y, fitLinearRegression(y))).toBe('BAJA');
+  });
+
+  it('menos de 6 semanas nunca da confianza alta', () => {
+    const y = [10, 10, 10, 10, 10];
+    expect(forecastDemand(y).confidence).toBe('BAJA');
+  });
+
+  it('calcula el cambio semanal en porcentaje', () => {
+    const y = [10, 12, 14, 16, 18, 20, 22, 24];
+    const f = forecastDemand(y);
+    expect(f.weeklyChangePct).toBeCloseTo((2 / 17) * 100, 0);
+    expect(f.trend).toBe('CRECIENTE');
+  });
+
+  it('días de stock: stock / demanda diaria pronosticada', () => {
+    expect(daysOfStock(70, 28, 4)).toBe(70); // 28 u. en 28 días = 1 u./día
+    expect(daysOfStock(0, 28, 4)).toBe(0);
+    expect(daysOfStock(50, 0, 4)).toBeNull();
   });
 });
 

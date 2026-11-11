@@ -1,0 +1,9 @@
+{
+  "luna": {
+    "Vestido Lino Marfil": { "imageUrl": "https://res.cloudinary.com/TU-CLOUD/image/upload/v1/boutique-elegance/products/xxxx.png", "imagePublicId": "boutique-elegance/products/xxxx" },
+    "Vestido Satén Noche": { "imageUrl": "https://res.cloudinary.com/TU-CLOUD/image/upload/v1/boutique-elegance/products/yyyy.png", "imagePublicId": "boutique-elegance/products/yyyy" }
+  },
+  "sol": {
+    "Vestido Floral Verano": { "imageUrl": "https://res.cloudinary.com/TU-CLOUD/image/upload/v1/boutique-elegance/products/zzzz.png", "imagePublicId": "boutique-elegance/products/zzzz" }
+  }
+}

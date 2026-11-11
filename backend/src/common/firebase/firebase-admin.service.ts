@@ -1,6 +1,6 @@
 import { existsSync } from 'fs';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { initializeApp, getApps, applicationDefault } from 'firebase-admin/app';
+import { initializeApp, getApps, applicationDefault, cert } from 'firebase-admin/app';
 import { getMessaging, Messaging } from 'firebase-admin/messaging';
 
 @Injectable()
@@ -11,8 +11,10 @@ export class FirebaseAdminService implements OnModuleInit {
   onModuleInit() {
     try {
       if (!getApps().length) {
+        // En hosting sin archivos: FIREBASE_SERVICE_ACCOUNT_JSON con el contenido del JSON de la cuenta de servicio.
+        const json = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
         initializeApp({
-          credential: applicationDefault(),
+          credential: json ? cert(JSON.parse(json)) : applicationDefault(),
         });
         this.logger.log('Firebase Admin SDK initialized successfully');
       }
@@ -28,7 +30,8 @@ export class FirebaseAdminService implements OnModuleInit {
   isReady() {
     // applicationDefault() no falla al iniciar aunque falten credenciales: se comprueba el archivo.
     const file = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-    return !!this.messaging && !!file && existsSync(file);
+    const hasCredentials = !!process.env.FIREBASE_SERVICE_ACCOUNT_JSON || (!!file && existsSync(file));
+    return !!this.messaging && hasCredentials;
   }
 
   getMessaging() {

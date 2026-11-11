@@ -10,14 +10,17 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import {
-  assignCluster, evaluateForecast, fitLinearRegression, forecastDemand, holdoutMae, kmeans, labelRfmClusters,
-  LinearModel, predict, silhouette, standardize,
+  assignCluster, daysOfStock, evaluateForecast, fitLinearRegression, forecastConfidence, forecastDemand, holdoutMae, kmeans,
+  labelRfmClusters, LinearModel, predict, silhouette, standardize,
 } from './ml';
 import { MlModel } from './ml-model.entity';
 
 const SALE_OK = `('PAGADA','COMPLETADA')`;
 const SYNTHETIC_DOMAIN = '@sintetico.local';
 const WEEK_MS = 7 * 24 * 3600 * 1000;
+
+/** Orden de la tabla: primero lo más urgente. */
+const URGENCY: Record<string, number> = { QUIEBRE: 0, REPONER: 1, OK: 2 };
 
 const SEGMENT_ACTIONS: Record<string, string> = {
   'Campeones': 'Programa VIP, acceso anticipado a colecciones.',
@@ -42,7 +45,11 @@ export class AnalyticsService {
   }
 
   // ------------------------------------------------------------------ datos
-  /** Serie semanal de unidades por producto (índice 0 = semana más antigua). */
+  /**
+   * Serie semanal de unidades por producto (índice 0 = semana más antigua; weeks-1 = última semana COMPLETA).
+   * La semana en curso se excluye porque está a medias y haría ver una caída falsa; ROUND (no FLOOR) evita
+   * desfases de una semana por cambios de horario.
+   */
   private async loadWeeklySeries(tenantId: number, weeks: number, branchId: number | null) {
     const params: any[] = [tenantId, weeks];
     let branchFilter = '';
@@ -50,14 +57,15 @@ export class AnalyticsService {
 
     const rows: { productId: number; name: string; week: number; units: string }[] = await this.dataSource.query(
       `SELECT p.id AS "productId", p.name,
-              FLOOR(EXTRACT(EPOCH FROM (date_trunc('week', now()) - date_trunc('week', s.date))) / 604800)::int AS week,
+              ROUND(EXTRACT(EPOCH FROM (date_trunc('week', now()) - date_trunc('week', s.date))) / 604800)::int AS week,
               SUM(si.quantity) AS units
          FROM sales s
          JOIN sale_items si ON si."saleId" = s.id
          JOIN variants v ON v.id = si."variantId"
          JOIN products p ON p.id = v."productId" AND p."tenantId" = s."tenantId"
         WHERE s."tenantId" = $1 AND s.status IN ${SALE_OK}
-          AND s.date >= date_trunc('week', now()) - ($2::int - 1) * INTERVAL '1 week'
+          AND s.date >= date_trunc('week', now()) - $2::int * INTERVAL '1 week'
+          AND s.date < date_trunc('week', now())
           ${branchFilter}
         GROUP BY p.id, p.name, week`,
       params,
@@ -67,7 +75,7 @@ export class AnalyticsService {
     for (const r of rows) {
       const id = Number(r.productId);
       if (!series.has(id)) series.set(id, { name: r.name, weekly: new Array(weeks).fill(0) });
-      const idx = weeks - 1 - Number(r.week);
+      const idx = weeks - Number(r.week);
       if (idx >= 0 && idx < weeks) series.get(id)!.weekly[idx] += Number(r.units);
     }
     return series;
@@ -94,7 +102,8 @@ export class AnalyticsService {
               COUNT(*) FILTER (WHERE u.email LIKE $3)::int AS "syntheticSales"
          FROM sales s LEFT JOIN users u ON u.id = s."userId"
         WHERE s."tenantId" = $1 AND s.status IN ${SALE_OK}
-          AND s.date >= date_trunc('week', now()) - ($2::int - 1) * INTERVAL '1 week'`,
+          AND s.date >= date_trunc('week', now()) - $2::int * INTERVAL '1 week'
+          AND s.date < date_trunc('week', now())`,
       [tenantId, weeks, `%${SYNTHETIC_DOMAIN}`],
     );
     return { windowWeeks: weeks, sales: r.sales, syntheticSales: r.syntheticSales, realSales: r.sales - r.syntheticSales };
@@ -236,22 +245,34 @@ export class AnalyticsService {
       const available = stock.get(productId) ?? 0;
       const sp = storedProducts[productId];
       let forecast: number[], forecastTotal: number, trend: string, model: LinearModel, mae: number | null, safetyStock: number, source: string;
+      let confidence: string, weeklyChangePct: number;
       if (sp) {
         usedStored++;
         model = sp.model;
         forecast = predict(model, stored!.params.windowWeeks + elapsedWeeks, horizon).map((v) => Number(v.toFixed(2)));
         forecastTotal = Number(forecast.reduce((a, b) => a + b, 0).toFixed(2));
         const relSlope = sp.mean > 0 ? model.slope / sp.mean : model.slope;
-        trend = relSlope > 0.05 ? 'CRECIENTE' : relSlope < -0.05 ? 'DECRECIENTE' : 'ESTABLE';
+        trend = model.r2 >= 0.25 && relSlope > 0.03 ? 'CRECIENTE' : model.r2 >= 0.25 && relSlope < -0.03 ? 'DECRECIENTE' : 'ESTABLE';
+        weeklyChangePct = Number((relSlope * 100).toFixed(1));
+        confidence = forecastConfidence(s.weekly, model);
         mae = sp.mae;
         safetyStock = Math.ceil(1.65 * model.residualStd * Math.sqrt(horizon));
         source = 'MODELO_ENTRENADO';
       } else {
         const f = forecastDemand(s.weekly, horizon);
-        ({ forecast, forecastTotal, trend, model, mae, safetyStock } = f);
+        ({ forecast, forecastTotal, trend, model, mae, safetyStock, confidence, weeklyChangePct } = f);
         source = 'AJUSTE_EN_LINEA';
       }
       const reorder = Math.max(0, Math.ceil(forecastTotal + safetyStock - available));
+      const risk = available <= 0 && forecastTotal > 0 ? 'QUIEBRE' : reorder > 0 ? 'REPONER' : 'OK';
+      const days = daysOfStock(available, forecastTotal, horizon);
+      const avg = s.weekly.reduce((a, b) => a + b, 0) / (s.weekly.length || 1);
+      const lowConf = confidence === 'BAJA' ? ' Ojo: el pronóstico es poco confiable (ventas muy variables o pocas semanas con ventas); tómalo como orientación.' : '';
+      const action = risk === 'QUIEBRE'
+        ? `Sin stock y se esperan ~${Math.round(forecastTotal)} u. en ${horizon} semana(s). Repón al menos ${reorder} u.${lowConf}`
+        : risk === 'REPONER'
+          ? `Compra ${reorder} u.: se venderían ~${Math.round(forecastTotal)} u. en ${horizon} semana(s), tienes ${available} y conviene guardar ${safetyStock} de seguridad.${lowConf}`
+          : `No hace falta reponer: tienes ${available} u. y se esperan ~${Math.round(forecastTotal)} u. en ${horizon} semana(s)${days != null ? ` (te duran ≈ ${Math.round(days)} días)` : ''}.${lowConf}`;
       return {
         productId,
         productName: s.name,
@@ -265,15 +286,21 @@ export class AnalyticsService {
         safetyStock,
         availableStock: available,
         suggestedReorder: reorder,
-        risk: available <= 0 && forecastTotal > 0 ? 'QUIEBRE' : reorder > 0 ? 'REPONER' : 'OK',
+        risk,
+        confidence,
+        weeklyChangePct,
+        avgWeeklyUnits: Number(avg.toFixed(1)),
+        daysOfStock: days,
+        action,
         source,
       };
-    }).sort((a, b) => b.forecastTotal - a.forecastTotal).slice(0, limit);
+    }).sort((a, b) => URGENCY[a.risk] - URGENCY[b.risk] || (a.daysOfStock ?? Infinity) - (b.daysOfStock ?? Infinity) || b.forecastTotal - a.forecastTotal).slice(0, limit);
 
     return {
       model: 'Regresión lineal (mínimos cuadrados) sobre ventas semanales',
       learningType: 'SUPERVISADO',
       weeks, horizon, branchId,
+      includesCurrentWeek: false,
       generatedAt: new Date().toISOString(),
       trainedModel: stored && usedStored > 0
         ? { version: stored.version, trainedAt: stored.trainedAt, dataSource: stored.dataSource, evaluation: stored.metrics?.evaluation ?? null }

@@ -1,3 +1,4 @@
+import { jwtSecret } from '../config/jwt-secret';
 /**
  * AUTH GUARD
  * Seguridad: Actúa como una barrera o "portero" para las rutas protegidas.
@@ -39,7 +40,7 @@ export class AuthGuard implements CanActivate {
     }
 
     try {
-      const secret = this.configService.get<string>('JWT_SECRET') || 'defaultSecret';
+      const secret = jwtSecret();
       const payload = await this.jwtService.verifyAsync(token, {
         secret: secret
       });

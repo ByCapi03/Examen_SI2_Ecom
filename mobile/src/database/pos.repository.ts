@@ -50,7 +50,7 @@ export const posRepository = {
   async saveSnapshot(branch: PosBranch, products: RemotePosProduct[], clients: PosClient[]) {
     const db = await getDatabase();
     const now = Date.now();
-    await db.withExclusiveTransactionAsync(async (txn) => {
+    await db.withTransactionAsync(async () => { const txn = db;
       await txn.runAsync(
         `INSERT INTO pos_branches (id, name, updated_at) VALUES (?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at`,
@@ -117,7 +117,7 @@ export const posRepository = {
     lines: LocalSaleLine[],
   ) {
     const db = await getDatabase();
-    await db.withExclusiveTransactionAsync(async (txn) => {
+    await db.withTransactionAsync(async () => { const txn = db;
       await txn.runAsync(
         `INSERT INTO offline_operations (operation_id, tenant_id, user_id, type, client_created_at, payload, summary, status, attempts)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,

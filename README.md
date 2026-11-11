@@ -38,7 +38,8 @@ npm install
 copy .env.example .env        # y completa tus datos (ver tabla de variables más abajo)
 npm run build
 npm run seed:demo             # crea las empresas demo (si ya existen, no hace nada)
-# npm run seed:demo:reset     # BORRA y recrea SOLO las empresas demo (luna y sol)
+# npm run seed:demo:reset     # BORRA y recrea SOLO las empresas demo (luna y sol); conserva las fotos, el vestidor virtual y Mi tienda web
+# npm run seed:demo:images    # recupera fotos perdidas: con --list muestra tus imágenes de Cloudinary; ver backend\demo-images.example.json
 
 # Frontend
 cd ..\frontend
@@ -177,6 +178,22 @@ $env:EXPO_PUBLIC_API_URL="https://URL-DEL-API.trycloudflare.com"
 npx expo start
 # si no conecta por la red local:  npx expo start --tunnel
 ```
+**Vestidor virtual con cámara en el iPhone (modo experimental):** por defecto está desactivado porque TensorFlow consume mucha memoria. Para activarlo:
+```powershell
+$env:TRYON="1"
+$env:NODE_OPTIONS="--max-old-space-size=4096"
+npx expo start --go --clear
+```
+Entra a un producto → **Probar en vestidor** y permite la cámara. Si falla en Expo Go, el vestidor completo funciona en la web del cliente (`/t/luna`).
+
+**En el navegador (Edge/Chrome), para pruebas rápidas:**
+```powershell
+cd "C:\Users\MSI CYBORG 15 A13V\Desktop\UNI\Examen_SI2_Ecom\mobile"
+$env:EXPO_PUBLIC_API_URL="http://localhost:3000"
+npx expo start --web --clear
+```
+Abre `http://localhost:8081`. En el navegador la sesión usa `localStorage` y no hay pago con tarjeta (Stripe) ni vestidor; el resto funciona.
+
 Escanea el QR con la cámara del iPhone (Expo Go instalado). Cuenta: `cliente@luna.com` / `123456`.
 La app exige iniciar sesión y muestra solo el catálogo de la empresa del cliente.
 
@@ -189,11 +206,13 @@ Con el backend corriendo (y los datos demo cargados):
 ```powershell
 cd "C:\Users\MSI CYBORG 15 A13V\Desktop\UNI\Examen_SI2_Ecom\backend"
 $env:API_URL="http://localhost:3000"
-npx jest                                  # 24 pruebas unitarias
-npm run test:e2e:saas                     # 34 · aislamiento multitenant, offline, IA, ML
+npx jest                                  # 30 pruebas unitarias
+npm run test:e2e:saas                     # 36 · aislamiento multitenant, offline, IA, ML
 npm run test:e2e:tienda                   # 22 · tienda pública, registro, Mi tienda web
 npm run test:e2e:notif                    # 16 · alertas de stock
 npm run test:e2e:posqr                    # 18 · cobro por QR en el POS
+# Verifica que el pronóstico de demanda (ML) es correcto: lo recalcula desde PostgreSQL (necesita DB_* en el entorno)
+npm run verify:forecast                   # 74 comprobaciones independientes
 # Planes y SuperAdmin: el backend debe haberse iniciado con SUPERADMIN_EMAIL y SUPERADMIN_PASSWORD
 $env:SUPERADMIN_EMAIL="superadmin@dressed.com"; $env:SUPERADMIN_PASSWORD="TuClave123"
 npm run test:e2e:planes                   # 33 · ciclos, límites, vigencia, suspensión
@@ -219,6 +238,7 @@ Más detalles en [`docs/README.md`](docs/README.md).
 
 | Síntoma | Causa y solución |
 |---|---|
+| Los productos demo perdieron sus fotos | Pasaba al correr `seed:demo:reset` en versiones anteriores. Ahora las conserva. Para recuperarlas: `npm run seed:demo:images -- --list` crea `backend\cloudinary-gallery.html` (galería de tus fotos) y `backend\demo-images.json` con tus productos; pega ahí la URL y el `public_id` de cada foto y ejecuta `npm run seed:demo:images`. O súbelas otra vez en Productos. |
 | `EADDRINUSE :3000` | Ya hay un backend corriendo. Usa `netstat` + `taskkill` (sección 3). |
 | `winget` no se reconoce | No lo necesitas: descarga `cloudflared.exe` como en la sección 4. |
 | El POS dice «necesita Internet» con señal | El backend o el túnel están caídos (el catálogo guardado engaña). Abre `…/saas/billing/config` desde el teléfono. |
@@ -230,7 +250,15 @@ Más detalles en [`docs/README.md`](docs/README.md).
 
 ---
 
-## 9. Mapa del repositorio
+## 9. Despliegue en la nube
+
+Guía completa, gratis y paso a paso (Neon + Render, con HTTPS y PWA offline sin túneles): [`docs/DESPLIEGUE.md`](docs/DESPLIEGUE.md). El archivo `render.yaml` describe la API y la web.
+
+En AWS (consola: App Runner para la API y Amplify para la web): [`docs/DESPLIEGUE_AWS.md`](docs/DESPLIEGUE_AWS.md).
+
+---
+
+## 10. Mapa del repositorio
 
 ```
 backend/   API NestJS, entidades, scripts de pruebas (backend/scripts)

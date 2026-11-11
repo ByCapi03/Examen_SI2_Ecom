@@ -1,27 +1,34 @@
 import { useState, useEffect, useRef } from 'react';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
+import type * as NotificationsType from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { api } from '../api/api';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  } as any),
-});
+// Expo Go (SDK 53+) ya no soporta notificaciones push: se omiten ahí y funcionan en una compilación propia.
+const IS_EXPO_GO = Constants.executionEnvironment === 'storeClient';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const Notifications: typeof NotificationsType = IS_EXPO_GO ? (null as any) : require('expo-notifications');
+
+if (!IS_EXPO_GO) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    } as any),
+  });
+}
 
 /** `enabled` = hay sesión iniciada: el token solo se puede guardar en el servidor con un usuario autenticado. */
 export function usePushNotifications(enabled: boolean = true) {
   const [expoPushToken, setExpoPushToken] = useState<string>('');
-  const [notification, setNotification] = useState<Notifications.Notification | false>(false);
+  const [notification, setNotification] = useState<NotificationsType.Notification | false>(false);
   const notificationListener = useRef<any>(null);
   const responseListener = useRef<any>(null);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || IS_EXPO_GO) return;
     registerForPushNotificationsAsync().then(result => {
       if (result && result.token) {
         setExpoPushToken(result.token);

@@ -1,3 +1,4 @@
+import { jwtSecret } from '../config/jwt-secret';
 import { Injectable, NestMiddleware } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import * as jwt from 'jsonwebtoken';
@@ -26,7 +27,7 @@ export class TenantContextMiddleware implements NestMiddleware {
     const auth = String(req.headers['authorization'] || '');
     if (auth.startsWith('Bearer ')) {
       try {
-        const payload: any = jwt.verify(auth.slice(7), process.env.JWT_SECRET || 'defaultSecret');
+        const payload: any = jwt.verify(auth.slice(7), jwtSecret());
         if (payload?.tenantId) {
           store.publicTenantId = Number(payload.tenantId);
           // Empresa suspendida: la vitrina por token (app móvil) también se bloquea

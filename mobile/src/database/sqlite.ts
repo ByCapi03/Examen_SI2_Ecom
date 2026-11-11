@@ -15,10 +15,8 @@ export const getDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
   const db = await SQLite.openDatabaseAsync('fashionstore.db');
 
   // Habilitar Foreign Keys y modo WAL para mejor concurrencia
-  await db.execAsync(`
-    PRAGMA foreign_keys = ON;
-    PRAGMA journal_mode = WAL;
-  `);
+  await db.execAsync('PRAGMA foreign_keys = ON;');
+  try { await db.execAsync('PRAGMA journal_mode = WAL;'); } catch { /* el navegador no admite WAL */ }
 
   await runMigrations(db);
 
@@ -34,7 +32,7 @@ const runMigrations = async (db: SQLite.SQLiteDatabase) => {
   const currentVersion = result?.user_version || 0;
 
   if (currentVersion < 1) {
-    await db.withExclusiveTransactionAsync(async (txn) => {
+    await db.withTransactionAsync(async () => { const txn = db;
       // 1. Tabla de metadatos de sincronización
       await txn.execAsync(`
         CREATE TABLE IF NOT EXISTS sync_metadata (
@@ -134,7 +132,7 @@ const runMigrations = async (db: SQLite.SQLiteDatabase) => {
   }
 
   if (currentVersion < 2) {
-    await db.withExclusiveTransactionAsync(async (txn) => {
+    await db.withTransactionAsync(async () => { const txn = db;
       // 8. Cola de operaciones offline pendientes de sincronizar (idempotentes por UUID)
       await txn.execAsync(`
         CREATE TABLE IF NOT EXISTS offline_operations (
@@ -160,7 +158,7 @@ const runMigrations = async (db: SQLite.SQLiteDatabase) => {
   }
 
   if (currentVersion < 3) {
-    await db.withExclusiveTransactionAsync(async (txn) => {
+    await db.withTransactionAsync(async () => { const txn = db;
       // 9. Caja POS offline: sucursal autorizada, existencias conocidas, clientes mínimos
       await txn.execAsync(`
         CREATE TABLE IF NOT EXISTS pos_branches (

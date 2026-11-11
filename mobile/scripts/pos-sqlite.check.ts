@@ -15,9 +15,9 @@ class Adapter {
   async runAsync(sql: string, params: any[] = []) { const r = this.db.prepare(sql).run(...params); return { changes: r.changes }; }
   async getFirstAsync(sql: string, params: any[] = []) { return this.db.prepare(sql).get(...params) ?? null; }
   async getAllAsync(sql: string, params: any[] = []) { return this.db.prepare(sql).all(...params); }
-  async withExclusiveTransactionAsync(fn: (t: Adapter) => Promise<void>) {
-    this.db.exec('BEGIN EXCLUSIVE');
-    try { await fn(this); this.db.exec('COMMIT'); } catch (e) { this.db.exec('ROLLBACK'); throw e; }
+  async withTransactionAsync(fn: () => Promise<void>) {
+    this.db.exec('BEGIN');
+    try { await fn(); this.db.exec('COMMIT'); } catch (e) { this.db.exec('ROLLBACK'); throw e; }
   }
 }
 const shared = new Adapter();

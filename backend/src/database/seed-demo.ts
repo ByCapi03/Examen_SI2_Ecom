@@ -14,7 +14,8 @@
  *   npm run seed:demo          crea las empresas demo si no existen (no toca nada más)
  *   npm run seed:demo:reset    borra SOLO las empresas demo (slugs "luna" y "sol") y las vuelve a crear
  *
- * Los productos se crean SIN imagen: se agregan después desde Catálogo > Productos.
+ * Los productos se crean SIN imagen la primera vez: se agregan después desde Catálogo > Productos.
+ * Al reiniciar (--reset) se CONSERVAN las fotos, la configuración del vestidor virtual y la de Mi tienda web.
  */
 import * as fs from 'fs';
 import * as path from 'path';
@@ -217,6 +218,14 @@ async function ensureGlobals(ds: DataSource): Promise<Globals> {
   });
 }
 
+/** Columnas de producto que se conservan al reiniciar los datos demo (fotos y configuración del vestidor virtual). */
+const KEEP_PRODUCT_COLUMNS = [
+  'imageUrl', 'imagePublicId', 'colorizable', 'sourceColor', 'arEnabled', 'arImageUrl', 'arImagePublicId',
+  'arTorsoUrl', 'arTorsoPublicId', 'arLeftSleeveUrl', 'arLeftSleevePublicId', 'arRightSleeveUrl', 'arRightSleevePublicId', 'arType',
+];
+const pickKept = (row?: Record<string, any>) =>
+  row ? Object.fromEntries(KEEP_PRODUCT_COLUMNS.filter((c) => row[c] !== null && row[c] !== undefined).map((c) => [c, row[c]])) : {};
+
 /* ───────────────────────── Limpieza de una empresa demo ───────────────────────── */
 
 async function deleteTenantData(m: EntityManager, T: number) {
@@ -280,6 +289,78 @@ interface AuditDraft { t: Date; who: Person | null; action: string; entity: stri
 
 interface BranchCtx {
   id: number; idx: number; encargado: Person; cashiers: Person[]; registerIds: number[];
+}
+
+/* ───────────────────────── Historial de ventas (para el pronóstico de demanda) ───────────────────────── */
+
+/** Semanas de historial previas a la semana simulada. Con ellas el pronóstico de demanda (ML) tiene una serie real que aprender. */
+const HISTORY_WEEKS = 12;
+
+/** Unidades por semana y sucursal de un producto "promedio" en la semana simulada (el nivel al que debe llegar el historial). */
+const BASE_WEEKLY_UNITS = 42;
+
+/**
+ * Comportamiento de ventas de cada producto como múltiplo de su nivel actual `L` (unidades por semana y sucursal).
+ * Se reparten por producto para que el análisis muestre casos distintos: creciente, estable, decreciente, estacional y errático.
+ */
+const SALES_PROFILES: { name: string; units: (L: number, week: number, weeks: number, noise: number) => number }[] = [
+  { name: 'creciente', units: (L, w, n, e) => L * (0.3 + (0.7 * w) / (n - 1) + e * 0.08) },
+  { name: 'estable', units: (L, _w, _n, e) => L * (0.97 + e * 0.1) },
+  { name: 'decreciente', units: (L, w, n, e) => L * (1.7 - (0.7 * w) / (n - 1) + e * 0.08) },
+  { name: 'estacional', units: (L, w, _n, e) => L * (0.9 + 0.3 * Math.sin((w * Math.PI) / 2.5) + e * 0.1) },
+  { name: 'creciente suave', units: (L, w, n, e) => L * (0.6 + (0.4 * w) / (n - 1) + e * 0.08) },
+  { name: 'errático', units: (L, _w, _n, e) => L * (0.75 + e * 0.45) },
+];
+
+/** Ventas de las semanas anteriores a la simulada (sin turnos de caja) y sus movimientos de stock, balanceados con una entrada. */
+function buildSalesHistory(r: Rng, b: BranchCtx, variants: VariantInfo[], clientIds: number[]) {
+  const sales: SaleDraft[] = [];
+  const movements: MovDraft[] = [];
+  const soldByVariant = new Map<number, number>();
+  const productIdxs = [...new Set(variants.map((v) => v.productIdx))];
+  // Nivel de cada producto según su popularidad (suma de pesos de sus variantes), igual que reparte las ventas la simulación
+  const weightOf = new Map(productIdxs.map((pi) => [pi, variants.filter((v) => v.productIdx === pi).reduce((a, v) => a + v.weight, 0)]));
+  const totalWeight = [...weightOf.values()].reduce((a, b) => a + b, 0);
+
+  for (let week = 0; week < HISTORY_WEEKS; week++) {
+    const firstOff = DAYS + 7 * (HISTORY_WEEKS - week - 1); // días atrás del día más reciente de este bloque
+    for (const pi of productIdxs) {
+      const profile = SALES_PROFILES[pi % SALES_PROFILES.length];
+      const level = BASE_WEEKLY_UNITS * productIdxs.length * (weightOf.get(pi)! / totalWeight);
+      const target = Math.max(0, Math.round(profile.units(level, week, HISTORY_WEEKS, (r.next() - 0.5) * 2)));
+      const pool = variants.filter((v) => v.productIdx === pi);
+      let left = target;
+      while (left > 0) {
+        const qty = left >= 2 && r.chance(0.15) ? 2 : 1;
+        left -= qty;
+        const v = r.weighted(pool, pool.map((x) => x.weight));
+        const off = firstOff + r.int(0, 6);
+        const dow = dayAt(off, 12).getDay();
+        if ((dow === 0 && r.chance(0.4)) || (dow !== 5 && dow !== 6 && r.chance(0.12))) { left += qty; continue; } // domingos más flojos
+        const t = dayAt(off, r.int(9, 19), r.int(0, 59));
+        const cashier = r.pick(b.cashiers);
+        const total = money(v.price * qty);
+        const method = r.weighted([PaymentMethod.EFECTIVO, PaymentMethod.TARJETA, PaymentMethod.QR, PaymentMethod.BILLETERA_MOVIL], [50, 25, 20, 5]);
+        const sale: SaleDraft = {
+          t, branchId: b.id, userId: cashier.id, channel: SaleChannel.POS, status: SaleStatus.COMPLETADA,
+          items: [{ variantId: v.id, qty, unit: v.price }], total,
+          clientId: r.chance(0.3) ? r.pick(clientIds) : undefined,
+          payments: [{ t: addMin(t, 1), amount: total, method, status: PaymentStatus.APROBADO, ref: method === PaymentMethod.EFECTIVO ? undefined : `TX-${r.int(100000, 999999)}` }],
+        };
+        sales.push(sale);
+        soldByVariant.set(v.id, (soldByVariant.get(v.id) ?? 0) + qty);
+        movements.push({ t, branchId: b.id, variantId: v.id, type: MovementType.VENTA, qty, userId: cashier.id, obs: (ids) => `Venta POS #${ids.saleId}`, sale });
+      }
+    }
+  }
+
+  // Entrada histórica por lo vendido en ese período, para que el kardex quede coherente con el stock actual
+  const tIn = dayAt(DAYS + 7 * HISTORY_WEEKS + 1, 9, 0);
+  let i = 0;
+  for (const [variantId, qty] of soldByVariant) {
+    movements.push({ t: addMin(tIn, i++), branchId: b.id, variantId, type: MovementType.ENTRADA, qty, userId: b.encargado.id, obs: () => 'Stock histórico (compras de períodos anteriores)' });
+  }
+  return { sales, movements };
 }
 
 /* ───────────────────────── Simulación de una sucursal ───────────────────────── */
@@ -471,6 +552,11 @@ function simulateBranch(r: Rng, b: BranchCtx, variants: VariantInfo[], clientIds
   events.sort((x, y) => x.t.getTime() - y.t.getTime() || x.order - y.order);
   events.forEach((e) => e.run());
 
+  // 5b) Historial de semanas anteriores (alimenta el pronóstico de demanda)
+  const history = buildSalesHistory(r, b, variants, clientIds);
+  sales.push(...history.sales);
+  movements.push(...history.movements);
+
   // 6) Cierre de cada turno: esperado = inicial + ventas en efectivo; el cajero cuenta con pequeñas diferencias
   for (const s of sessions) {
     const cash = s.sales.reduce((sum, sale) => sum + sale.payments.filter((p) => p.method === PaymentMethod.EFECTIVO).reduce((a, p) => a + p.amount, 0), 0);
@@ -518,10 +604,18 @@ async function seedCompany(ds: DataSource, def: CompanyDef, g: Globals, password
   const r = rng(def.seed * 7919);
 
   await ds.transaction(async (m) => {
-    if (existing) { console.log(`  · ${def.name}: eliminando datos demo anteriores…`); await deleteTenantData(m, existing.id); }
+    // Lo que se subió a mano (fotos, vestidor virtual, Mi tienda web) se conserva al recrear la empresa demo
+    let keptProducts = new Map<string, Record<string, any>>();
+    const keptStoreConfig = existing?.storeConfig ?? null;
+    if (existing) {
+      const rows: Record<string, any>[] = await m.query(`SELECT name, ${KEEP_PRODUCT_COLUMNS.map((c) => `"${c}"`).join(', ')} FROM products WHERE "tenantId" = $1`, [existing.id]);
+      keptProducts = new Map(rows.map((row) => [row.name, row]));
+      console.log(`  · ${def.name}: eliminando datos demo anteriores (se conservan fotos y configuración de ${keptProducts.size} producto(s))…`);
+      await deleteTenantData(m, existing.id);
+    }
 
     const created = dayAt(14, 9, 0);
-    const T = (await m.insert(Tenant, { slug: def.slug, name: def.name, taxId: def.taxId, active: true, createdAt: created } as any)).identifiers[0].id as number;
+    const T = (await m.insert(Tenant, { slug: def.slug, name: def.name, taxId: def.taxId, active: true, createdAt: created, ...(keptStoreConfig ? { storeConfig: keptStoreConfig } : {}) } as any)).identifiers[0].id as number;
     // Luna: plan anual vigente; Sol: plan mensual que vence en 20 días (para mostrar vigencias en el panel SuperAdmin)
     const yearly = def.planCode === 'PROFESIONAL';
     await m.insert(Subscription, { tenantId: T, planId: g.plans[def.planCode], status: 'ACTIVE', billingCycle: yearly ? 'YEARLY' : 'MONTHLY', startDate: created, endDate: addMin(new Date(), (yearly ? 300 : 20) * 1440) } as any);
@@ -588,6 +682,7 @@ async function seedCompany(ds: DataSource, def: CompanyDef, g: Globals, password
       const productId = (await m.insert(Product, {
         tenantId: T, name: p.name, price: p.price, active: true, categoryId: cat.categories[p.category], collectionId: collectionIds[p.collection],
         arEnabled: false, arType: AR_TYPE[p.category],
+        ...pickKept(keptProducts.get(p.name)),
       } as any)).identifiers[0].id as number;
       productIds.push(productId);
       const rows: any[] = [];
@@ -709,16 +804,21 @@ export async function main() {
   const reset = process.argv.includes('--reset');
   const ds = new DataSource({
     type: 'postgres',
-    host: process.env.DB_HOST || 'localhost',
-    port: Number(process.env.DB_PORT || 5432),
-    username: process.env.DB_USERNAME || 'postgres',
-    password: String(process.env.DB_PASSWORD ?? ''),
-    database: process.env.DB_DATABASE || 'ecommerce_ropa',
+    ...(process.env.DATABASE_URL
+      ? { url: process.env.DATABASE_URL }
+      : {
+          host: process.env.DB_HOST || 'localhost',
+          port: Number(process.env.DB_PORT || 5432),
+          username: process.env.DB_USERNAME || 'postgres',
+          password: String(process.env.DB_PASSWORD ?? ''),
+          database: process.env.DB_DATABASE || 'ecommerce_ropa',
+        }),
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
     entities: [path.join(__dirname, '..', 'modules', '**', '*.entity.{ts,js}')],
     synchronize: process.env.DB_SYNCHRONIZE !== 'false',
   });
 
-  console.log(`\n=== Datos demo sobre "${ds.options.database as string}" ${reset ? '(con reinicio de las empresas demo)' : ''} ===`);
+  console.log(`\n=== Datos demo sobre "${(ds.options.database as string) || (process.env.DATABASE_URL ? 'la base de datos de DATABASE_URL' : '')}" ${reset ? '(con reinicio de las empresas demo)' : ''} ===`);
   await ds.initialize();
   try {
     const g = await ensureGlobals(ds);

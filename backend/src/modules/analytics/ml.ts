@@ -46,6 +46,8 @@ export function holdoutMae(y: number[], test = 2): number | null {
   return preds.reduce((a, p, i) => a + Math.abs(p - actual[i]), 0) / test;
 }
 
+export type Confidence = 'ALTA' | 'MEDIA' | 'BAJA';
+
 export interface DemandForecast {
   history: number[];
   forecast: number[];
@@ -54,6 +56,30 @@ export interface DemandForecast {
   model: LinearModel;
   mae: number | null;
   safetyStock: number;
+  /** Variación semanal de las ventas respecto al promedio (pendiente / promedio). */
+  weeklyChangePct: number;
+  /** Qué tan confiable es el pronóstico, según cuánto se alejan las ventas reales de la recta. */
+  confidence: Confidence;
+}
+
+/**
+ * Confianza del pronóstico: error típico del modelo sobre el promedio de ventas (coeficiente de variación del residuo).
+ * Con pocas semanas con ventas no se puede confiar en una recta, sin importar cuánto ajuste.
+ */
+export function forecastConfidence(weekly: number[], model: LinearModel): Confidence {
+  const n = weekly.length;
+  const active = weekly.filter((v) => v > 0).length;
+  const mean = n ? weekly.reduce((a, b) => a + b, 0) / n : 0;
+  if (n < 6 || active < 4 || mean <= 0) return 'BAJA';
+  const cv = model.residualStd / mean;
+  return cv <= 0.2 ? 'ALTA' : cv <= 0.4 ? 'MEDIA' : 'BAJA';
+}
+
+/** Días que dura el stock disponible al ritmo de ventas pronosticado (null si no se espera demanda). */
+export function daysOfStock(available: number, forecastTotal: number, horizonWeeks: number): number | null {
+  const perDay = forecastTotal / (horizonWeeks * 7);
+  if (!(perDay > 0)) return null;
+  return Number((Math.max(0, available) / perDay).toFixed(1));
 }
 
 export function forecastDemand(weekly: number[], horizon = 4, serviceZ = 1.65): DemandForecast {
@@ -62,9 +88,15 @@ export function forecastDemand(weekly: number[], horizon = 4, serviceZ = 1.65): 
   const forecastTotal = Number(forecast.reduce((a, b) => a + b, 0).toFixed(2));
   const mean = weekly.length ? weekly.reduce((a, b) => a + b, 0) / weekly.length : 0;
   const relSlope = mean > 0 ? model.slope / mean : model.slope;
-  const trend = relSlope > 0.05 ? 'CRECIENTE' : relSlope < -0.05 ? 'DECRECIENTE' : 'ESTABLE';
+  // Hay tendencia si las ventas cambian más de 3 % por semana Y la recta explica al menos el 25 % de la variación;
+  // si no, el cambio es ruido y se considera estable.
+  const trend = model.r2 >= 0.25 && relSlope > 0.03 ? 'CRECIENTE' : model.r2 >= 0.25 && relSlope < -0.03 ? 'DECRECIENTE' : 'ESTABLE';
   const safetyStock = Math.ceil(serviceZ * model.residualStd * Math.sqrt(horizon));
-  return { history: weekly, forecast, forecastTotal, trend, model, mae: holdoutMae(weekly), safetyStock };
+  return {
+    history: weekly, forecast, forecastTotal, trend, model, mae: holdoutMae(weekly), safetyStock,
+    weeklyChangePct: Number((relSlope * 100).toFixed(1)),
+    confidence: forecastConfidence(weekly, model),
+  };
 }
 
 // ------------------------------------------------------------------ K-Means

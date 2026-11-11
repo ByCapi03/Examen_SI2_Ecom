@@ -22,6 +22,7 @@
     "seed": "ts-node src/database/seed-runner.ts",
     "seed:demo": "node scripts/seed-demo.js",
     "seed:demo:reset": "node scripts/seed-demo.js --reset",
+    "seed:demo:images": "node scripts/demo-images.js",
     "migrate:multitenant": "node scripts/migrate-multitenant.js",
     "seed:synthetic": "node scripts/seed-synthetic.js",
     "test:e2e:saas": "node scripts/test-saas-e2e.js",
@@ -29,7 +30,8 @@
     "test:e2e:notif": "node scripts/test-notificaciones.js",
     "test:e2e:planes": "node scripts/test-planes-superadmin.js",
     "test:e2e:stripe": "node scripts/test-billing-stripe.js",
-    "test:e2e:posqr": "node scripts/test-pos-qr.js"
+    "test:e2e:posqr": "node scripts/test-pos-qr.js",
+    "verify:forecast": "node scripts/verify-forecast.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",

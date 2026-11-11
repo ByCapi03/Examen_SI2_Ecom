@@ -4,6 +4,7 @@ import { api } from '../../api/axios';
 import { enqueue, isNetworkError } from '../../offline/syncManager';
 import { cacheGet, cacheSet } from '../../offline/db';
 import { useOffline } from '../../offline/useOffline';
+import { PosProductCard } from './PosProductCard';
 
 interface PosProduct {
   productId: number;
@@ -119,12 +120,22 @@ export const PosTerminalPage = () => {
     }
   };
 
-  const filteredProducts = useMemo(() => {
-    if (!searchQuery.trim()) return products;
-    const lowerQ = searchQuery.toLowerCase();
-    return products.filter(
-      p => p.productName.toLowerCase().includes(lowerQ) || p.sku.toLowerCase().includes(lowerQ)
-    );
+  // Una tarjeta por prenda: se agrupan las variantes (color/talla) y la búsqueda filtra por prenda completa.
+  const productGroups = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const byProduct = new Map<number, PosProduct[]>();
+    for (const p of products) {
+      if (!byProduct.has(p.productId)) byProduct.set(p.productId, []);
+      byProduct.get(p.productId)!.push(p);
+    }
+    const groups: { productId: number; variants: PosProduct[]; preferredVariantId?: number }[] = [];
+    for (const [productId, variants] of byProduct) {
+      if (!q) { groups.push({ productId, variants }); continue; }
+      const nameMatch = variants[0].productName.toLowerCase().includes(q);
+      const skuMatch = variants.find(v => v.sku.toLowerCase().includes(q) || `${v.size} ${v.color}`.toLowerCase().includes(q));
+      if (nameMatch || skuMatch) groups.push({ productId, variants, preferredVariantId: skuMatch?.variantId });
+    }
+    return groups;
   }, [products, searchQuery]);
 
   const total = useMemo(() => {
@@ -340,7 +351,7 @@ export const PosTerminalPage = () => {
 
         <input
           type="text"
-          placeholder="Buscar por nombre o SKU..."
+          placeholder="Buscar por prenda, SKU, color o talla..."
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
           style={{ width: '100%', padding: '10px', marginBottom: '20px', borderRadius: '4px', border: '1px solid #ccc' }}
@@ -356,59 +367,18 @@ export const PosTerminalPage = () => {
         {error && <div style={{ padding: '10px', backgroundColor: '#f8d7da', color: '#721c24', marginBottom: '15px', borderRadius: '4px' }}>{error}</div>}
         {successMessage && <div style={{ padding: '10px', backgroundColor: '#d4edda', color: '#155724', marginBottom: '15px', borderRadius: '4px', fontWeight: 'bold' }}>{successMessage}</div>}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '15px' }}>
-          {filteredProducts.map(p => {
-            const inCart = cart.find(c => c.product.variantId === p.variantId)?.quantity || 0;
-            const canAdd = inCart < p.available;
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '15px' }}>
+          {productGroups.map(g => (
+            <PosProductCard
+              key={g.productId}
+              variants={g.variants}
+              preferredVariantId={g.preferredVariantId}
+              inCart={(variantId) => cart.find(c => c.product.variantId === variantId)?.quantity || 0}
+              onAdd={(v) => addToCart(v as PosProduct)}
+            />
+          ))}
 
-            return (
-              <div key={p.variantId} style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '15px', backgroundColor: '#fff', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ height: '100px', backgroundColor: '#f5f5f5', marginBottom: '10px', borderRadius: '4px', overflow: 'hidden' }}>
-                  {p.imageUrl ? (
-                    <img src={p.imageUrl} alt={p.productName} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                  ) : (
-                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: '0.8rem' }}>Sin imagen</div>
-                  )}
-                </div>
-                <h5 style={{ margin: '0 0 5px 0', fontSize: '1rem' }}>{p.productName}</h5>
-                <p style={{ margin: '0 0 5px 0', fontSize: '0.8rem', color: '#666' }}>SKU: {p.sku}</p>
-                <p style={{ margin: '0 0 5px 0', fontSize: '0.8rem' }}>{p.size} | {p.color}</p>
-                
-                {(p as any).discount ? (
-                  <>
-                    <p style={{ margin: '0 0 2px 0', textDecoration: 'line-through', color: '#999', fontSize: '0.85rem' }}>Bs. {Number(p.price).toFixed(2)}</p>
-                    <p style={{ margin: '0 0 2px 0', color: '#dc3545', fontSize: '0.75rem', fontWeight: 'bold' }}>
-                      {(p as any).discount.type === 'PERCENTAGE' ? `-${(p as any).discount.value}%` : `-Bs.${(p as any).discount.value}`} OFF
-                    </p>
-                    <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', fontSize: '1.1rem', color: '#28a745' }}>Bs. {Number((p as any).finalPrice).toFixed(2)}</p>
-                  </>
-                ) : (
-                  <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', fontSize: '1.1rem' }}>Bs. {Number(p.price).toFixed(2)}</p>
-                )}
-                
-                <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.8rem', color: 'green', fontWeight: 'bold' }}>Stock: {p.available}</span>
-                  <button 
-                    onClick={() => addToCart(p)}
-                    disabled={!canAdd}
-                    style={{ 
-                      padding: '5px 10px', 
-                      backgroundColor: canAdd ? '#007bff' : '#ccc', 
-                      color: '#fff', 
-                      border: 'none', 
-                      borderRadius: '4px', 
-                      cursor: canAdd ? 'pointer' : 'not-allowed', 
-                      fontSize: '0.8rem' 
-                    }}
-                  >
-                    Agregar
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-
-          {filteredProducts.length === 0 && (
+          {productGroups.length === 0 && (
             <div style={{ gridColumn: '1 / -1', padding: '40px', textAlign: 'center', color: '#666' }}>
               No se encontraron productos.
             </div>
@@ -504,7 +474,7 @@ export const PosTerminalPage = () => {
               {cart.map(item => (
                 <div key={item.product.variantId} style={{ display: 'flex', flexDirection: 'column', paddingBottom: '10px', borderBottom: '1px solid #eee' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                    <strong style={{ fontSize: '0.9rem' }}>{item.product.productName} ({item.product.size})</strong>
+                    <strong style={{ fontSize: '0.9rem' }}>{item.product.productName} ({item.product.size} · {item.product.color})</strong>
                     <button onClick={() => removeFromCart(item.product.variantId)} style={{ background: 'none', border: 'none', color: 'red', cursor: 'pointer', fontSize: '0.8rem' }}>✖</button>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

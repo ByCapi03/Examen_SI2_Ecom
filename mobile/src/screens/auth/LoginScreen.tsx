@@ -46,12 +46,13 @@ export const LoginScreen: React.FC<Props> = ({ navigation, route }) => {
       const pendingReservation = route.params?.pendingReservation;
       if (pendingReservation) {
         navigation.replace('CreateReservation', pendingReservation);
-      } else {
-        navigation.navigate('MainTabs');
       }
+      // Sin reserva pendiente no se navega: al iniciar sesión el navegador cambia solo a MainTabs.
     } catch (err: any) {
       if (err.response?.status === 401) {
         setError(err.response?.data?.message || 'Correo o contraseña incorrectos.');
+      } else if (!err.response) {
+        setError(`No se pudo conectar con el servidor (${api.defaults.baseURL}). Revisa que el backend y el túnel estén encendidos y que EXPO_PUBLIC_API_URL sea la URL actual.`);
       } else {
         setError(err.response?.data?.message || 'Error al intentar iniciar sesión.');
       }

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import * as SecureStore from 'expo-secure-store';
+import { secureStorage } from '../storage/secureStorage';
 import { User } from '../types';
 
 interface AuthContextType {
@@ -21,8 +21,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const loadStoredAuth = async () => {
       try {
-        const storedToken = await SecureStore.getItemAsync('userToken');
-        const storedUser = await SecureStore.getItemAsync('userData');
+        const storedToken = await secureStorage.getItem('userToken');
+        const storedUser = await secureStorage.getItem('userData');
         if (storedToken && storedUser) {
           setToken(storedToken);
           setUser(JSON.parse(storedUser));
@@ -38,8 +38,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (newToken: string, newUser: User) => {
     try {
-      await SecureStore.setItemAsync('userToken', newToken);
-      await SecureStore.setItemAsync('userData', JSON.stringify(newUser));
+      await secureStorage.setItem('userToken', newToken);
+      await secureStorage.setItem('userData', JSON.stringify(newUser));
       setToken(newToken);
       setUser(newUser);
     } catch (e) {
@@ -49,8 +49,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      await SecureStore.deleteItemAsync('userToken');
-      await SecureStore.deleteItemAsync('userData');
+      await secureStorage.removeItem('userToken');
+      await secureStorage.removeItem('userData');
       setToken(null);
       setUser(null);
     } catch (e) {

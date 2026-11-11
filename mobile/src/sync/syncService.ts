@@ -4,7 +4,7 @@
  * POST /sync/batch cuando vuelve la conectividad (al reactivar la app,
  * periódicamente o manualmente).
  */
-import * as SecureStore from 'expo-secure-store';
+import { secureStorage } from '../storage/secureStorage';
 import { api } from '../api/api';
 import { offlineQueueRepository, OfflineOperation } from '../database/offlineQueue.repository';
 
@@ -34,7 +34,7 @@ export function isNetworkError(err: any): boolean {
 
 export async function currentUser(): Promise<{ id: number; tenantId: number } | null> {
   try {
-    const raw = await SecureStore.getItemAsync('userData');
+    const raw = await secureStorage.getItem('userData');
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;

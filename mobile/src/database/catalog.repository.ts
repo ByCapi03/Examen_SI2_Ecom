@@ -9,7 +9,7 @@ export const catalogRepository = {
     const db = await getDatabase();
     const now = Date.now();
 
-    await db.withExclusiveTransactionAsync(async (txn) => {
+    await db.withTransactionAsync(async () => { const txn = db;
       for (const p of products) {
         // Upsert de categorías únicas
         if (p.categoryId && p.categoryName) {
@@ -114,7 +114,7 @@ export const catalogRepository = {
     const db = await getDatabase();
     const now = Date.now();
 
-    await db.withExclusiveTransactionAsync(async (txn) => {
+    await db.withTransactionAsync(async () => { const txn = db;
       // 1. Guardar o actualizar producto
       const discountStr = product.discount ? JSON.stringify(product.discount) : null;
       await txn.runAsync(
