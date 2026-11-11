@@ -57,6 +57,8 @@ export const TenantRegisterPage = () => {
   const planPrice = plan ? (cycle === 'YEARLY' ? Number(plan.priceYearly ?? plan.priceMonthly * 10) : plan.priceMonthly) : 0;
 
   const [step, setStep] = useState<Step>('form');
+  const [stripeOn, setStripeOn] = useState(false);
+  useEffect(() => { api.get('/saas/billing/config').then((r) => setStripeOn(!!r.data?.stripeEnabled)).catch(() => {}); }, []);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
@@ -175,7 +177,13 @@ export const TenantRegisterPage = () => {
             <svg width="32" height="32" fill="none" stroke="#16a34a" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
           </div>
           <h2 style={{ margin:'0 0 6px', fontSize:'1.6rem', fontWeight:800, color: G }}>¡Empresa activada!</h2>
-          {!isFree && <p style={{ color:'#16a34a', fontWeight:600, fontSize:'0.88rem', margin:'0 0 20px' }}>✓ Pago de ${planPrice}{cycle === 'YEARLY' ? '/año' : '/mes'} procesado</p>}
+          {result?.pendingPlan ? (
+            <p style={{ color:'#92400e', background:'#fef3c7', borderRadius:10, padding:'10px 14px', fontWeight:600, fontSize:'0.86rem', margin:'0 0 20px' }}>
+              Tu empresa se creó con el plan Básico. Para activar el {result.pendingPlan.name} ({result.pendingPlan.billingCycle === 'YEARLY' ? 'anual' : 'mensual'}) inicia sesión y paga con tarjeta en «Mi suscripción».
+            </p>
+          ) : !isFree && (
+            <p style={{ color:'#92400e', fontWeight:600, fontSize:'0.86rem', margin:'0 0 20px' }}>Plan activado en modo demostración (sin cobro real).</p>
+          )}
 
           <div style={{ background: Cr, borderRadius:14, padding:'20px 24px', textAlign:'left', marginBottom:24, border:'1px solid #e8e3d9' }}>
             {[
@@ -381,7 +389,7 @@ export const TenantRegisterPage = () => {
                   >
                     {busy ? (
                       <><svg width="17" height="17" fill="none" viewBox="0 0 24 24" style={{ animation:'spin 0.8s linear infinite' }}><circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.3)" strokeWidth="4"/><path fill="rgba(255,255,255,0.9)" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Procesando pago…</>
-                    ) : `Pagar $${planPrice}${cycle === 'YEARLY' ? '/año' : '/mes'} y activar empresa`}
+                    ) : (stripeOn ? 'Crear empresa (pagarás tu plan en el panel)' : `Activar empresa (demostración, sin cobro) · $${planPrice}${cycle === 'YEARLY' ? '/año' : '/mes'}`)}
                   </button>
                   <button type="button" onClick={() => { setStep('form'); setErr(''); }}
                     style={{ width:'100%', background:'none', border:'none', cursor:'pointer', color:'#9ca3af', fontSize:'0.8rem', padding:'10px 0', marginTop:4 }}>

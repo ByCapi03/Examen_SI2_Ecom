@@ -51,6 +51,7 @@ import { SyncConflictsPage } from '../features/sync/SyncConflictsPage';
 import { AiReportsPage } from '../features/ai-reports/AiReportsPage';
 import { AnalyticsPage } from '../features/analytics/AnalyticsPage';
 import { PricingPage } from '../features/saas/PricingPage';
+import { AccessNotice } from '../components/common/AccessNotice';
 import { PlatformPage } from '../features/platform/PlatformPage';
 import { SubscriptionPage } from '../features/platform/SubscriptionPage';
 import { LandingPage } from '../features/landing/LandingPage';
@@ -67,6 +68,7 @@ const DashboardIndex = () => {
 export const AppRouter = () => {
   return (
     <BrowserRouter>
+      <AccessNotice />
       <Routes>
         {/* Auth Routes */}
         <Route element={<AuthLayout />}>

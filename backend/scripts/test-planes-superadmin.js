@@ -113,7 +113,8 @@ const login = async (email, password = '123456') => (await call('POST', '/auth/l
     check('S26', 'El SuperAdmin suspende la empresa', r.status === 200 && r.data?.active === false);
     check('S27', 'El admin suspendido ya no puede iniciar sesión', !(await login(`adminzz.${RUN}@test.com`)));
     check('S28', 'Su sesión previa deja de funcionar → 403', (await call('GET', '/branches', adm)).status === 403);
-    check('S29', 'Su tienda pública deja de mostrarse → 404', (await call('GET', `/saas/tenants/by-slug/zz-plan-${RUN}`)).status === 404);
+    check('S28b', 'El catálogo móvil (por token) de una empresa suspendida también se bloquea → 403', (await call('GET', '/store/products', adm)).status === 403);
+    { const st = await call('GET', `/saas/tenants/by-slug/zz-plan-${RUN}`); check('S29', 'Su tienda pública responde «no disponible» (403 TENANT_SUSPENDED)', st.status === 403 && st.data?.code === 'TENANT_SUSPENDED', JSON.stringify(st.data)); }
     await call('PATCH', `/saas/admin/tenants/${T}/active`, sa, { active: true });
     check('S30', 'Reactivada, vuelve a funcionar', !!(await login(`adminzz.${RUN}@test.com`)));
     check('S31', 'Suspender una empresa inexistente → 404', (await call('PATCH', '/saas/admin/tenants/999999/active', sa, { active: false })).status === 404);

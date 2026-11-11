@@ -20,6 +20,16 @@ export const StoreShell = ({ children }: { children?: React.ReactNode }) => {
 
   if (status === 'loading') return <Centered><p style={{ margin: 0, color: '#6b7280' }}>Cargando tienda…</p></Centered>;
 
+  if (status === 'suspended') {
+    return (
+      <Centered>
+        <h2 style={{ margin: '0 0 8px', color: '#182D2A' }}>Tienda no disponible</h2>
+        <p style={{ margin: '0 0 22px', color: '#6b7280', lineHeight: 1.5 }}>Esta tienda no está disponible por el momento. Vuelve a intentarlo más tarde o contacta directamente al negocio.</p>
+        <Link to="/" style={linkBtn}>Ir al inicio</Link>
+      </Centered>
+    );
+  }
+
   if (status === 'offline') {
     return (
       <Centered>

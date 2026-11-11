@@ -27,7 +27,9 @@ Leyenda: ✅ implementado y probado · 🟡 implementado, con prueba parcial o c
 | Límites por plan: sucursales, productos, usuarios internos | ✅ aplicados en backend, visibles en precios y *Mi suscripción* |
 | Vencimiento: bloquea altas y funciones del plan; la sincronización offline sigue aceptándose | ✅ |
 | Suspensión de empresas (login, sesiones activas y tienda pública) | ✅ |
-| Cobro real del plan (pasarela, facturas, recordatorios por correo) | ❌ el cambio de plan es simulado |
+| Cobro real del plan con Stripe Checkout (confirmación, idempotencia, webhook firmado) | ✅ 16 pruebas contra un Stripe simulado; **falta probarlo con tu clave real de Stripe (modo test)** |
+| Facturas/recibos y recordatorios de vencimiento por correo | ❌ |
+| Avisos de empresa suspendida / plan vencido (web y móvil) | ✅ web verificada en navegador; móvil solo compilado |
 
 ## 2. Qué falta IMPLEMENTAR (lista previa; los puntos 1 y 2 ya se resolvieron)
 

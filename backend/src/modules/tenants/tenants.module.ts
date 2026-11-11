@@ -5,6 +5,7 @@ import { Plan } from './plan.entity';
 import { Subscription } from './subscription.entity';
 import { SubscriptionHistory } from './subscription-history.entity';
 import { TenantsService } from './tenants.service';
+import { BillingService } from './billing.service';
 import { TenantsController } from './tenants.controller';
 import { AuthModule } from '../auth/auth.module';
 
@@ -14,8 +15,8 @@ import { AuthModule } from '../auth/auth.module';
     AuthModule,
   ],
   controllers: [TenantsController],
-  providers: [TenantsService],
-  exports: [TenantsService, TypeOrmModule],
+  providers: [TenantsService, BillingService],
+  exports: [TenantsService, BillingService, TypeOrmModule],
 })
 export class TenantsModule {}
 

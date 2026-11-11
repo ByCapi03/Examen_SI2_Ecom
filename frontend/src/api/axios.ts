@@ -56,7 +56,16 @@ api.interceptors.response.use(
     return response;
   },
   async (error) => {
-    if (error.response && error.response.status === 401) {
+    const status = error.response?.status;
+    const msg: string = String(error.response?.data?.message ?? '');
+    // Empresa suspendida o suscripción vencida: se avisa al usuario con un mensaje claro (ver AccessNotice)
+    if (status === 403 && /suspendid/i.test(msg)) {
+      window.dispatchEvent(new CustomEvent('dressed:access', { detail: { kind: 'SUSPENDED', message: msg } }));
+    } else if (status === 402) {
+      window.dispatchEvent(new CustomEvent('dressed:access', { detail: { kind: 'EXPIRED', message: msg } }));
+    }
+    // Un 401 en el propio login (credenciales incorrectas, empresa suspendida…) se muestra en el formulario
+    if (error.response && error.response.status === 401 && !String(error.config?.url ?? '').includes('/auth/')) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';

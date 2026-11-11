@@ -19,7 +19,7 @@ export interface StoreInfo { name: string; slug: string; branches: StoreBranch[]
 interface Ctx {
   slug: string;
   store: StoreInfo | null;
-  status: 'loading' | 'ready' | 'notfound' | 'offline';
+  status: 'loading' | 'ready' | 'notfound' | 'offline' | 'suspended';
   /** Empresa de la sesión iniciada (si no coincide con la tienda de la URL, la API devolvería datos de otra). */
   sessionStore: { slug: string; name: string } | null;
   mismatch: boolean;
@@ -68,6 +68,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
         if (stale) return;
         // 404 = la tienda no existe. Sin respuesta (offline / red caída) = usar la última copia guardada.
         if (err?.response?.status === 404) { setStore(null); setStatus('notfound'); return; }
+        if (err?.response?.data?.code === 'TENANT_SUSPENDED') { setStore(null); setStatus('suspended'); return; }
         let cached: StoreInfo | null = null;
         try { cached = JSON.parse(localStorage.getItem(`store_info:${slug}`) || 'null'); } catch { /* ignorar */ }
         if (cached) { setStore(cached); setStatus('ready'); } else { setStore(null); setStatus('offline'); }

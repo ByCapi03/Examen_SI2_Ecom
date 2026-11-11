@@ -1,11 +1,11 @@
-import { Injectable, NotFoundException, ConflictException, Logger, OnModuleInit, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException, ConflictException, Logger, OnModuleInit, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { randomInt } from 'crypto';
 import { MailService } from '../../common/mail.service';
-import { TenantGuard } from '../../common/guards/tenant.guard';
+import { invalidateTenantStatus } from '../../common/tenancy/tenant-status';
 import { Tenant } from './tenant.entity';
 import { Subscription } from './subscription.entity';
 import { Plan } from './plan.entity';
@@ -255,6 +255,18 @@ export class TenantsService implements OnModuleInit {
     return this.getMyTenant(tenantId);
   }
 
+  /** Rechaza el cambio si la empresa usa más recursos de los que permite el plan destino. */
+  async assertWithinPlan(tenantId: number, plan: Plan) {
+    const use = await this.usage(tenantId);
+    const over: string[] = [];
+    if (use.branches > plan.maxBranches) over.push(`${use.branches} sucursales (máx. ${plan.maxBranches})`);
+    if (plan.maxProducts != null && use.products > plan.maxProducts) over.push(`${use.products} productos (máx. ${plan.maxProducts})`);
+    if (plan.maxUsers != null && use.users > plan.maxUsers) over.push(`${use.users} usuarios internos (máx. ${plan.maxUsers})`);
+    if (over.length) {
+      throw new ConflictException(`No se puede cambiar al plan ${plan.name}: la empresa usa ${over.join(', ')}. Reduce el uso primero.`);
+    }
+  }
+
   /**
    * Contrata, cambia o renueva el plan. Reinicia el período según el ciclo (mensual/anual).
    * Se rechaza si la empresa usa más recursos de los que permite el plan destino.
@@ -266,14 +278,7 @@ export class TenantsService implements OnModuleInit {
     if (!sub) throw new NotFoundException('Suscripción no encontrada');
     const cycle = Number(plan.priceMonthly) === 0 ? 'MONTHLY' : TenantsService.normalizeCycle(billingCycle);
 
-    const use = await this.usage(tenantId);
-    const over: string[] = [];
-    if (use.branches > plan.maxBranches) over.push(`${use.branches} sucursales (máx. ${plan.maxBranches})`);
-    if (plan.maxProducts != null && use.products > plan.maxProducts) over.push(`${use.products} productos (máx. ${plan.maxProducts})`);
-    if (plan.maxUsers != null && use.users > plan.maxUsers) over.push(`${use.users} usuarios internos (máx. ${plan.maxUsers})`);
-    if (over.length) {
-      throw new ConflictException(`No se puede cambiar al plan ${plan.name}: la empresa usa ${over.join(', ')}. Reduce el uso primero.`);
-    }
+    await this.assertWithinPlan(tenantId, plan);
 
     const previousPlanId = sub.planId;
     const prevPrice = Number(sub.plan?.priceMonthly ?? 0);
@@ -352,7 +357,7 @@ export class TenantsService implements OnModuleInit {
     if (!tenant || tenant.slug === TenantsService.PLATFORM_SLUG) throw new NotFoundException('Empresa no encontrada');
     tenant.active = !!active;
     await this.tenantRepo.save(tenant);
-    TenantGuard.invalidate(id);
+    invalidateTenantStatus(id);
     await this.subRepo.update({ tenantId: id }, { status: active ? 'ACTIVE' : 'SUSPENDED' });
     const sub = await this.subRepo.findOne({ where: { tenantId: id } });
     if (sub) {
@@ -388,8 +393,11 @@ export class TenantsService implements OnModuleInit {
   }
 
   async findBySlugPublic(slug: string) {
-    const tenant = await this.tenantRepo.findOne({ where: { slug, active: true } });
+    const tenant = await this.tenantRepo.findOne({ where: { slug } });
     if (!tenant) throw new NotFoundException('Empresa no encontrada');
+    if (!tenant.active) {
+      throw new ForbiddenException({ message: 'Esta tienda no está disponible por el momento.', code: 'TENANT_SUSPENDED' });
+    }
     const branches = await this.dataSource.query(
       `SELECT b.name, b.address, b.phone, c.name AS city
          FROM branches b LEFT JOIN cities c ON c.id = b."cityId"
@@ -453,8 +461,14 @@ export class TenantsService implements OnModuleInit {
     }
 
     const planCode = data.planCode || 'BASICO';
-    const plan = await this.planRepo.findOne({ where: { code: planCode } });
-    if (!plan) throw new NotFoundException(`Plan ${planCode} no existe`);
+    const requested = await this.planRepo.findOne({ where: { code: planCode } });
+    if (!requested) throw new NotFoundException(`Plan ${planCode} no existe`);
+    // Con cobro real activo (Stripe) un plan de pago NO se concede gratis al registrarse: la empresa nace en
+    // Básico y el administrador paga desde "Mi suscripción". Se informa en `pendingPlan`.
+    const stripeOn = !!process.env.STRIPE_SECRET_KEY && /^sk_(test|live)_/.test(process.env.STRIPE_SECRET_KEY) && process.env.STRIPE_SECRET_KEY !== 'sk_test_mock';
+    const deferPayment = stripeOn && Number(requested.priceMonthly) > 0;
+    const plan = deferPayment ? (await this.planRepo.findOneOrFail({ where: { code: 'BASICO' } })) : requested;
+    const pendingPlan = deferPayment ? { code: requested.code, name: requested.name, billingCycle: TenantsService.normalizeCycle(data.billingCycle) } : null;
 
     await this.ensureRoles();
 
@@ -503,6 +517,7 @@ export class TenantsService implements OnModuleInit {
       const base = {
         tenant: { id: savedTenant.id, name: savedTenant.name, slug: savedTenant.slug },
         plan: { code: plan.code, name: plan.name, priceMonthly: plan.priceMonthly, priceYearly: plan.priceYearly },
+        pendingPlan,
       };
       if (!adminUser || !code) return { ...base, requiresVerification: false };
 

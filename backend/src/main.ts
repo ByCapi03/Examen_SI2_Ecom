@@ -4,7 +4,7 @@ import { DataSource } from 'typeorm';
 import { TenantContextMiddleware } from './common/tenancy/tenant-context.middleware';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { rawBody: true }); // rawBody: verificación de firma de los webhooks de Stripe
   app.enableCors();
   // Contexto multitenant por petición (AsyncLocalStorage)
   const tenantMiddleware = new TenantContextMiddleware(app.get(DataSource));

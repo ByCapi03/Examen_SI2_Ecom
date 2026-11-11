@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../../api/axios';
 import { DashStyles, PageHeader, Card } from '../../components/dashboard/ui';
 import { money, limitText, fmtDate, STATUS_LABEL, price, yearlySaving } from './planUtils';
@@ -31,6 +32,8 @@ export const SubscriptionPage = () => {
   const [cycle, setCycle] = useState<Cycle>('MONTHLY');
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [billing, setBilling] = useState<{ stripeEnabled: boolean; mode: string; currency: string } | null>(null);
+  const [params, setParams] = useSearchParams();
 
   const load = async () => {
     const [m, p] = await Promise.all([api.get('/saas/tenants/me'), api.get('/saas/plans')]);
@@ -38,12 +41,33 @@ export const SubscriptionPage = () => {
     if (m.data.subscription?.billingCycle) setCycle(m.data.subscription.billingCycle);
   };
   useEffect(() => { void load().catch(() => setMsg({ ok: false, text: 'No se pudo cargar tu suscripción.' })); }, []);
+  useEffect(() => { api.get('/saas/billing/config').then((r) => setBilling(r.data)).catch(() => {}); }, []);
+
+  // Regreso desde Stripe Checkout: se confirma el pago en el servidor (que lo verifica con Stripe)
+  useEffect(() => {
+    const paid = params.get('paid');
+    const sessionId = params.get('session_id');
+    if (paid === null) return;
+    setParams({}, { replace: true });
+    if (paid === '0') { setMsg({ ok: false, text: 'El pago fue cancelado. Tu plan no cambió.' }); return; }
+    if (!sessionId) return;
+    setBusy('confirm');
+    api.post('/saas/billing/confirm', { sessionId })
+      .then(async (r) => { await load(); setMsg({ ok: true, text: r.data?.applied === false ? 'Este pago ya estaba aplicado.' : '¡Pago recibido! Tu plan fue actualizado.' }); })
+      .catch((e) => setMsg({ ok: false, text: e.response?.data?.message || 'No pudimos confirmar el pago. Si te cobraron, contacta a soporte.' }))
+      .finally(() => setBusy(''));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const choose = async (code: string) => {
     setBusy(code); setMsg(null);
-    try { await api.patch('/saas/tenants/me/plan', { planCode: code, billingCycle: cycle }); await load(); setMsg({ ok: true, text: 'Plan actualizado correctamente.' }); }
-    catch (e: any) { setMsg({ ok: false, text: e.response?.data?.message || 'No se pudo cambiar el plan.' }); }
-    finally { setBusy(''); }
+    try {
+      const { data } = await api.post('/saas/billing/checkout', { planCode: code, billingCycle: cycle });
+      if (data.mode === 'stripe' && data.url) { window.location.href = data.url; return; } // pago real en Stripe
+      await load();
+      setMsg({ ok: true, text: data.mode === 'simulated' ? 'Plan actualizado (modo simulado: no se realizó ningún cobro).' : 'Plan actualizado correctamente.' });
+    } catch (e: any) { setMsg({ ok: false, text: e.response?.data?.message || 'No se pudo cambiar el plan.' }); }
+    finally { setBusy((b) => (b === code ? '' : b)); }
   };
 
   const sub = me?.subscription;
@@ -54,6 +78,12 @@ export const SubscriptionPage = () => {
     <div className="dz-page">
       <DashStyles />
       <PageHeader title="Mi suscripción" subtitle="Plan contratado, vigencia, consumo y cambio de plan" />
+      {billing && (
+        <div style={{ marginBottom: 12, fontSize: '0.78rem', color: billing.stripeEnabled ? '#15803D' : '#92400e' }}>
+          {billing.stripeEnabled ? `🔒 Pago seguro con tarjeta (Stripe, ${billing.currency}).` : '⚠️ Modo simulado: los cambios de plan no generan cobro real.'}
+        </div>
+      )}
+      {busy === 'confirm' && <div style={{ padding: 10, borderRadius: 8, marginBottom: 14, fontSize: '0.86rem', background: '#e0f2fe', color: '#075985' }}>Confirmando tu pago…</div>}
       {msg && <div style={{ padding: 10, borderRadius: 8, marginBottom: 14, fontSize: '0.86rem', background: msg.ok ? '#dcfce7' : '#fee2e2', color: msg.ok ? '#166534' : '#991b1b' }}>{msg.text}</div>}
 
       <div className="dz-grid dz-2-1" style={{ marginBottom: 18 }}>
@@ -98,7 +128,7 @@ export const SubscriptionPage = () => {
                   <li>{p.aiGenerativeReports ? 'Reportes IA y analítica ML' : free ? 'Sin reportes' : 'Reportes básicos'}</li>
                 </ul>
                 <button className="dz-btn" style={{ width: '100%' }} disabled={!!busy || (isCur && free)} onClick={() => choose(p.code)}>
-                  {busy === p.code ? 'Procesando…' : isCur ? 'Renovar' : 'Elegir plan'}
+                  {busy === p.code ? 'Procesando…' : free ? (isCur ? 'Plan actual' : 'Cambiar a gratis') : billing?.stripeEnabled ? (isCur ? 'Renovar y pagar' : 'Pagar con tarjeta') : (isCur ? 'Renovar' : 'Elegir plan')}
                 </button>
               </div>
             );

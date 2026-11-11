@@ -59,6 +59,7 @@ prenda en el vestidor virtual, la reserva o la compra y paga en línea o en sucu
 | RF-23 | Configuración de apariencia: tema, idioma, moneda, sidebar compacto. | frontend |
 | RF-24 | Notificaciones internas y push: reservas (encargado/cliente) y **alerta de stock bajo** (encargado de la sucursal y administrador). | notifications |
 | RF-26 | **Panel de plataforma (SuperAdmin):** ver empresas, plan, ciclo, vigencia y consumo; ingresos recurrentes (MRR/ARR); cambiar plan o ciclo, extender vigencia y suspender o reactivar empresas. | tenants |
+| RF-28 | **Cobro real de la suscripción con Stripe:** cambiar o renovar un plan de pago exige pagar con tarjeta; el plan se aplica solo con el pago confirmado (consulta a Stripe y webhook firmado), sin duplicar. Sin clave de Stripe funciona en modo demostración, declarado en pantalla. | tenants |
 | RF-27 | **Suscripción por ciclo:** cada plan de pago tiene precio mensual y anual (10 meses); la suscripción vence al terminar el período y el administrador la renueva o cambia desde *Mi suscripción*. | tenants |
 | RF-25 | Generar datos demostrativos (2 empresas, personal, cajas, ventas, bitácora). | scripts |
 
@@ -90,6 +91,8 @@ prenda en el vestidor virtual, la reserva o la compra y paga en línea o en sucu
 | RN-17 | El plan anual cuesta 10 meses (2 meses gratis). Cada contratación o renovación reinicia el período (+1 mes o +1 año); el plan Básico no vence. |
 | RN-18 | Con la suscripción **vencida** no se pueden crear sucursales, productos ni usuarios y se pierden las funciones del plan (IA, ML, reportes). |
 | RN-19 | No se puede bajar a un plan cuyos límites la empresa ya excede (se pide reducir el uso primero). |
+| RN-21 | Con Stripe activo, ningún plan de pago se concede sin pagar: ni por el cambio de plan ni al registrar la empresa (nace en Básico y paga desde *Mi suscripción*). El monto cobrado debe coincidir con el precio del plan. |
+| RN-22 | Al suspenderse una empresa, el personal ve «Tu empresa está suspendida…», el cliente web ve «Tienda no disponible» y la app móvil muestra el aviso y cierra la sesión. |
 | RN-20 | Solo el SuperAdmin suspende empresas: su personal no puede iniciar sesión, sus sesiones activas se rechazan y su tienda pública deja de mostrarse. |
 | RN-05 | Encargado y Cajero deben estar asignados a una sucursal. |
 | RN-06 | El administrador **no entra a una sucursal como espacio de trabajo aparte**: administra todo desde su propio panel lateral; el encargado tiene un panel equivalente, adaptado y limitado a su sucursal. |

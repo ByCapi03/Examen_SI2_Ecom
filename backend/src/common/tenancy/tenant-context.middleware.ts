@@ -2,6 +2,7 @@ import { Injectable, NestMiddleware } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import * as jwt from 'jsonwebtoken';
 import { tenantStorage, TenantStore } from './tenant-context';
+import { isTenantActive } from './tenant-status';
 
 /**
  * Abre un contexto ALS por petición y, si viene la cabecera X-Tenant-Slug,
@@ -26,7 +27,11 @@ export class TenantContextMiddleware implements NestMiddleware {
     if (auth.startsWith('Bearer ')) {
       try {
         const payload: any = jwt.verify(auth.slice(7), process.env.JWT_SECRET || 'defaultSecret');
-        if (payload?.tenantId) store.publicTenantId = Number(payload.tenantId);
+        if (payload?.tenantId) {
+          store.publicTenantId = Number(payload.tenantId);
+          // Empresa suspendida: la vitrina por token (app móvil) también se bloquea
+          if (!(await isTenantActive(this.dataSource, Number(payload.tenantId)))) store.suspended = true;
+        }
       } catch { /* token inválido: lo rechazará el guard donde aplique */ }
     }
     tenantStorage.run(store, () => next());

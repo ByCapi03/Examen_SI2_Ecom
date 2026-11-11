@@ -6,7 +6,7 @@
  * usa para rutas anónimas (vitrina pública, registro de clientes).
  */
 import { AsyncLocalStorage } from 'async_hooks';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 
 export interface TenantStore {
   /** Tenant autenticado (JWT). Tiene prioridad absoluta. */
@@ -15,6 +15,8 @@ export interface TenantStore {
   publicTenantId?: number;
   /** Slug recibido en X-Tenant-Slug (aunque no exista), para distinguir "no indicó tienda" de "tienda inexistente". */
   publicSlug?: string;
+  /** La empresa del token está suspendida (rutas públicas con sesión). */
+  suspended?: boolean;
   userId?: number;
 }
 
@@ -43,6 +45,7 @@ export function getEffectiveTenantId(): number {
  */
 export function requireTenantId(): number {
   const store = tenantStorage.getStore();
+  if (store?.suspended) throw new ForbiddenException('Tu empresa está suspendida. Contacta al soporte de la plataforma.');
   const id = store?.tenantId ?? store?.publicTenantId;
   if (id) return id;
   if (store?.publicSlug) throw new NotFoundException('Tienda no encontrada');
