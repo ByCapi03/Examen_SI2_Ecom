@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/axios';
-import { Sparkline } from '../ai-reports/ReportChart';
 import { DashStyles, PageHeader, PlanBadge, PlanGate } from '../../components/dashboard/ui';
 
 /**
@@ -22,6 +21,170 @@ export const AnalyticsPage = () => (
     </PlanGate>
   </div>
 );
+
+
+const RISK_STYLE: Record<string, { color: string; bg: string; label: string }> = {
+  QUIEBRE: { color: '#B91C1C', bg: '#FEE2E2', label: 'Sin stock' },
+  REPONER: { color: '#B45309', bg: '#FEF3C7', label: 'Reponer' },
+  OK: { color: '#15803D', bg: '#DCFCE7', label: 'Stock suficiente' },
+};
+const CONF_STYLE: Record<string, { color: string; bg: string; hint: string }> = {
+  ALTA: { color: '#15803D', bg: '#DCFCE7', hint: 'Las ventas siguen un patrón estable: el pronóstico es confiable.' },
+  MEDIA: { color: '#B45309', bg: '#FEF3C7', hint: 'Las ventas varían bastante de una semana a otra: úsalo como referencia.' },
+  BAJA: { color: '#B91C1C', bg: '#FEE2E2', hint: 'Ventas muy irregulares o pocas semanas con ventas: tómalo solo como orientación.' },
+};
+
+const Badge = ({ text, color, bg, title }: { text: string; color: string; bg: string; title?: string }) => (
+  <span title={title} style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 999, fontSize: '0.72rem', fontWeight: 700, color, background: bg, whiteSpace: 'nowrap' }}>{text}</span>
+);
+
+/** Barras = unidades vendidas por semana; barras claras = pronóstico. Al pasar el mouse sobre una barra se ve su valor. */
+const DemandChart = ({ history, forecast }: { history: number[]; forecast: number[] }) => {
+  const all = [...history, ...forecast];
+  const W = 250, H = 84, padL = 30, padB = 16, padT = 6;
+  const max = Math.max(...all, 1);
+  const niceMax = Math.ceil(max / 10) * 10 || 10;
+  const bw = (W - padL) / all.length;
+  const y = (v: number) => padT + (H - padT - padB) * (1 - v / niceMax);
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label="Unidades vendidas por semana y pronóstico">
+      {[0, niceMax / 2, niceMax].map((t) => (
+        <g key={t}>
+          <line x1={padL} x2={W} y1={y(t)} y2={y(t)} style={{ stroke: 'var(--atemporal-border)' }} strokeWidth="1" />
+          <text x={padL - 4} y={y(t) + 3} fontSize="9" textAnchor="end" style={{ fill: 'var(--atemporal-muted)' }}>{Math.round(t)}</text>
+        </g>
+      ))}
+      {all.map((v, i) => {
+        const isForecast = i >= history.length;
+        const label = isForecast ? `Pronóstico: semana +${i - history.length + 1}` : `Hace ${history.length - i} sem.`;
+        return (
+          <rect key={i} x={padL + i * bw + 1} y={y(v)} width={Math.max(bw - 2, 1)} height={Math.max(y(0) - y(v), v > 0 ? 1 : 0)} rx="1.5"
+            style={{ fill: isForecast ? 'var(--atemporal-gold)' : 'var(--atemporal-green)', opacity: isForecast ? 0.6 : 0.9 }}>
+            <title>{`${label}: ${Math.round(v)} u.`}</title>
+          </rect>
+        );
+      })}
+      <line x1={padL + history.length * bw} x2={padL + history.length * bw} y1={padT} y2={H - padB} style={{ stroke: 'var(--atemporal-muted)' }} strokeDasharray="3 3" strokeWidth="1" />
+      <text x={padL} y={H - 3} fontSize="9" style={{ fill: 'var(--atemporal-muted)' }}>hace {history.length} sem.</text>
+      <text x={padL + history.length * bw + 3} y={H - 3} fontSize="9" style={{ fill: 'var(--atemporal-gold)' }}>pronóstico</text>
+    </svg>
+  );
+};
+
+const trendText = (p: any) => {
+  const pct = Math.abs(p.weeklyChangePct);
+  if (p.trend === 'CRECIENTE') return <span style={{ color: '#15803D', fontWeight: 600 }}>▲ Sube {pct}% por semana</span>;
+  if (p.trend === 'DECRECIENTE') return <span style={{ color: '#B91C1C', fontWeight: 600 }}>▼ Baja {pct}% por semana</span>;
+  return <span style={{ color: 'var(--atemporal-muted)', fontWeight: 600 }}>■ Estable</span>;
+};
+
+const DemandHelp = ({ horizon, weeks }: { horizon: number; weeks: number }) => (
+  <details open style={{ background: 'var(--atemporal-bg, #F4F1EA)', border: '1px solid var(--atemporal-border)', borderRadius: 12, padding: '12px 16px', marginBottom: 16, fontSize: '0.85rem', lineHeight: 1.55 }}>
+    <summary style={{ cursor: 'pointer', fontWeight: 700 }}>¿Qué es esto y cómo se lee?</summary>
+    <p style={{ margin: '8px 0' }}>
+      El sistema mira cuántas unidades vendiste de cada producto en las últimas <b>{weeks} semanas completas</b>, traza la línea de tendencia que mejor las
+      resume (<i>aprendizaje supervisado: regresión lineal</i>) y la prolonga <b>{horizon} semana(s)</b> hacia adelante. Con eso estima cuánto venderás y si te alcanza el stock.
+    </p>
+    <ul style={{ margin: '0 0 6px', paddingLeft: 18 }}>
+      <li><b>Barras oscuras:</b> unidades vendidas cada semana. <b>Barras claras:</b> lo que se espera vender. Pasa el mouse para ver el número.</li>
+      <li><b>Stock de seguridad:</b> unidades extra que conviene tener por si las ventas suben más de lo esperado (cubre el 95 % de los casos).</li>
+      <li><b>Reponer</b> = ventas esperadas + stock de seguridad − stock actual. Si es 0 o menos, no hace falta comprar.</li>
+      <li><b>Confianza:</b> qué tan parecidas son las ventas reales a la línea. Si es <b>baja</b>, el pronóstico es solo una orientación.</li>
+      <li>La semana en curso no se usa para entrenar porque todavía está incompleta.</li>
+    </ul>
+  </details>
+);
+
+const DemandRow = ({ p, horizon }: { p: any; horizon: number }) => {
+  const [open, setOpen] = useState(false);
+  const risk = RISK_STYLE[p.risk];
+  const conf = CONF_STYLE[p.confidence];
+  const slopeAbs = Math.abs(p.slope).toFixed(1);
+  const slope = `${p.slope > 0 ? '+' : p.slope < 0 ? '−' : ''}${slopeAbs}`;
+  return (
+    <>
+      <tr style={{ cursor: 'pointer' }} onClick={() => setOpen((o) => !o)} title="Clic para ver el detalle del cálculo">
+        <td style={{ fontWeight: 700 }}>{p.productName}<div style={{ fontWeight: 400, fontSize: '0.72rem', color: 'var(--atemporal-muted)', margin: '2px 0 5px' }}>Promedio: {p.avgWeeklyUnits} u./semana</div><Badge text={`Confianza ${p.confidence.toLowerCase()}`} color={conf.color} bg={conf.bg} title={conf.hint} /></td>
+        <td><DemandChart history={p.history} forecast={p.forecast} /></td>
+        <td>{trendText(p)}</td>
+        <td style={{ textAlign: 'right' }}><b>{Math.round(p.forecastTotal)}</b> u.<div style={{ fontSize: '0.72rem', color: 'var(--atemporal-muted)' }}>en {horizon} sem.</div></td>
+        <td style={{ textAlign: 'right' }}><b>{p.availableStock}</b> u.<div style={{ fontSize: '0.72rem', color: 'var(--atemporal-muted)' }}>{p.daysOfStock == null ? 'sin demanda' : `te duran ≈ ${Math.round(p.daysOfStock)} días`}</div></td>
+        <td style={{ whiteSpace: 'normal', minWidth: 230, maxWidth: 330 }}>
+          <Badge text={p.suggestedReorder > 0 ? `${risk.label}: comprar ${p.suggestedReorder} u.` : risk.label} color={risk.color} bg={risk.bg} />
+          <div style={{ fontSize: '0.78rem', marginTop: 5, lineHeight: 1.4 }}>{p.action}</div>
+        </td>
+        <td style={{ color: 'var(--atemporal-muted)' }}>{open ? '▲' : '▼'}</td>
+      </tr>
+      {open && (
+        <tr>
+          <td colSpan={7} style={{ background: 'var(--atemporal-bg, #F4F1EA)', whiteSpace: 'normal', fontSize: '0.8rem', lineHeight: 1.6 }}>
+            <b>Detalle del cálculo</b>
+            <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+              <li><b>Reposición:</b> {Math.round(p.forecastTotal)} (ventas esperadas) + {p.safetyStock} (stock de seguridad) − {p.availableStock} (stock actual) = <b>{Math.max(0, Math.round(p.forecastTotal) + p.safetyStock - p.availableStock)}</b>{Math.round(p.forecastTotal) + p.safetyStock - p.availableStock <= 0 ? ' → no hace falta comprar' : ''}</li>
+              <li><b>Pendiente de la línea:</b> {slope} unidades por semana (cada semana se vende {slopeAbs} u. {p.slope >= 0 ? 'más' : 'menos'} que la anterior).</li>
+              <li><b>R² = {p.r2}</b> (0 a 1): qué parte de la variación de las ventas explica la línea. Cercano a 1 = patrón claro; cercano a 0 = ventas sin tendencia (si además el error es bajo, el producto es simplemente estable).</li>
+              <li><b>MAE = {p.mae ?? '—'}</b>: error promedio en unidades por semana al predecir las últimas 2 semanas con el modelo entrenado sin ellas.</li>
+              <li><b>Confianza {p.confidence}:</b> {conf.hint}</li>
+            </ul>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+};
+
+const DemandTab = ({ demand, weeks, horizon, setWeeks, setHorizon }: { demand: any; weeks: number; horizon: number; setWeeks: (n: number) => void; setHorizon: (n: number) => void }) => {
+  const [filter, setFilter] = useState<'all' | 'urgent' | 'ok'>('all');
+  const products: any[] = demand?.products ?? [];
+  const urgent = products.filter((p) => p.risk !== 'OK');
+  const noStock = products.filter((p) => p.risk === 'QUIEBRE').length;
+  const units = products.reduce((a, p) => a + p.suggestedReorder, 0);
+  const shown = filter === 'urgent' ? urgent : filter === 'ok' ? products.filter((p) => p.risk === 'OK') : products;
+  const chip = (id: typeof filter, label: string) => (
+    <button key={id} onClick={() => setFilter(id)} className={`dz-btn ${filter === id ? '' : 'ghost'}`} style={{ padding: '6px 14px', fontSize: '0.78rem' }}>{label}</button>
+  );
+  const card = (label: string, value: string, color: string) => (
+    <div className="dz-card" style={{ padding: '12px 16px', flex: '1 1 150px' }}>
+      <div style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--atemporal-muted)' }}>{label}</div>
+      <div style={{ fontSize: '1.5rem', fontWeight: 800, color }}>{value}</div>
+    </div>
+  );
+  return (
+    <>
+      <DemandHelp horizon={horizon} weeks={weeks} />
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
+        <label>Historial: <select className="dz-input" value={weeks} onChange={(e) => setWeeks(+e.target.value)}>{[8, 12, 26, 52].map((w) => <option key={w} value={w}>{w} semanas</option>)}</select></label>
+        <label>Pronosticar: <select className="dz-input" value={horizon} onChange={(e) => setHorizon(+e.target.value)}>{[1, 2, 4, 8].map((h) => <option key={h} value={h}>próximas {h} semana(s)</option>)}</select></label>
+      </div>
+      {products.length === 0 && <div style={{ color: 'var(--atemporal-muted)' }}>Todavía no hay ventas completas en las últimas {weeks} semanas para entrenar el modelo.</div>}
+      {products.length > 0 && (
+        <>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+            {card('Productos a reponer', `${urgent.length} de ${products.length}`, urgent.length ? '#B45309' : '#15803D')}
+            {card('Sin stock', String(noStock), noStock ? '#B91C1C' : '#15803D')}
+            {card('Unidades a comprar', String(units), 'var(--atemporal-text)')}
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+            {chip('all', `Todos (${products.length})`)}{chip('urgent', `Urgentes (${urgent.length})`)}{chip('ok', `Stock suficiente (${products.length - urgent.length})`)}
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="dz-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr>
+                  <th>Producto</th><th>Ventas por semana</th><th>Tendencia</th>
+                  <th style={{ textAlign: 'right' }}>Se venderían</th><th style={{ textAlign: 'right' }}>Stock actual</th>
+                  <th>Qué hacer</th><th />
+                </tr>
+              </thead>
+              <tbody>{shown.map((p) => <DemandRow key={p.productId} p={p} horizon={demand.horizon} />)}</tbody>
+            </table>
+          </div>
+          <p style={{ fontSize: 12, color: 'var(--atemporal-muted)' }}>Ordenado por urgencia. Haz clic en un producto para ver cómo se calculó. {demand.model}.</p>
+        </>
+      )}
+    </>
+  );
+};
 
 const AnalyticsContent = () => {
   const [tab, setTab] = useState<'demand' | 'segments'>('demand');
@@ -48,7 +211,6 @@ const AnalyticsContent = () => {
 
   useEffect(() => { void load(); }, [tab, weeks, horizon, k]);
 
-  const riskColor: Record<string, string> = { QUIEBRE: '#b91c1c', REPONER: '#b45309', OK: '#15803d' };
   const tabBtn = (t: typeof tab, label: string) => (
     <button onClick={() => setTab(t)} style={{ padding: '8px 16px', border: 'none', borderBottom: tab === t ? '3px solid var(--atemporal-gold)' : '3px solid transparent', background: 'none', color: 'var(--atemporal-text)', fontFamily: 'inherit', fontWeight: tab === t ? 700 : 400, cursor: 'pointer' }}>{label}</button>
   );
@@ -62,46 +224,7 @@ const AnalyticsContent = () => {
       {error && <div style={{ color: '#721c24', background: '#f8d7da', padding: 10, borderRadius: 4, marginBottom: 16 }}>{error}</div>}
       {loading && <div>Calculando modelo…</div>}
 
-      {tab === 'demand' && (
-        <>
-          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 12, alignItems: 'center' }}>
-            <label>Historial: <select value={weeks} onChange={(e) => setWeeks(+e.target.value)}>{[8, 12, 26, 52].map((w) => <option key={w} value={w}>{w} semanas</option>)}</select></label>
-            <label>Horizonte: <select value={horizon} onChange={(e) => setHorizon(+e.target.value)}>{[1, 2, 4, 8].map((h) => <option key={h} value={h}>{h} semana(s)</option>)}</select></label>
-            {demand && <span style={{ color: '#666', fontSize: 13 }}>{demand.model}</span>}
-          </div>
-          {demand?.products?.length === 0 && <div style={{ color: '#666' }}>No hay ventas suficientes en el período para entrenar el modelo.</div>}
-          {demand?.products?.length > 0 && (
-            <div style={{ overflowX: 'auto' }}>
-              <style>{'.ml-table th, .ml-table td { padding: 8px 10px; white-space: nowrap; }'}</style>
-              <table className="ml-table" style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--atemporal-white)', color: 'var(--atemporal-text)', fontSize: 13 }}>
-                <thead>
-                  <tr style={{ textAlign: 'left', borderBottom: '2px solid #ddd' }}>
-                    <th style={{ padding: 8 }}>Producto</th><th>Histórico → pronóstico</th><th>Tendencia</th>
-                    <th style={{ textAlign: 'right' }}>Demanda {demand.horizon} sem.</th><th style={{ textAlign: 'right' }}>Stock disp.</th>
-                    <th style={{ textAlign: 'right' }}>Stock seguridad</th><th style={{ textAlign: 'right' }}>Reponer</th><th>R² / MAE</th><th>Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {demand.products.map((p: any) => (
-                    <tr key={p.productId} style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: 8 }}>{p.productName}</td>
-                      <td><Sparkline history={p.history} forecast={p.forecast} /></td>
-                      <td>{p.trend === 'CRECIENTE' ? '▲ Creciente' : p.trend === 'DECRECIENTE' ? '▼ Decreciente' : '■ Estable'}</td>
-                      <td style={{ textAlign: 'right' }}>{p.forecastTotal}</td>
-                      <td style={{ textAlign: 'right' }}>{p.availableStock}</td>
-                      <td style={{ textAlign: 'right' }}>{p.safetyStock}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 700 }}>{p.suggestedReorder}</td>
-                      <td>{p.r2} / {p.mae ?? '—'}</td>
-                      <td style={{ color: riskColor[p.risk], fontWeight: 600 }}>{p.risk}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p style={{ fontSize: 12, color: '#777' }}>Línea sólida: unidades vendidas por semana. Línea punteada: pronóstico. Reponer = demanda pronosticada + stock de seguridad (95%) − stock disponible.</p>
-            </div>
-          )}
-        </>
-      )}
+      {tab === 'demand' && <DemandTab demand={demand} weeks={weeks} horizon={horizon} setWeeks={setWeeks} setHorizon={setHorizon} />}
 
       {tab === 'segments' && (
         <>

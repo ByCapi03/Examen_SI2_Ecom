@@ -205,11 +205,13 @@ Con el backend corriendo (y los datos demo cargados):
 ```powershell
 cd "C:\Users\MSI CYBORG 15 A13V\Desktop\UNI\Examen_SI2_Ecom\backend"
 $env:API_URL="http://localhost:3000"
-npx jest                                  # 24 pruebas unitarias
-npm run test:e2e:saas                     # 34 · aislamiento multitenant, offline, IA, ML
+npx jest                                  # 30 pruebas unitarias
+npm run test:e2e:saas                     # 36 · aislamiento multitenant, offline, IA, ML
 npm run test:e2e:tienda                   # 22 · tienda pública, registro, Mi tienda web
 npm run test:e2e:notif                    # 16 · alertas de stock
 npm run test:e2e:posqr                    # 18 · cobro por QR en el POS
+# Verifica que el pronóstico de demanda (ML) es correcto: lo recalcula desde PostgreSQL (necesita DB_* en el entorno)
+npm run verify:forecast                   # 74 comprobaciones independientes
 # Planes y SuperAdmin: el backend debe haberse iniciado con SUPERADMIN_EMAIL y SUPERADMIN_PASSWORD
 $env:SUPERADMIN_EMAIL="superadmin@dressed.com"; $env:SUPERADMIN_PASSWORD="TuClave123"
 npm run test:e2e:planes                   # 33 · ciclos, límites, vigencia, suspensión

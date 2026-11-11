@@ -70,7 +70,7 @@ Leyenda: ✅ implementado y probado · 🟡 implementado, con prueba parcial o c
 ## 5. Sugerencias dentro de los parámetros del parcial
 
 **Para lucirse en la defensa (bajo esfuerzo, alto impacto)**
-1. **Métricas del ML:** mostrar error del pronóstico (MAE/MAPE con prueba hacia atrás) y el tamaño de cada segmento RFM. Justifica el modelo.
+1. **Métricas del ML:** ✅ hecho para el pronóstico (R², MAE con prueba hacia atrás, confianza alta/media/baja, días de stock y explicación en pantalla; verificado 74/74 contra un recálculo independiente). Pendiente: mostrar el tamaño y la calidad de cada segmento RFM.
 2. **IA transparente:** indicar en el reporte qué motor respondió (LLM o reglas) y mostrar la especificación validada. Refuerza que la IA no genera SQL.
 3. **Pantalla de estado offline:** contador de operaciones pendientes y último sincronizado en el POS y en la app móvil.
 4. **Demo guiada:** un guion de 5 minutos con las cuentas demo (`luna` y `sol`): aislamiento, venta offline, conflicto, reporte IA, segmento RFM.

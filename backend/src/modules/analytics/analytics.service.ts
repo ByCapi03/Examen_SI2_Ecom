@@ -6,7 +6,10 @@
  */
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { forecastDemand, kmeans, labelRfmClusters, silhouette, standardize } from './ml';
+import { daysOfStock, forecastDemand, kmeans, labelRfmClusters, silhouette, standardize } from './ml';
+
+/** Orden de la tabla: primero lo más urgente. */
+const URGENCY: Record<string, number> = { QUIEBRE: 0, REPONER: 1, OK: 2 };
 
 @Injectable()
 export class AnalyticsService {
@@ -28,16 +31,19 @@ export class AnalyticsService {
     let branchFilter = '';
     if (branchId) { params.push(branchId); branchFilter = `AND s."branchId" = $3`; }
 
+    // Solo semanas COMPLETAS: la semana en curso se excluye porque está a medias y haría ver una caída falsa.
+    // week = 1 es la última semana completa; ROUND (no FLOOR) evita desfases de una semana por cambios de horario.
     const rows: { productId: number; name: string; week: number; units: string }[] = await this.dataSource.query(
       `SELECT p.id AS "productId", p.name,
-              FLOOR(EXTRACT(EPOCH FROM (date_trunc('week', now()) - date_trunc('week', s.date))) / 604800)::int AS week,
+              ROUND(EXTRACT(EPOCH FROM (date_trunc('week', now()) - date_trunc('week', s.date))) / 604800)::int AS week,
               SUM(si.quantity) AS units
          FROM sales s
          JOIN sale_items si ON si."saleId" = s.id
          JOIN variants v ON v.id = si."variantId"
          JOIN products p ON p.id = v."productId" AND p."tenantId" = s."tenantId"
         WHERE s."tenantId" = $1 AND s.status IN ('PAGADA','COMPLETADA')
-          AND s.date >= date_trunc('week', now()) - ($2::int - 1) * INTERVAL '1 week'
+          AND s.date >= date_trunc('week', now()) - $2::int * INTERVAL '1 week'
+          AND s.date < date_trunc('week', now())
           ${branchFilter}
         GROUP BY p.id, p.name, week`,
       params,
@@ -59,7 +65,7 @@ export class AnalyticsService {
     for (const r of rows) {
       const id = Number(r.productId);
       if (!series.has(id)) series.set(id, { name: r.name, weekly: new Array(weeks).fill(0) });
-      const idx = weeks - 1 - Number(r.week); // índice 0 = semana más antigua
+      const idx = weeks - Number(r.week); // índice 0 = semana más antigua; weeks-1 = última semana completa
       if (idx >= 0 && idx < weeks) series.get(id)!.weekly[idx] += Number(r.units);
     }
 
@@ -67,6 +73,15 @@ export class AnalyticsService {
       const f = forecastDemand(s.weekly, horizon);
       const available = stock.get(productId) ?? 0;
       const reorder = Math.max(0, Math.ceil(f.forecastTotal + f.safetyStock - available));
+      const risk = available <= 0 && f.forecastTotal > 0 ? 'QUIEBRE' : reorder > 0 ? 'REPONER' : 'OK';
+      const days = daysOfStock(available, f.forecastTotal, horizon);
+      const avg = f.history.reduce((a, b) => a + b, 0) / (f.history.length || 1);
+      const lowConf = f.confidence === 'BAJA' ? ' Ojo: el pronóstico es poco confiable (ventas muy variables o pocas semanas con ventas); tómalo como orientación.' : '';
+      const action = risk === 'QUIEBRE'
+        ? `Sin stock y se esperan ~${Math.round(f.forecastTotal)} u. en ${horizon} semana(s). Repón al menos ${reorder} u.${lowConf}`
+        : risk === 'REPONER'
+          ? `Compra ${reorder} u.: se venderían ~${Math.round(f.forecastTotal)} u. en ${horizon} semana(s), tienes ${available} y conviene guardar ${f.safetyStock} de seguridad.${lowConf}`
+          : `No hace falta reponer: tienes ${available} u. y se esperan ~${Math.round(f.forecastTotal)} u. en ${horizon} semana(s)${days != null ? ` (te duran ≈ ${Math.round(days)} días)` : ''}.${lowConf}`;
       return {
         productId,
         productName: s.name,
@@ -80,14 +95,20 @@ export class AnalyticsService {
         safetyStock: f.safetyStock,
         availableStock: available,
         suggestedReorder: reorder,
-        risk: available <= 0 && f.forecastTotal > 0 ? 'QUIEBRE' : reorder > 0 ? 'REPONER' : 'OK',
+        risk,
+        confidence: f.confidence,
+        weeklyChangePct: f.weeklyChangePct,
+        avgWeeklyUnits: Number(avg.toFixed(1)),
+        daysOfStock: days,
+        action,
       };
-    }).sort((a, b) => b.forecastTotal - a.forecastTotal).slice(0, limit);
+    }).sort((a, b) => URGENCY[a.risk] - URGENCY[b.risk] || (a.daysOfStock ?? Infinity) - (b.daysOfStock ?? Infinity) || b.forecastTotal - a.forecastTotal).slice(0, limit);
 
     return {
       model: 'Regresión lineal (mínimos cuadrados) sobre ventas semanales',
       learningType: 'SUPERVISADO',
       weeks, horizon, branchId,
+      includesCurrentWeek: false,
       generatedAt: new Date().toISOString(),
       products,
     };

@@ -265,8 +265,16 @@ async function main() {
 
     // ======================================================== ML
     console.log('\n--- HU: Analítica con Machine Learning ---');
+    // Las ventas de la prueba son de HOY (semana en curso, incompleta): no deben entrenar el modelo
+    r = await api('GET', '/analytics/demand-forecast?weeks=8&horizon=4', tok.adminA);
+    check('T31a La semana en curso (incompleta) no entra al pronóstico', r.status === 200 && r.data.includesCurrentWeek === false && r.data.products.length === 0, r.data);
+    // Se mueven esas ventas a la semana anterior (completa) y entonces sí se usan
+    await q(`UPDATE sales SET date = date - interval '8 days' WHERE "tenantId" = $1`, [created.tenants[0]]);
     r = await api('GET', '/analytics/demand-forecast?weeks=8&horizon=4', tok.adminA);
     check('T31 Pronóstico de demanda (supervisado) solo con productos de A', r.status === 200 && r.data.products.length >= 1 && r.data.products.every((p) => p.productName.includes(' A ')), r.data);
+    const fp = r.data.products?.[0];
+    check('T31b Cada producto trae confianza, días de stock, tendencia y una frase de acción',
+      !!fp && ['ALTA', 'MEDIA', 'BAJA'].includes(fp.confidence) && 'daysOfStock' in fp && typeof fp.weeklyChangePct === 'number' && typeof fp.action === 'string' && fp.action.length > 10 && fp.history.length === 8, fp);
     r = await api('GET', '/analytics/customer-segments?k=2', tok.adminA);
     check('T32 Segmentación RFM K-Means (no supervisado) responde', r.status === 200 && r.data.learningType === 'NO_SUPERVISADO', r.data);
     r = await api('GET', '/analytics/demand-forecast', tok.adminB);

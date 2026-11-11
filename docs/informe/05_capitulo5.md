@@ -27,7 +27,9 @@ crear caja → abrir sesión → vender → cerrar, reservas, tienda `/t/luna` y
 
 ## 5.3. Pruebas de integración
 
-- **Batería E2E SaaS (`test-saas-e2e.js`): 34 pruebas** (T01–T33) sobre API y PostgreSQL reales — aislamiento entre empresas, POS, sincronización idempotente, conflictos, reportes IA con intento de inyección SQL, analítica ML y restricciones de plan.
+- **Batería E2E SaaS (`test-saas-e2e.js`): 36 pruebas** (T01–T33, con T31a/b) sobre API y PostgreSQL reales — aislamiento entre empresas, POS, sincronización idempotente, conflictos, reportes IA con intento de inyección SQL, analítica ML y restricciones de plan.
+- **Verificación del pronóstico de demanda (`verify-forecast.js`):** lee las ventas directamente de PostgreSQL, las agrupa por semana a mano, resuelve la regresión por ecuaciones normales y compara con la respuesta de `GET /analytics/demand-forecast`: serie semanal, pendiente, R², pronóstico, stock de seguridad, reposición, días de stock, tendencia, confianza y MAE. Resultado: 74 de 74 coincidencias; además la pendiente, el R², el pronóstico y el stock de seguridad coinciden con `numpy.polyfit` en los 6 productos.
+- **Reglas del modelo:** solo se entrenan semanas completas (la semana en curso se excluye porque sesga la tendencia hacia abajo); hay tendencia solo si el cambio semanal supera el 3 % y R² ≥ 0.25; la confianza (alta/media/baja) sale del error típico del modelo sobre el promedio de ventas y exige al menos 6 semanas con 4 de ellas con ventas.
 - **Batería E2E tienda (`test-tienda-publica.js`): 22 pruebas** (P01–P22) — catálogo por empresa, 404/400 por tienda inexistente o ausente, prioridad del JWT, registro dentro de la empresa, saneamiento y permisos de *Mi tienda web*.
 
 ## 5.4. Corrección de errores
@@ -50,8 +52,9 @@ Defectos detectados y corregidos durante esta fase:
 
 | Prueba | Resultado |
 |---|---|
-| Jest (unitarias) | **24 / 24 aprobadas** |
-| E2E SaaS | **34 / 34 aprobadas** |
+| Jest (unitarias) | **30 / 30 aprobadas** |
+| E2E SaaS | **36 / 36 aprobadas** |
+| Verificación independiente del pronóstico (`verify-forecast.js`) | **74 / 74 coincidencias** con un recálculo desde PostgreSQL y con `numpy` |
 | E2E tienda pública | **22 / 22 aprobadas** |
 | E2E notificaciones (stock bajo) | **16 / 16 aprobadas** |
 | E2E planes y SuperAdmin | **33 / 33 aprobadas** |

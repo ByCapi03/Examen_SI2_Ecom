@@ -77,8 +77,9 @@ bash docs/informe/build_informe.sh
 
 # Backend y pruebas
 cd backend && npm install && npm run seed:demo && npm run build && npm run start:prod
-npx jest                       # 24 pruebas unitarias
-npm run test:e2e:saas          # 34 pruebas E2E
+npx jest                       # 30 pruebas unitarias
+npm run test:e2e:saas          # 36 pruebas E2E
+npm run verify:forecast        # 74 comprobaciones independientes del pronóstico (ML)
 npm run test:e2e:tienda        # 22 pruebas E2E
 npm run test:e2e:notif         # 16 pruebas E2E
 # Stripe: node scripts/mock-stripe.js y backend con STRIPE_SECRET_KEY=sk_test_mockserver STRIPE_API_HOST=localhost STRIPE_API_PORT=12111 STRIPE_API_PROTOCOL=http STRIPE_WEBHOOK_SECRET=whsec_testsecret

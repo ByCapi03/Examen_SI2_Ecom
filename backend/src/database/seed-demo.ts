@@ -272,6 +272,78 @@ interface BranchCtx {
   id: number; idx: number; encargado: Person; cashiers: Person[]; registerIds: number[];
 }
 
+/* ───────────────────────── Historial de ventas (para el pronóstico de demanda) ───────────────────────── */
+
+/** Semanas de historial previas a la semana simulada. Con ellas el pronóstico de demanda (ML) tiene una serie real que aprender. */
+const HISTORY_WEEKS = 12;
+
+/** Unidades por semana y sucursal de un producto "promedio" en la semana simulada (el nivel al que debe llegar el historial). */
+const BASE_WEEKLY_UNITS = 42;
+
+/**
+ * Comportamiento de ventas de cada producto como múltiplo de su nivel actual `L` (unidades por semana y sucursal).
+ * Se reparten por producto para que el análisis muestre casos distintos: creciente, estable, decreciente, estacional y errático.
+ */
+const SALES_PROFILES: { name: string; units: (L: number, week: number, weeks: number, noise: number) => number }[] = [
+  { name: 'creciente', units: (L, w, n, e) => L * (0.3 + (0.7 * w) / (n - 1) + e * 0.08) },
+  { name: 'estable', units: (L, _w, _n, e) => L * (0.97 + e * 0.1) },
+  { name: 'decreciente', units: (L, w, n, e) => L * (1.7 - (0.7 * w) / (n - 1) + e * 0.08) },
+  { name: 'estacional', units: (L, w, _n, e) => L * (0.9 + 0.3 * Math.sin((w * Math.PI) / 2.5) + e * 0.1) },
+  { name: 'creciente suave', units: (L, w, n, e) => L * (0.6 + (0.4 * w) / (n - 1) + e * 0.08) },
+  { name: 'errático', units: (L, _w, _n, e) => L * (0.75 + e * 0.45) },
+];
+
+/** Ventas de las semanas anteriores a la simulada (sin turnos de caja) y sus movimientos de stock, balanceados con una entrada. */
+function buildSalesHistory(r: Rng, b: BranchCtx, variants: VariantInfo[], clientIds: number[]) {
+  const sales: SaleDraft[] = [];
+  const movements: MovDraft[] = [];
+  const soldByVariant = new Map<number, number>();
+  const productIdxs = [...new Set(variants.map((v) => v.productIdx))];
+  // Nivel de cada producto según su popularidad (suma de pesos de sus variantes), igual que reparte las ventas la simulación
+  const weightOf = new Map(productIdxs.map((pi) => [pi, variants.filter((v) => v.productIdx === pi).reduce((a, v) => a + v.weight, 0)]));
+  const totalWeight = [...weightOf.values()].reduce((a, b) => a + b, 0);
+
+  for (let week = 0; week < HISTORY_WEEKS; week++) {
+    const firstOff = DAYS + 7 * (HISTORY_WEEKS - week - 1); // días atrás del día más reciente de este bloque
+    for (const pi of productIdxs) {
+      const profile = SALES_PROFILES[pi % SALES_PROFILES.length];
+      const level = BASE_WEEKLY_UNITS * productIdxs.length * (weightOf.get(pi)! / totalWeight);
+      const target = Math.max(0, Math.round(profile.units(level, week, HISTORY_WEEKS, (r.next() - 0.5) * 2)));
+      const pool = variants.filter((v) => v.productIdx === pi);
+      let left = target;
+      while (left > 0) {
+        const qty = left >= 2 && r.chance(0.15) ? 2 : 1;
+        left -= qty;
+        const v = r.weighted(pool, pool.map((x) => x.weight));
+        const off = firstOff + r.int(0, 6);
+        const dow = dayAt(off, 12).getDay();
+        if ((dow === 0 && r.chance(0.4)) || (dow !== 5 && dow !== 6 && r.chance(0.12))) { left += qty; continue; } // domingos más flojos
+        const t = dayAt(off, r.int(9, 19), r.int(0, 59));
+        const cashier = r.pick(b.cashiers);
+        const total = money(v.price * qty);
+        const method = r.weighted([PaymentMethod.EFECTIVO, PaymentMethod.TARJETA, PaymentMethod.QR, PaymentMethod.BILLETERA_MOVIL], [50, 25, 20, 5]);
+        const sale: SaleDraft = {
+          t, branchId: b.id, userId: cashier.id, channel: SaleChannel.POS, status: SaleStatus.COMPLETADA,
+          items: [{ variantId: v.id, qty, unit: v.price }], total,
+          clientId: r.chance(0.3) ? r.pick(clientIds) : undefined,
+          payments: [{ t: addMin(t, 1), amount: total, method, status: PaymentStatus.APROBADO, ref: method === PaymentMethod.EFECTIVO ? undefined : `TX-${r.int(100000, 999999)}` }],
+        };
+        sales.push(sale);
+        soldByVariant.set(v.id, (soldByVariant.get(v.id) ?? 0) + qty);
+        movements.push({ t, branchId: b.id, variantId: v.id, type: MovementType.VENTA, qty, userId: cashier.id, obs: (ids) => `Venta POS #${ids.saleId}`, sale });
+      }
+    }
+  }
+
+  // Entrada histórica por lo vendido en ese período, para que el kardex quede coherente con el stock actual
+  const tIn = dayAt(DAYS + 7 * HISTORY_WEEKS + 1, 9, 0);
+  let i = 0;
+  for (const [variantId, qty] of soldByVariant) {
+    movements.push({ t: addMin(tIn, i++), branchId: b.id, variantId, type: MovementType.ENTRADA, qty, userId: b.encargado.id, obs: () => 'Stock histórico (compras de períodos anteriores)' });
+  }
+  return { sales, movements };
+}
+
 /* ───────────────────────── Simulación de una sucursal ───────────────────────── */
 
 function simulateBranch(r: Rng, b: BranchCtx, variants: VariantInfo[], clientIds: number[]) {
@@ -460,6 +532,11 @@ function simulateBranch(r: Rng, b: BranchCtx, variants: VariantInfo[], clientIds
 
   events.sort((x, y) => x.t.getTime() - y.t.getTime() || x.order - y.order);
   events.forEach((e) => e.run());
+
+  // 5b) Historial de semanas anteriores (alimenta el pronóstico de demanda)
+  const history = buildSalesHistory(r, b, variants, clientIds);
+  sales.push(...history.sales);
+  movements.push(...history.movements);
 
   // 6) Cierre de cada turno: esperado = inicial + ventas en efectivo; el cajero cuenta con pequeñas diferencias
   for (const s of sessions) {
