@@ -250,7 +250,13 @@ Más detalles en [`docs/README.md`](docs/README.md).
 
 ---
 
-## 9. Mapa del repositorio
+## 9. Despliegue en la nube
+
+Guía completa, gratis y paso a paso (Neon + Render, con HTTPS y PWA offline sin túneles): [`docs/DESPLIEGUE.md`](docs/DESPLIEGUE.md). El archivo `render.yaml` describe la API y la web.
+
+---
+
+## 10. Mapa del repositorio
 
 ```
 backend/   API NestJS, entidades, scripts de pruebas (backend/scripts)

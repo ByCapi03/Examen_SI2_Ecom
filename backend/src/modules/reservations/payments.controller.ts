@@ -1,3 +1,4 @@
+import { jwtSecret } from '../../common/config/jwt-secret';
 import { Controller, Post, Get, Param, Body, Req, UseGuards, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { AuthGuard } from '../../common/guards/auth.guard';
 import { ReservationsService } from './reservations.service';
@@ -94,8 +95,7 @@ export class PublicPaymentsController {
 
   private verifyToken(token: string) {
     try {
-      const jwtSecret = process.env.JWT_SECRET || 'secret';
-      return jwt.verify(token, jwtSecret) as { paymentId: number };
+      return jwt.verify(token, jwtSecret()) as { paymentId: number };
     } catch (e) {
       throw new BadRequestException('Token inválido o expirado');
     }

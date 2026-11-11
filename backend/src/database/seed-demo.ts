@@ -793,16 +793,21 @@ export async function main() {
   const reset = process.argv.includes('--reset');
   const ds = new DataSource({
     type: 'postgres',
-    host: process.env.DB_HOST || 'localhost',
-    port: Number(process.env.DB_PORT || 5432),
-    username: process.env.DB_USERNAME || 'postgres',
-    password: String(process.env.DB_PASSWORD ?? ''),
-    database: process.env.DB_DATABASE || 'ecommerce_ropa',
+    ...(process.env.DATABASE_URL
+      ? { url: process.env.DATABASE_URL }
+      : {
+          host: process.env.DB_HOST || 'localhost',
+          port: Number(process.env.DB_PORT || 5432),
+          username: process.env.DB_USERNAME || 'postgres',
+          password: String(process.env.DB_PASSWORD ?? ''),
+          database: process.env.DB_DATABASE || 'ecommerce_ropa',
+        }),
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
     entities: [path.join(__dirname, '..', 'modules', '**', '*.entity.{ts,js}')],
     synchronize: process.env.DB_SYNCHRONIZE !== 'false',
   });
 
-  console.log(`\n=== Datos demo sobre "${ds.options.database as string}" ${reset ? '(con reinicio de las empresas demo)' : ''} ===`);
+  console.log(`\n=== Datos demo sobre "${(ds.options.database as string) || (process.env.DATABASE_URL ? 'la base de datos de DATABASE_URL' : '')}" ${reset ? '(con reinicio de las empresas demo)' : ''} ===`);
   await ds.initialize();
   try {
     const g = await ensureGlobals(ds);

@@ -1,0 +1,80 @@
+# Despliegue en Render (https://render.com): API (NestJS) + web (React/PWA).
+# La base de datos PostgreSQL va aparte (Neon, gratis): ver docs/DESPLIEGUE.md.
+# Los valores marcados "sync: false" te los pide Render al crear el Blueprint.
+services:
+  - type: web
+    name: dressed-api
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: node dist/main
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: DB_SSL
+        value: "true"
+      - key: DB_SYNCHRONIZE
+        value: "true"
+      - key: FRONTEND_URL
+        sync: false
+      - key: QR_PUBLIC_WEB_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: SUPERADMIN_EMAIL
+        sync: false
+      - key: SUPERADMIN_PASSWORD
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_CURRENCY
+        value: bob
+      - key: STRIPE_PLAN_CURRENCY
+        value: usd
+
+  - type: web
+    name: dressed-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: VITE_API_URL
+        sync: false
+      - key: VITE_SUPPORT_EMAIL
+        sync: false
+    headers:
+      # El service worker (modo offline) no debe quedar en caché del navegador
+      - path: /sw.js
+        name: Cache-Control
+        value: no-cache
+      - path: /firebase-messaging-sw.js
+        name: Cache-Control
+        value: no-cache
+    routes:
+      # La web es una SPA: cualquier ruta (/t/luna, /dashboard…) la resuelve React
+      - type: rewrite
+        source: /*
+        destination: /index.html
