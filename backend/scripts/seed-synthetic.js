@@ -16,6 +16,7 @@
  * Uso (desde backend/):
  *   node scripts/seed-synthetic.js                       # empresa 1, 12 meses, 80 clientes
  *   node scripts/seed-synthetic.js --tenant=mi-empresa --months=18 --clients=120 --seed=7
+ *   node scripts/seed-synthetic.js --tenant=mi-empresa --sales=3000        # cantidad exacta de ventas sintéticas
  *   node scripts/seed-synthetic.js --tenant=mi-empresa --clean   # elimina lo generado
  */
 const fs = require('fs');
@@ -37,6 +38,7 @@ const args = Object.fromEntries(process.argv.slice(2).map((a) => {
 const MONTHS = Math.min(Math.max(Number(args.months) || 12, 3), 36);
 const N_CLIENTS = Math.min(Math.max(Number(args.clients) || 80, 10), 500);
 const SEED = Number(args.seed) || 42;
+const TARGET_SALES = Number(args.sales) || 0;
 const DOMAIN = '@sintetico.local';
 
 // ---------------------------------------------------------------- aleatoriedad
@@ -253,6 +255,23 @@ async function main() {
           const channel = weightedPick(['POS', 'WEB', 'MOVIL'], [40, 40, 20]);
           addSale(day, c.id, rnd() < 0.7 ? c.branch : pick(branches), channel, makeBasket(day, c.arch.items));
         }
+      }
+    }
+
+    // Cantidad exacta pedida (--sales=N): se recorta al azar (con la semilla) o se completa con ventas de mostrador
+    if (TARGET_SALES > 0) {
+      if (sales.length > TARGET_SALES) {
+        for (let i = sales.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [sales[i], sales[j]] = [sales[j], sales[i]]; }
+        sales.length = TARGET_SALES;
+        sales.sort((a, b) => a.date - b.date);
+      } else {
+        const days = Array.from({ length: D }, (_, d) => d);
+        const dayW = days.map((d) => { const dt = new Date(start.getTime() + d * 86400000); return seasonal(dt) * dowFactor[dt.getDay()] * (1 + 0.0008 * d); });
+        for (let k = sales.length; k < TARGET_SALES; k++) {
+          const day = weightedPick(days, dayW);
+          addSale(day, null, pick(branches), 'POS', makeBasket(day, 1.8));
+        }
+        sales.sort((a, b) => a.date - b.date);
       }
     }
 
