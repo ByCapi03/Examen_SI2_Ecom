@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, Alert, Dimensions, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, Alert, Dimensions, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Camera, CameraView } from 'expo-camera';
@@ -24,17 +24,6 @@ if (!(Camera as any).Constants) {
 const TensorCamera = cameraWithTensors(CameraView as any);
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const SMOOTHING_FACTOR = 0.5;
-
-// La cámara con IA entrega un cuadro 3:4. Se muestra en un área 3:4 del ancho de la pantalla (sin estirar)
-// y los puntos del cuerpo se convierten con la misma escala, así la prenda coincide con la persona.
-const TENSOR_W = 360;
-const TENSOR_H = 480;
-const CAM_W = SCREEN_W;
-const CAM_H = Math.round(SCREEN_W * (TENSOR_H / TENSOR_W));
-const CAM_TOP = Math.max(0, Math.round((SCREEN_H - CAM_H) / 2));
-const SCALE = CAM_W / TENSOR_W;
-// Tamaño de textura que recomienda tfjs-react-native: en Android es horizontal (1600x1200), en iOS vertical.
-const TEXTURE = Platform.OS === 'ios' ? { width: 1080, height: 1920 } : { width: 1600, height: 1200 };
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TryOn'>;
 
@@ -183,9 +172,22 @@ export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
     const arType = productData?.arType;
     const isArticulated = productData?.arTorsoUrl && productData?.arLeftSleeveUrl && productData?.arRightSleeveUrl;
 
-    // Coordenadas del tensor -> pantalla (misma escala en X e Y; el área de la cámara va centrada verticalmente)
-    const toScreenX = (x: number) => x * SCALE;
-    const toScreenY = (y: number) => y * SCALE + CAM_TOP;
+    // We need to map tensor coordinates (which depend on camera resolution) to screen coordinates
+    // However, TensorCamera output might not match screen dimensions perfectly, we'll assume it scales to fill
+    // For simplicity, we just use raw tensor coordinates if we configure tensor size to match screen aspect ratio,
+    // or scale them. Let's assume tensor is mapped.
+    
+    // We will use relative ratios based on standard tensor size (e.g. 152x200 or whatever it outputs).
+    // Let's assume keypoints are in Tensor dimensions. 
+    // To be precise, we need the tensor dimensions. We will pass a fixed size to TensorCamera.
+    const tensorWidth = 360;
+    const tensorHeight = Math.floor((360 / SCREEN_W) * SCREEN_H);
+    
+    const scaleX = SCREEN_W / tensorWidth;
+    const scaleY = SCREEN_H / tensorHeight;
+
+    const toScreenX = (x: number) => x * scaleX;
+    const toScreenY = (y: number) => y * scaleY;
 
     const newStyles: any = {};
 
@@ -399,16 +401,19 @@ export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
     );
   }
 
+  const tensorWidth = 360;
+  const tensorHeight = Math.floor((360 / SCREEN_W) * SCREEN_H);
+
   return (
     <View style={styles.container}>
       <TensorCamera
         style={styles.camera}
         facing="front"
         type="front"
-        cameraTextureHeight={TEXTURE.height}
-        cameraTextureWidth={TEXTURE.width}
-        resizeHeight={TENSOR_H}
-        resizeWidth={TENSOR_W}
+        cameraTextureHeight={1920}
+        cameraTextureWidth={1080}
+        resizeHeight={tensorHeight}
+        resizeWidth={tensorWidth}
         resizeDepth={3}
         onReady={handleCameraStream}
         autorender={true}
@@ -487,11 +492,7 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   camera: {
-    position: 'absolute',
-    top: CAM_TOP,
-    left: 0,
-    width: CAM_W,
-    height: CAM_H,
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     zIndex: 0,
   },
   loadingText: {
