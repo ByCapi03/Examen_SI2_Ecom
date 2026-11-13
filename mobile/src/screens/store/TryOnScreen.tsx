@@ -472,7 +472,7 @@ export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
 const shouldersHint = (hud: string) => hud.startsWith('✗');
 
 const styles = StyleSheet.create({
-  hudBox: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center', gap: 4, paddingTop: 8 },
+  hudBox: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center', gap: 4, paddingTop: 8, zIndex: 2000, elevation: 2000 },
   hudText: { color: '#fff', backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, fontSize: 12, overflow: 'hidden' },
   hudWarn: { color: '#fff', backgroundColor: 'rgba(185,28,28,0.85)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, fontSize: 12, textAlign: 'center', marginHorizontal: 16, overflow: 'hidden' },
   container: { flex: 1, backgroundColor: 'black' },
@@ -484,9 +484,8 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   camera: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
   },
   loadingText: {
     ...typography.body,
@@ -516,6 +515,8 @@ const styles = StyleSheet.create({
     left: 20,
     right: 20,
     alignItems: 'center',
+    zIndex: 2000,
+    elevation: 2000,
   },
   closeBtn: {
     backgroundColor: colors.danger,
