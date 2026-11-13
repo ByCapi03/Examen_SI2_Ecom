@@ -208,9 +208,13 @@ export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
 
     const newStyles: any = {};
 
-    const shouldersVisible = !!(leftShoulder?.score && leftShoulder.score > 0.35 && rightShoulder?.score && rightShoulder.score > 0.35);
-    const hipsVisible = !!(leftHipRaw?.score && leftHipRaw.score > 0.35 && rightHipRaw?.score && rightHipRaw.score > 0.35);
-    const hudNext = `${shouldersVisible ? '✓' : '✗'} hombros · ${hipsVisible ? '✓' : '✗'} caderas`;
+    // Umbral más bajo que el de los demás puntos: sentado o con algo delante, MoveNet rara vez pasa de 0.3 en los hombros
+    const SHOULDER_MIN = 0.2;
+    const HIP_MIN = 0.25;
+    const shouldersVisible = !!(leftShoulder?.score && leftShoulder.score > SHOULDER_MIN && rightShoulder?.score && rightShoulder.score > SHOULDER_MIN);
+    const hipsVisible = !!(leftHipRaw?.score && leftHipRaw.score > HIP_MIN && rightHipRaw?.score && rightHipRaw.score > HIP_MIN);
+    const sc = (k: any) => (k?.score ?? 0).toFixed(2);
+    const hudNext = `${shouldersVisible ? '✓' : '✗'} hombros (${sc(leftShoulder)}/${sc(rightShoulder)}) · ${hipsVisible ? '✓' : '✗'} caderas`;
     if (hudRef.current !== hudNext) { hudRef.current = hudNext; setHud(hudNext); }
 
     if (arType === 'TOP') {
