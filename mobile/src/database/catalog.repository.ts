@@ -13,6 +13,9 @@ export const catalogRepository = {
       for (const p of products) {
         // Upsert de categorías únicas
         if (p.categoryId && p.categoryName) {
+          // Si cambió la base de datos del servidor, la misma categoría llega con otro id: se retira la copia vieja
+          // (el nombre es único en la tabla local).
+          await txn.runAsync(`DELETE FROM categories WHERE name = ? AND id <> ?;`, [p.categoryName, p.categoryId]);
           await txn.runAsync(
             `INSERT INTO categories (id, name) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name;`,
             [p.categoryId, p.categoryName]
