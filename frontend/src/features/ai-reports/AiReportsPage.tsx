@@ -5,7 +5,10 @@ import { useSettings } from '../../config/SettingsContext';
 import { api } from '../../api/axios';
 import { BarChart, LineChart } from './ReportChart';
 import { DashStyles, PageHeader, PlanBadge, PlanGate, downloadCsv } from '../../components/dashboard/ui';
-import type { ReportResult } from './exportReport';
+import type { ReportResult, ExportOptions } from './exportOptions';
+import { EXPORT_OPTION_LABELS, loadExportOptions, saveExportOptions } from './exportOptions';
+import { useAuth } from '../auth/AuthContext';
+import { usePlan } from '../saas/PlanContext';
 
 /**
  * REPORTES GENERATIVOS — el usuario pregunta en lenguaje natural y obtiene un
@@ -35,6 +38,16 @@ const AiReportsContent = () => {
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState<'csv' | 'excel' | 'pdf' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [exportOpts, setExportOpts] = useState<ExportOptions>(loadExportOptions);
+  const [showOpts, setShowOpts] = useState(false);
+  const { user } = useAuth();
+  const { tenant } = usePlan();
+
+  const toggleOpt = (key: keyof ExportOptions) => {
+    const next = { ...exportOpts, [key]: !exportOpts[key] };
+    setExportOpts(next);
+    saveExportOptions(next);
+  };
 
   const { settings } = useSettings();
   const voice = useSpeechRecognition(settings.lang === 'en' ? 'en-US' : 'es-BO');
@@ -76,6 +89,8 @@ const AiReportsContent = () => {
     });
   };
 
+  const meta = { companyName: tenant?.name, userName: user?.name };
+
   const exportReport = async (format: 'csv' | 'excel' | 'pdf') => {
     if (!result) return;
     setExporting(format);
@@ -86,10 +101,10 @@ const AiReportsContent = () => {
         downloadCsv(`reporte-ia-${stamp}.csv`, result.columns, result.rows.map((r) => [r.label, r.value]));
       } else if (format === 'excel') {
         const { exportReportExcel } = await import('./exportReport');
-        await exportReportExcel(result);
+        await exportReportExcel(result, exportOpts, meta);
       } else {
         const { exportReportPdf } = await import('./exportReport');
-        exportReportPdf(result);
+        exportReportPdf(result, exportOpts, meta);
       }
     } catch {
       setError('No se pudo exportar el reporte. Inténtalo de nuevo.');
@@ -163,9 +178,24 @@ const AiReportsContent = () => {
                     {exporting === key ? 'Exportando…' : label}
                   </button>
                 ))}
+                <button onClick={() => setShowOpts((v) => !v)} aria-expanded={showOpts}
+                  style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ccc', background: showOpts ? '#F5F5F5' : '#fff', cursor: 'pointer' }}>
+                  Opciones
+                </button>
               </div>
             </div>
           </div>
+          {showOpts && (
+            <fieldset style={{ border: '1px solid var(--atemporal-border)', borderRadius: 8, padding: '8px 12px', margin: '0 0 12px', display: 'grid', gap: 6, gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
+              <legend style={{ fontSize: 12, padding: '0 4px', color: 'var(--atemporal-muted)' }}>Qué incluir en PDF y Excel</legend>
+              {(Object.keys(EXPORT_OPTION_LABELS) as (keyof ExportOptions)[]).map((key) => (
+                <label key={key} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={exportOpts[key]} onChange={() => toggleOpt(key)} />
+                  {EXPORT_OPTION_LABELS[key]}
+                </label>
+              ))}
+            </fieldset>
+          )}
           <div style={{ fontSize: 12, color: '#777', margin: '4px 0 12px' }}>
             {result.columns[1]} {result.spec.dimension !== 'ninguna' ? `por ${result.columns[0].toLowerCase()}` : ''}
             {result.spec.filters.dateFrom ? ` · ${result.spec.filters.dateFrom} a ${result.spec.filters.dateTo ?? 'hoy'}` : ' · todo el período'}
