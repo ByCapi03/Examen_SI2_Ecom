@@ -299,14 +299,17 @@ export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
         setOverlayStyles({});
       }
     } else if (arType === 'BOTTOM') {
-      if (leftHip?.score && leftHip.score > 0.35 && 
-          rightHip?.score && rightHip.score > 0.35 &&
-          ((leftAnkle?.score && leftAnkle.score > 0.35) || (leftKnee?.score && leftKnee.score > 0.35))) {
-        
-        const hipWidth = Math.abs(toScreenX(leftHip.x) - toScreenX(rightHip.x));
-        const centerX = toScreenX((leftHip.x + rightHip.x) / 2);
-        const topY = toScreenY(Math.min(leftHip.y, rightHip.y));
-        
+      // Si no se ven las caderas o las rodillas se estiman desde los hombros (la cámara frontal rara vez las muestra)
+      if (hipsVisible || shouldersVisible) {
+        const estShoulderW = shouldersVisible ? Math.abs(leftShoulder!.x - rightShoulder!.x) : 0;
+        const estimateHip = (sh: any) => ({ x: sh.x, y: sh.y + estShoulderW * 1.6, score: 1 });
+        const bLeftHip: any = hipsVisible ? leftHipRaw! : estimateHip(leftShoulder);
+        const bRightHip: any = hipsVisible ? rightHipRaw! : estimateHip(rightShoulder);
+
+        const hipWidth = Math.abs(toScreenX(bLeftHip.x) - toScreenX(bRightHip.x));
+        const centerX = toScreenX((bLeftHip.x + bRightHip.x) / 2);
+        const topY = toScreenY(Math.min(bLeftHip.y, bRightHip.y));
+
         let bottomY = topY + hipWidth * 3; // fallback
         if (leftAnkle?.score && leftAnkle.score > 0.35 && rightAnkle?.score && rightAnkle.score > 0.35) {
           bottomY = toScreenY(Math.max(leftAnkle.y, rightAnkle.y));
@@ -332,16 +335,18 @@ export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
         setOverlayStyles({});
       }
     } else if (arType === 'DRESS') {
-      if (leftShoulder?.score && leftShoulder.score > 0.35 && 
-          rightShoulder?.score && rightShoulder.score > 0.35 &&
-          leftHip?.score && leftHip.score > 0.35 && 
-          rightHip?.score && rightHip.score > 0.35) {
-        
-        const shoulderWidth = Math.abs(toScreenX(leftShoulder.x) - toScreenX(rightShoulder.x));
-        const centerX = toScreenX((leftShoulder.x + rightShoulder.x) / 2);
-        const topY = toScreenY(Math.min(leftShoulder.y, rightShoulder.y));
-        const torsoHeight = toScreenY(Math.max(leftHip.y, rightHip.y)) - topY;
-        
+      // Con la cámara frontal casi nunca se ven las caderas: si faltan se estiman bajo los hombros (como en la blusa).
+      if (shouldersVisible) {
+        const estShoulderW = Math.abs(leftShoulder!.x - rightShoulder!.x);
+        const estimateHip = (sh: any) => ({ x: sh.x, y: sh.y + estShoulderW * 1.6, score: 1 });
+        const dLeftHip: any = hipsVisible ? leftHipRaw! : estimateHip(leftShoulder);
+        const dRightHip: any = hipsVisible ? rightHipRaw! : estimateHip(rightShoulder);
+
+        const shoulderWidth = Math.abs(toScreenX(leftShoulder!.x) - toScreenX(rightShoulder!.x));
+        const centerX = toScreenX((leftShoulder!.x + rightShoulder!.x) / 2);
+        const topY = toScreenY(Math.min(leftShoulder!.y, rightShoulder!.y));
+        const torsoHeight = toScreenY(Math.max(dLeftHip.y, dRightHip.y)) - topY;
+
         let bottomY = topY + torsoHeight * 2.5; // fallback
         if (leftKnee?.score && leftKnee.score > 0.35 && rightKnee?.score && rightKnee.score > 0.35) {
           bottomY = toScreenY(Math.max(leftKnee.y, rightKnee.y));
@@ -452,6 +457,9 @@ export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
         <Text style={styles.hudText}>{hud}</Text>
         {!(productConfig.product?.arTorsoUrl || productConfig.product?.arImageUrl) ? (
           <Text style={styles.hudWarn}>Este producto no tiene imagen para el vestidor: súbela en el panel web (Productos, imagen AR).</Text>
+        ) : null}
+        {!productConfig.product?.arType ? (
+          <Text style={styles.hudWarn}>Este producto no tiene tipo de prenda (blusa, falda o vestido): defínelo en el panel web para que se pueda probar.</Text>
         ) : null}
         {imageError ? <Text style={styles.hudWarn}>No se pudo descargar la imagen de la prenda.</Text> : null}
         {shouldersHint(hud) ? <Text style={styles.hudWarn}>Aléjate un poco para que se vean tus hombros.</Text> : null}
