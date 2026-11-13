@@ -39,6 +39,10 @@ export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
   const [hud, setHud] = useState('Buscando a la persona…');
   const hudRef = useRef('');
   const [imageError, setImageError] = useState(false);
+  // Al salir se desmonta primero la cámara (GL) y recién después se cierra la pantalla: así la cámara no sigue
+  // pintando sobre una superficie ya liberada (provocaba "Error during updateTexImage" y cerraba la app).
+  const [closing, setClosing] = useState(false);
+  const leaveAction = useRef<any>(null);
 
   const detectorRef = useRef<poseDetection.PoseDetector | null>(null);
   const isDetecting = useRef(false);
@@ -47,6 +51,19 @@ export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
   
   // Animation frame ref to be able to cancel it
   const requestAnimationFrameId = useRef<number>(0);
+
+  useEffect(() => {
+    const unsub = navigation.addListener('beforeRemove', (e: any) => {
+      if (leaveAction.current) return; // ya se está cerrando: dejar salir
+      e.preventDefault();
+      leaveAction.current = e.data.action;
+      unmounted.current = true;
+      if (requestAnimationFrameId.current) cancelAnimationFrame(requestAnimationFrameId.current);
+      setClosing(true);
+      setTimeout(() => navigation.dispatch(e.data.action), 350);
+    });
+    return unsub;
+  }, [navigation]);
 
   useEffect(() => {
     unmounted.current = false;
@@ -406,7 +423,7 @@ export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
 
   return (
     <View style={styles.container}>
-      <TensorCamera
+      {!closing && <TensorCamera
         style={styles.camera}
         facing="front"
         type="front"
@@ -418,7 +435,7 @@ export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
         onReady={handleCameraStream}
         autorender={true}
         useCustomShadersToResize={false}
-      />
+      />}
 
       {overlayStyles.torso && productConfig.product?.arTorsoUrl && (
         <Image 
