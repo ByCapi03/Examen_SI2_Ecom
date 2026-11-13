@@ -118,6 +118,10 @@ export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
   const badFrames = useRef(0);
   const goodFrames = useRef(0);
   const rotLocked = useRef(false);
+  // Diagnóstico (se muestra en el HUD): mejor confianza de hombros por giro y brillo medio de la imagen del tensor
+  const rotBest = useRef<number[]>([0, 0, 0, 0]);
+  const frameCount = useRef(0);
+  const meanPx = useRef<number | null>(null);
 
   const rotateTensor = (t: tf.Tensor3D, deg: number): tf.Tensor3D => {
     if (deg === 0) return t;
@@ -167,12 +171,18 @@ export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
           const deg = ROTATIONS[rotIdx.current];
           const [H, W] = imageTensor.shape;
           rotated = rotateTensor(imageTensor, deg);
+          frameCount.current += 1;
+          if (frameCount.current % 20 === 1) {
+            const m = await tf.mean(imageTensor).data();
+            meanPx.current = Math.round(Number(m[0]));
+          }
           const poses = await detectorRef.current.estimatePoses(rotated as any);
 
           if (poses && poses.length > 0) {
             const mapped = { ...poses[0], keypoints: poses[0].keypoints.map((k) => mapKeypoint(k, deg, W, H)) };
             const byName = (n: string) => mapped.keypoints.find((k) => k.name === n)?.score ?? 0;
             const shoulderScore = Math.min(byName('left_shoulder'), byName('right_shoulder'));
+            rotBest.current[rotIdx.current] = Math.max(rotBest.current[rotIdx.current], Math.round(shoulderScore * 100) / 100);
 
             if (shoulderScore >= 0.35) {
               goodFrames.current += 1;
@@ -266,7 +276,7 @@ export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
     const shouldersVisible = !!(leftShoulder?.score && leftShoulder.score > SHOULDER_MIN && rightShoulder?.score && rightShoulder.score > SHOULDER_MIN);
     const hipsVisible = !!(leftHipRaw?.score && leftHipRaw.score > HIP_MIN && rightHipRaw?.score && rightHipRaw.score > HIP_MIN);
     const sc = (k: any) => (k?.score ?? 0).toFixed(2);
-    const hudNext = `${shouldersVisible ? '✓' : '✗'} hombros (${sc(leftShoulder)}/${sc(rightShoulder)}) · ${hipsVisible ? '✓' : '✗'} caderas · giro ${ROTATIONS[rotIdx.current]}°${rotLocked.current ? ' fijo' : ''}`;
+    const hudNext = `${shouldersVisible ? '✓' : '✗'} hombros (${sc(leftShoulder)}/${sc(rightShoulder)}) · ${hipsVisible ? '✓' : '✗'} caderas · giro ${ROTATIONS[rotIdx.current]}°${rotLocked.current ? ' fijo' : ''} · máx ${ROTATIONS.map((r, i) => `${r}°:${rotBest.current[i].toFixed(2)}`).join(' ')} · brillo ${meanPx.current ?? '-'}`;
     if (hudRef.current !== hudNext) { hudRef.current = hudNext; setHud(hudNext); }
 
     if (arType === 'TOP') {
