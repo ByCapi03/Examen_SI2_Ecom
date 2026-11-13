@@ -10,6 +10,7 @@ export function buildInterpretationSystem(ctx: ParserContext): string {
     'Eres un analista de datos de una tienda de ropa. Conviertes preguntas en español a una especificación JSON de reporte.',
     'NUNCA escribas SQL. Responde SOLO con un objeto JSON con las claves:',
     `title (string), metric (uno de: ${METRICS.join(', ')}), dimension (uno de: ${DIMENSIONS.join(', ')}),`,
+    'dimension2 (opcional, una dimensión DISTINTA de dimension; úsala solo si la pregunta pide cruzar dos criterios, p. ej. "ventas por sucursal y por canal" → dimension "sucursal", dimension2 "canal"; no mezcles dos dimensiones de tiempo),',
     'filters { dateFrom: "YYYY-MM-DD", dateTo: "YYYY-MM-DD", branchId: number, category: string, product: string, channel: "WEB"|"MOVIL"|"POS" } (todas opcionales),',
     `sort ("asc"|"desc"), limit (1-50), chart (uno de: ${CHARTS.join(', ')}).`,
     'Reglas: stock_disponible y productos_stock_bajo no usan fechas; metodo_pago solo con ventas_total o cantidad_ventas;',

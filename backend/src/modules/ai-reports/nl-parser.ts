@@ -22,6 +22,14 @@ export function parseDateRange(q: string, now: Date): { dateFrom?: string; dateT
   const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
   if (/\bhoy\b/.test(q)) return { dateFrom: iso(today), dateTo: iso(today) };
   if (/\bayer\b/.test(q)) { const y = addDays(today, -1); return { dateFrom: iso(y), dateTo: iso(y) }; }
+  // "el último mes", "la última semana", "el último año" (sin número)
+  const lastOne = q.match(/\bultim[oa]\s+(mes|semana|ano)\b/);
+  if (lastOne) {
+    const from = lastOne[1] === 'mes' ? new Date(today.getFullYear(), today.getMonth() - 1, today.getDate() + 1)
+      : lastOne[1] === 'semana' ? addDays(today, -6)
+        : new Date(today.getFullYear() - 1, today.getMonth(), today.getDate() + 1);
+    return { dateFrom: iso(from), dateTo: iso(today) };
+  }
   const lastN = q.match(/ultim[oa]s?\s+(\d+|\w+)\s+(dias|semanas|meses)/);
   if (lastN) {
     const n = Number(lastN[1]) || NUMBER_WORDS[lastN[1]] || 7;

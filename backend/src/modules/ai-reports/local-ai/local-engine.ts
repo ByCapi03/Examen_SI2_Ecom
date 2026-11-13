@@ -58,9 +58,65 @@ function fuzzyMatch(query: string, candidates: string[]): string | null {
     const cn = normalize(c);
     if (q.includes(cn)) return c;
     if (cn.length >= 4 && q.includes(cn.slice(0, cn.length - 1))) return c;
-    if (cn.length >= 5 && levenshtein(q.split(/\s+/).find((w) => levenshtein(w, cn) <= 2) ?? '', cn) <= 2) return c;
+    // Tolerancia a errores de tipeo: 1 letra (2 solo en palabras largas). Con 2 letras "vendidos" se confundía con "Vestidos".
+    const tol = cn.length >= 9 ? 2 : 1;
+    if (cn.length >= 5 && q.split(/\s+/).some((w) => w.length >= 5 && Math.abs(w.length - cn.length) <= 1 && levenshtein(w, cn) <= tol)) return c;
   }
   return null;
+}
+
+/** Palabras que nombran una agrupación en la pregunta (el texto ya viene sin acentos y en minúsculas). */
+const DIM_WORDS: [Dimension, RegExp][] = [
+  ['sucursal', /\bsucursal(?:es)?\b|\btiendas?\b/g],
+  ['canal', /\bcanal(?:es)?\b/g],
+  ['metodo_pago', /\bmetodos? de pago\b|\bformas? de pago\b|\bmedios? de pago\b/g],
+  ['categoria', /\bcategori(?:a|as)\b|\btipos? de (?:ropa|prendas?)\b/g],
+  ['producto', /\bproductos?\b|\bprendas?\b|\barticulos?\b/g],
+  ['talla', /\btallas?\b/g],
+  ['color', /\bcolor(?:es)?\b/g],
+  ['temporada', /\btemporadas?\b/g],
+  ['cliente', /\bpor clientes?\b|\bcada cliente\b/g],
+  ['estado', /\bestados?\b/g],
+  ['dia', /\bpor dias?\b|\bdiari[oa]s?\b|\bcada dia\b|\bdia a dia\b/g],
+  ['semana', /\bpor semanas?\b|\bsemanal(?:es)?\b|\bcada semana\b/g],
+  ['mes', /\bpor mes(?:es)?\b|\bmensual(?:es)?\b|\bcada mes\b/g],
+];
+
+/** "en el canal web", "del canal pos", "solo la sucursal X": ahí la palabra filtra, no agrupa. */
+const FILTER_PREFIX = /\b(?:en|del|de|con|solo|solamente|unicamente|para|al)\s+(?:el|la|los|las)?\s*$/;
+
+/**
+ * Detecta una segunda agrupación ("ventas por sucursal y por canal", "categorizado por", "desglosado por"):
+ * devuelve [principal, secundaria] en el orden en que aparecen, o null si solo hay una agrupación.
+ */
+export function detectDimensionMentions(q: string): Dimension[] {
+  const found: { dim: Dimension; idx: number }[] = [];
+  for (const [dim, re] of DIM_WORDS) {
+    for (const m of q.matchAll(re)) {
+      const idx = m.index ?? 0;
+      // Solo el singular tras "en el / del / de la" filtra ("en el canal web"); el plural agrupa ("de las sucursales")
+      const singular = !/s\b/.test(m[0].trim()) || /^por /.test(m[0]);
+      if (singular && FILTER_PREFIX.test(q.slice(Math.max(0, idx - 14), idx))) continue;
+      found.push({ dim, idx });
+    }
+  }
+  found.sort((a, b) => a.idx - b.idx);
+  const ordered: Dimension[] = [];
+  for (const f of found) if (!ordered.includes(f.dim)) ordered.push(f.dim);
+  // Dos agrupaciones de tiempo no se cruzan: se queda con la primera de cada tipo
+  const time = ['dia', 'semana', 'mes'];
+  const picked: Dimension[] = [];
+  for (const d of ordered) {
+    if (time.includes(d) && picked.some((x) => time.includes(x))) continue;
+    picked.push(d);
+  }
+  return picked;
+}
+
+/** Las dos primeras agrupaciones mencionadas (sin validar contra la métrica). */
+export function detectCrossDimensions(q: string): [Dimension, Dimension] | null {
+  const m = detectDimensionMentions(q);
+  return m.length >= 2 ? [m[0], m[1]] : null;
 }
 
 /** Extrae número de "top N" de la pregunta */
@@ -76,68 +132,75 @@ export function interpretLocal(question: string, ctx: ParserContext): LocalInter
   const corrected = correctTypos(question);
   const q = normalize(corrected);
 
-  const classifier = getClassifier();
-  const results = classifier.classify(corrected);
+  const classes = getClassifier().classify(corrected);
 
-  // Mapa de log-odds para aplicar boosts
-  const scoreMap = new Map<string, number>();
-  for (const r of results) scoreMap.set(`${r.label.metric}::${r.label.dimension}`, r.prob);
-
-  // Aplicar boosts de reglas
+  // ── 1) MÉTRICA: probabilidad marginal de Naive Bayes + reglas de palabras clave
+  const metricScore = new Map<Metric, number>(METRICS.map((m) => [m, 0]));
+  for (const r of classes) metricScore.set(r.label.metric, (metricScore.get(r.label.metric) ?? 0) + r.prob);
+  let metricRuleHit = false;
   for (const rule of RULE_BOOSTS) {
-    if (rule.re.test(q)) {
-      const key = `${rule.metric}::${rule.dimension}`;
-      scoreMap.set(key, (scoreMap.get(key) ?? 0) + rule.boost);
+    if (rule.dimension === 'ninguna' && rule.re.test(q)) {
+      metricScore.set(rule.metric, (metricScore.get(rule.metric) ?? 0) + rule.boost);
+      metricRuleHit = true;
     }
   }
-
-  // Renormalizar
-  const total = Array.from(scoreMap.values()).reduce((a, b) => a + b, 0);
-  for (const [k, v] of scoreMap) scoreMap.set(k, v / total);
-
-  // Mejor clase global
-  let bestKey = [...scoreMap.entries()].sort((a, b) => b[1] - a[1])[0][0];
-  let [bestMetric, bestDim] = bestKey.split('::') as [Metric, Dimension];
-
-  // Si la dimensión no es válida para la métrica elegida, buscar la mejor dimensión válida
-  if (!VALID_DIMS[bestMetric].includes(bestDim)) {
-    const validEntries = [...scoreMap.entries()]
-      .filter(([k]) => {
-        const [m, d] = k.split('::') as [Metric, Dimension];
-        return m === bestMetric && VALID_DIMS[bestMetric].includes(d);
-      })
-      .sort((a, b) => b[1] - a[1]);
-    if (validEntries.length) [bestKey] = validEntries[0];
-    else bestKey = `${bestMetric}::ninguna`;
-    [bestMetric, bestDim] = bestKey.split('::') as [Metric, Dimension];
+  // "ventas", "vendimos", "ingresos"… sin otra pista de métrica: monto vendido
+  if (!metricRuleHit && /\b(ventas?|vendimos|vendi|vendio|ingresos?|facturacion|monto|recaudado)\b/.test(q)) {
+    metricScore.set('ventas_total', (metricScore.get('ventas_total') ?? 0) + 0.4);
   }
+  const metricTotal = [...metricScore.values()].reduce((a, b) => a + b, 0) || 1;
+  const bestMetric = [...metricScore.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  const confidence = Math.min((metricScore.get(bestMetric) ?? 0) / metricTotal, 1);
+  const validDims = VALID_DIMS[bestMetric];
 
-  const confidence = Math.min(scoreMap.get(bestKey) ?? 0, 1);
-
-  // Construir filtros
+  // ── 2) FILTROS (fechas, sucursal, categoría) para no confundirlos con agrupaciones
   const filters: any = { ...parseDateRange(q, ctx.now) };
-
-  // Extracción fuzzy de sucursal
   const branchNames = ctx.branches.map((b) => b.name);
   const matchedBranch = fuzzyMatch(q, branchNames);
   if (matchedBranch) {
     const branch = ctx.branches.find((b) => normalize(b.name) === normalize(matchedBranch));
-    if (branch) {
-      filters.branchId = branch.id;
-      if (bestDim === 'sucursal') bestDim = 'ninguna';
-    }
+    if (branch) filters.branchId = branch.id;
   }
-
-  // Extracción fuzzy de categoría
   const matchedCat = fuzzyMatch(q, ctx.categories);
   if (matchedCat) filters.category = matchedCat;
 
-  // Canal explícito
-  if (/\bweb\b/.test(q) && bestDim !== 'canal') filters.channel = 'WEB';
-  else if (/\b(movil|app)\b/.test(q) && bestDim !== 'canal') filters.channel = 'MOVIL';
-  else if (/\b(pos|tienda fisica|caja)\b/.test(q) && bestDim !== 'canal') filters.channel = 'POS';
+  // ── 3) AGRUPACIONES: lo que la frase nombra ("por sucursal y por canal"); si no nombra ninguna, Naive Bayes + reglas
+  let qDims = q;
+  for (const name of [matchedBranch, matchedCat]) if (name) qDims = qDims.split(normalize(name)).join(' ');
+  const mentioned = detectDimensionMentions(qDims).filter((d) => validDims.includes(d));
 
-  // Stock no usa fechas ni canal
+  let dimension: Dimension;
+  let dimension2: Dimension | undefined;
+  if (mentioned.length) {
+    dimension = mentioned[0];
+    dimension2 = mentioned[1];
+  } else {
+    const dimScore = new Map<Dimension, number>();
+    for (const r of classes) if (r.label.metric === bestMetric) dimScore.set(r.label.dimension, (dimScore.get(r.label.dimension) ?? 0) + r.prob);
+    for (const rule of RULE_BOOSTS) {
+      if (rule.dimension !== 'ninguna' && rule.re.test(q)) dimScore.set(rule.dimension, (dimScore.get(rule.dimension) ?? 0) + rule.boost);
+    }
+    const ranked = [...dimScore.entries()].filter(([d]) => validDims.includes(d)).sort((a, b) => b[1] - a[1]);
+    dimension = ranked.length ? ranked[0][0] : 'ninguna';
+    // Un solo día ("hoy", "ayer"): un total, no una serie
+    if (/\b(hoy|ayer)\b/.test(q)) dimension = 'ninguna';
+  }
+
+  // Si ya se filtra por una sucursal concreta, no se agrupa por sucursal
+  if (filters.branchId) {
+    if (dimension2 === 'sucursal') dimension2 = undefined;
+    if (dimension === 'sucursal') { dimension = dimension2 ?? 'ninguna'; dimension2 = undefined; }
+  }
+
+  // Canal explícito como filtro (solo si no se agrupa por canal)
+  const groupsByChannel = dimension === 'canal' || dimension2 === 'canal';
+  if (!groupsByChannel) {
+    if (/\bweb\b/.test(q)) filters.channel = 'WEB';
+    else if (/\b(movil|app)\b/.test(q)) filters.channel = 'MOVIL';
+    else if (/\b(pos|tienda fisica|caja)\b/.test(q)) filters.channel = 'POS';
+  }
+
+  // El stock no usa fechas ni canal
   if (bestMetric === 'stock_disponible' || bestMetric === 'productos_stock_bajo') {
     delete filters.dateFrom; delete filters.dateTo; delete filters.channel;
   }
@@ -145,8 +208,15 @@ export function interpretLocal(question: string, ctx: ParserContext): LocalInter
   const sort: 'asc' | 'desc' = /menos|peor|menor/.test(q) ? 'asc' : 'desc';
   const limit = extractLimit(q);
 
-  const spec = validateSpec({ title: question.trim().slice(0, 120), metric: bestMetric, dimension: bestDim, filters, sort, limit });
+  const base = { title: question.trim().slice(0, 120), metric: bestMetric, filters, sort, limit };
+  let spec: ReportSpec;
+  try {
+    spec = validateSpec({ ...base, dimension, dimension2 });
+  } catch {
+    // La combinación no es válida: se intenta con una sola agrupación y, en último caso, sin agrupar
+    try { spec = validateSpec({ ...base, dimension }); } catch { spec = validateSpec({ ...base, dimension: 'ninguna' }); }
+  }
 
-  const explanation = `NB+Reglas: métrica=${bestMetric}, dim=${bestDim}, confianza=${(confidence * 100).toFixed(1)}%`;
+  const explanation = `NB+Reglas: métrica=${bestMetric}, dim=${spec.dimension}${spec.dimension2 ? `×${spec.dimension2}` : ''}, confianza=${(confidence * 100).toFixed(1)}%`;
   return { spec, confidence, explanation, engine: 'IA_LOCAL' };
 }

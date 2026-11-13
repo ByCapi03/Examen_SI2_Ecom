@@ -376,6 +376,14 @@ async function main() {
     r = await api('POST', '/ai-reports/query', tok.adminA, { question: '¿Cuáles fueron los 3 vestidos más vendidos este mes?' });
     check('T27 Reporte en lenguaje natural responde con datos reales', r.status === 201 && r.data.rows.length >= 1 && typeof r.data.narrative === 'string', r.data);
     check('T28 El reporte solo contiene productos de la Empresa A', r.data?.rows?.every((row) => row.label.includes(' A ')), r.data?.rows);
+    r = await api('POST', '/ai-reports/query', tok.adminA, { question: 'Ventas por sucursal y por canal' });
+    const pv = r.data?.pivot;
+    check('T67 Dos agrupaciones ("por sucursal y por canal") generan una tabla cruzada con columna Total',
+      r.status === 201 && r.data.spec.dimension === 'sucursal' && r.data.spec.dimension2 === 'canal' && pv?.series?.length >= 1 && r.data.columns[r.data.columns.length - 1] === 'Total', r.data);
+    check('T68 La tabla cruzada solo contiene sucursales de la Empresa A', !!pv && pv.rows.length >= 1 && pv.rows.every((row) => / A$/.test(row.label)), pv?.rows?.map((x) => x.label));
+    check('T69 Las celdas de cada fila suman su total', !!pv && pv.rows.every((row) => Math.abs(row.cells.reduce((x, y) => x + y, 0) - row.total) < 0.01), pv?.rows);
+    r = await api('POST', '/ai-reports/query', tok.adminA, { question: 'Los 10 productos más vendidos de los últimos 3 meses' });
+    check('T70 "productos más vendidos" no filtra por la categoría "Vestidos" (vendidos ≠ vestidos)', r.status === 201 && r.data.spec.filters.category === undefined, r.data?.spec);
     r = await api('POST', '/ai-reports/query', tok.adminA, { question: "ventas por sucursal'; DROP TABLE sales; --" });
     const salesStill = await one(`SELECT to_regclass('public.sales') AS t`);
     check('T29 Intento de inyección SQL en la pregunta no afecta la BD', r.status < 500 && !!salesStill.t, r.status);
