@@ -17,7 +17,8 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.cinthia_03.mobile"
+      "package": "com.atemporal",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -30,10 +31,13 @@
     "plugins": [
       "expo-secure-store",
       "@react-native-community/datetimepicker",
-      ["@stripe/stripe-react-native", {
-        "merchantIdentifier": "merchant.com.dressed.demo",
-        "enableGooglePay": false
-      }]
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.dressed.demo",
+          "enableGooglePay": false
+        }
+      ]
     ],
     "extra": {
       "eas": {
