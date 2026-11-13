@@ -46,6 +46,11 @@
         }
       ]
     ],
-    "extra": {}
+    "extra": {
+      "eas": {
+        "projectId": "302a3550-12f0-4cc5-ade7-f02c8ee4a662"
+      }
+    },
+    "owner": "cinthia_03"
   }
 }
