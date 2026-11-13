@@ -96,12 +96,16 @@ function seasonal(date) {
 }
 
 async function main() {
-  const missing = ['DB_HOST', 'DB_USERNAME', 'DB_PASSWORD', 'DB_DATABASE'].filter((k) => !process.env[k]);
-  if (missing.length) { console.error(`Faltan variables: ${missing.join(', ')} (revise backend/.env)`); process.exit(1); }
-  const db = new Client({
-    host: process.env.DB_HOST, port: Number(process.env.DB_PORT || 5432),
-    user: process.env.DB_USERNAME, password: String(process.env.DB_PASSWORD), database: process.env.DB_DATABASE,
-  });
+  const url = process.env.DATABASE_URL;
+  const missing = url ? [] : ['DB_HOST', 'DB_USERNAME', 'DB_PASSWORD', 'DB_DATABASE'].filter((k) => !process.env[k]);
+  if (missing.length) { console.error(`Faltan variables: ${missing.join(', ')} (revise backend/.env o defina DATABASE_URL)`); process.exit(1); }
+  const ssl = process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined;
+  const db = url
+    ? new Client({ connectionString: url, ssl })
+    : new Client({
+        host: process.env.DB_HOST, port: Number(process.env.DB_PORT || 5432),
+        user: process.env.DB_USERNAME, password: String(process.env.DB_PASSWORD), database: process.env.DB_DATABASE, ssl,
+      });
   await db.connect();
   const q = (sql, params) => db.query(sql, params);
   const one = async (sql, params) => (await q(sql, params)).rows[0];
