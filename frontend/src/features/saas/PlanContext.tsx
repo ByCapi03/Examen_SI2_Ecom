@@ -12,6 +12,8 @@ interface TenantInfo {
   slug: string;
   plan: { code: PlanCode; name: string; aiGenerativeReports: boolean; maxBranches: number } | null;
   subscription?: { status: string; billingCycle: string; endDate: string | null; daysLeft: number | null } | null;
+  /** Personalización de la empresa (Mi tienda web); accentColor es su color principal. */
+  storeConfig?: { accentColor?: string } | null;
 }
 
 interface Ctx {

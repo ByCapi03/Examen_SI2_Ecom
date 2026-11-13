@@ -3,9 +3,11 @@ import { Mic, Square } from 'lucide-react';
 import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
 import { useSettings } from '../../config/SettingsContext';
 import { api } from '../../api/axios';
-import { BarChart, LineChart } from './ReportChart';
-import { DashStyles, PageHeader, PlanBadge, PlanGate, downloadCsv } from '../../components/dashboard/ui';
-import type { ReportResult, ExportOptions } from './exportOptions';
+import { BarChart, LineChart, PivotChart } from './ReportChart';
+import { DashStyles, PageHeader, PlanBadge, PlanGate } from '../../components/dashboard/ui';
+import { CompanyThemeScope, useCompanyColor } from '../../components/dashboard/CompanyThemeScope';
+import { ExportControl } from '../../components/dashboard/ExportControl';
+import type { ReportResult, ExportOptions, ExportFormat } from './exportOptions';
 import { EXPORT_OPTION_LABELS, loadExportOptions, saveExportOptions } from './exportOptions';
 import { useAuth } from '../auth/AuthContext';
 import { usePlan } from '../saas/PlanContext';
@@ -17,15 +19,17 @@ import { usePlan } from '../saas/PlanContext';
 export const AiReportsPage = () => (
   <div className="dz-page">
     <DashStyles />
-    <PageHeader title="Reportes con IA" subtitle="Pregunta en lenguaje natural y obtén un reporte con los datos reales de tu empresa" badge={<PlanBadge />} />
-    <PlanGate feature="ai" title="Reportes generativos con IA" bullets={[
-      'Consultas en lenguaje natural ("¿qué vestidos se vendieron más este mes?")',
-      'Gráficos y narrativa generados automáticamente',
-      'Historial de consultas y exportación a PDF, Excel y CSV',
-      'Datos aislados por empresa (multitenant)',
-    ]}>
-      <AiReportsContent />
-    </PlanGate>
+    <CompanyThemeScope>
+      <PageHeader title="Reportes con IA" subtitle="Pregunta en lenguaje natural y obtén un reporte con los datos reales de tu empresa" badge={<PlanBadge />} />
+      <PlanGate feature="ai" title="Reportes generativos con IA" bullets={[
+        'Consultas en lenguaje natural ("¿qué vestidos se vendieron más este mes?")',
+        'Tablas, tablas cruzadas (por sucursal y por canal) y gráficos',
+        'Historial de consultas y descarga en PDF, Excel o CSV',
+        'Datos aislados por empresa (multitenant)',
+      ]}>
+        <AiReportsContent />
+      </PlanGate>
+    </CompanyThemeScope>
   </div>
 );
 
@@ -36,12 +40,13 @@ const AiReportsContent = () => {
   const [result, setResult] = useState<ReportResult | null>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [exporting, setExporting] = useState<'csv' | 'excel' | 'pdf' | null>(null);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exportOpts, setExportOpts] = useState<ExportOptions>(loadExportOptions);
   const [showOpts, setShowOpts] = useState(false);
   const { user } = useAuth();
   const { tenant } = usePlan();
+  const brand = useCompanyColor();
 
   const toggleOpt = (key: keyof ExportOptions) => {
     const next = { ...exportOpts, [key]: !exportOpts[key] };
@@ -89,27 +94,19 @@ const AiReportsContent = () => {
     });
   };
 
-  const meta = { companyName: tenant?.name, userName: user?.name };
+  const meta = { companyName: tenant?.name, userName: user?.name, color: brand.color };
 
-  const exportReport = async (format: 'csv' | 'excel' | 'pdf') => {
+  const download = async (format: ExportFormat) => {
     if (!result) return;
-    setExporting(format);
+    setExporting(true);
     setError(null);
     try {
-      if (format === 'csv') {
-        const stamp = new Date(result.generatedAt).toISOString().slice(0, 10);
-        downloadCsv(`reporte-ia-${stamp}.csv`, result.columns, result.rows.map((r) => [r.label, r.value]));
-      } else if (format === 'excel') {
-        const { exportReportExcel } = await import('./exportReport');
-        await exportReportExcel(result, exportOpts, meta);
-      } else {
-        const { exportReportPdf } = await import('./exportReport');
-        exportReportPdf(result, exportOpts, meta);
-      }
+      const { exportReport } = await import('./exportReport');
+      await exportReport(result, format, exportOpts, meta);
     } catch {
       setError('No se pudo exportar el reporte. Inténtalo de nuevo.');
     } finally {
-      setExporting(null);
+      setExporting(false);
     }
   };
 
@@ -170,19 +167,11 @@ const AiReportsContent = () => {
               <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, background: result.engine === 'LLM' ? '#e0e7ff' : '#f3f4f6' }}>
                 {result.engine === 'LLM' ? 'Interpretado por IA' : 'Intérprete local'}
               </span>
-              <div role="group" aria-label="Exportar reporte" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: 'var(--atemporal-muted)', marginRight: 2 }}>Exportar:</span>
-                {([['pdf', 'PDF'], ['excel', 'Excel'], ['csv', 'CSV']] as const).map(([key, label]) => (
-                  <button key={key} onClick={() => void exportReport(key)} disabled={exporting !== null}
-                    style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ccc', background: '#fff', cursor: exporting ? 'wait' : 'pointer', opacity: exporting && exporting !== key ? 0.5 : 1 }}>
-                    {exporting === key ? 'Exportando…' : label}
-                  </button>
-                ))}
-                <button onClick={() => setShowOpts((v) => !v)} aria-expanded={showOpts}
-                  style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ccc', background: showOpts ? '#F5F5F5' : '#fff', cursor: 'pointer' }}>
-                  Opciones
-                </button>
-              </div>
+              <ExportControl onExport={(f) => void download(f)} busy={exporting} />
+              <button onClick={() => setShowOpts((v) => !v)} aria-expanded={showOpts}
+                style={{ fontSize: 12, padding: '6px 12px', borderRadius: 8, border: '1px solid var(--atemporal-border)', background: showOpts ? 'var(--company-soft)' : '#fff', cursor: 'pointer' }}>
+                Qué incluir
+              </button>
             </div>
           </div>
           {showOpts && (
@@ -197,34 +186,31 @@ const AiReportsContent = () => {
             </fieldset>
           )}
           <div style={{ fontSize: 12, color: '#777', margin: '4px 0 12px' }}>
-            {result.columns[1]} {result.spec.dimension !== 'ninguna' ? `por ${result.columns[0].toLowerCase()}` : ''}
+            {result.metricLabel ?? result.columns[1]} {result.pivot ? `por ${result.pivot.rowLabel.toLowerCase()} y ${result.pivot.columnLabel.toLowerCase()}` : result.spec.dimension !== 'ninguna' ? `por ${result.columns[0].toLowerCase()}` : ''}
             {result.spec.filters.dateFrom ? ` · ${result.spec.filters.dateFrom} a ${result.spec.filters.dateTo ?? 'hoy'}` : ' · todo el período'}
             {result.branchName ? ` · ${result.branchName}` : ''}
             {result.spec.filters.category ? ` · categoría ${result.spec.filters.category}` : ''}
             {result.spec.filters.channel ? ` · canal ${result.spec.filters.channel}` : ''}
           </div>
 
-          <div style={{ background: '#F5F2EB', borderLeft: '4px solid var(--atemporal-gold)', padding: '10px 14px', borderRadius: 4, marginBottom: 16 }}>
+          <div style={{ background: 'var(--company-soft)', borderLeft: '4px solid var(--atemporal-green)', padding: '10px 14px', borderRadius: 4, marginBottom: 16 }}>
             {result.narrative}
           </div>
+          {result.pivot && result.insights && result.insights.length > 0 && (
+            <ul style={{ margin: '0 0 16px', paddingLeft: 18, fontSize: 13, color: 'var(--atemporal-text)' }}>
+              {result.insights.slice(-5).map((i, k) => <li key={k}>{i.text}</li>)}
+            </ul>
+          )}
 
           {result.rows.length === 0 ? <div style={{ color: '#666' }}>Sin datos para los filtros interpretados.</div>
             : result.spec.chart === 'kpi' ? (
               <div style={{ fontSize: 40, fontWeight: 700 }}>{result.rows[0].value.toLocaleString('es-BO', { maximumFractionDigits: 2 })}
-                <div style={{ fontSize: 14, fontWeight: 400, color: '#666' }}>{result.columns[1]}</div></div>
-            ) : result.spec.chart === 'line' ? <LineChart rows={result.rows} /> : <BarChart rows={result.rows} />}
+                <div style={{ fontSize: 14, fontWeight: 400, color: '#666' }}>{result.metricLabel ?? result.columns[1]}</div></div>
+            ) : result.pivot ? <PivotChart pivot={result.pivot} colors={brand.palette(Math.max(result.pivot.series.length, 2))} />
+              : result.spec.chart === 'line' ? <LineChart rows={result.rows} />
+                : result.spec.chart === 'table' ? null : <BarChart rows={result.rows} />}
 
-          {result.rows.length > 0 && result.spec.chart !== 'kpi' && (
-            <details style={{ marginTop: 16 }}>
-              <summary style={{ cursor: 'pointer' }}>Ver tabla de datos ({result.rows.length} filas)</summary>
-              <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 8, fontSize: 13 }}>
-                <thead><tr><th style={{ textAlign: 'left', borderBottom: '1px solid #ddd' }}>{result.columns[0]}</th><th style={{ textAlign: 'right', borderBottom: '1px solid #ddd' }}>{result.columns[1]}</th></tr></thead>
-                <tbody>{result.rows.map((r, i) => (
-                  <tr key={i}><td style={{ padding: 4 }}>{r.label}</td><td style={{ padding: 4, textAlign: 'right' }}>{r.value.toLocaleString('es-BO', { maximumFractionDigits: 2 })}</td></tr>
-                ))}</tbody>
-              </table>
-            </details>
-          )}
+          {result.rows.length > 0 && result.spec.chart !== 'kpi' && <ResultTable result={result} />}
         </div>
       )}
 
@@ -241,6 +227,54 @@ const AiReportsContent = () => {
           </ul>
         </div>
       )}
+    </div>
+  );
+};
+
+const num = (n: number) => n.toLocaleString('es-BO', { maximumFractionDigits: 2 });
+
+/** Tabla del reporte (siempre visible). Con dos agrupaciones es una tabla cruzada con totales por fila y columna. */
+const ResultTable = ({ result }: { result: ReportResult }) => {
+  const p = result.pivot;
+  const th: React.CSSProperties = { padding: '9px 10px', background: 'var(--atemporal-green)', color: 'var(--company-on)', fontSize: 12, whiteSpace: 'nowrap' };
+  const td: React.CSSProperties = { padding: '8px 10px', borderBottom: '1px solid var(--atemporal-border)', fontVariantNumeric: 'tabular-nums' };
+  return (
+    <div style={{ marginTop: 18, overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <thead>
+          <tr>
+            <th style={{ ...th, textAlign: 'left', borderTopLeftRadius: 8 }}>{result.columns[0]}</th>
+            {p
+              ? <>{p.series.map((sName) => <th key={sName} style={{ ...th, textAlign: 'right' }}>{sName}</th>)}<th style={{ ...th, textAlign: 'right', borderTopRightRadius: 8 }}>Total</th></>
+              : <th style={{ ...th, textAlign: 'right', borderTopRightRadius: 8 }}>{result.columns[1]}</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {p ? p.rows.map((row, i) => (
+            <tr key={row.label} style={{ background: i % 2 ? 'var(--company-soft)' : undefined }}>
+              <td style={td}>{row.label}</td>
+              {row.cells.map((v, k) => <td key={k} style={{ ...td, textAlign: 'right' }}>{num(v)}</td>)}
+              <td style={{ ...td, textAlign: 'right', fontWeight: 700 }}>{num(row.total)}</td>
+            </tr>
+          )) : result.rows.map((r, i) => (
+            <tr key={i} style={{ background: i % 2 ? 'var(--company-soft)' : undefined }}>
+              <td style={td}>{r.label}</td>
+              <td style={{ ...td, textAlign: 'right' }}>{num(r.value)}</td>
+            </tr>
+          ))}
+        </tbody>
+        {p && p.columnTotals && (
+          <tfoot>
+            <tr style={{ fontWeight: 700, color: 'var(--atemporal-green)' }}>
+              <td style={{ ...td, borderTop: '2px solid var(--atemporal-green)', borderBottom: 'none' }}>Total</td>
+              {p.columnTotals.map((v, k) => <td key={k} style={{ ...td, textAlign: 'right', borderTop: '2px solid var(--atemporal-green)', borderBottom: 'none' }}>{num(v)}</td>)}
+              <td style={{ ...td, textAlign: 'right', borderTop: '2px solid var(--atemporal-green)', borderBottom: 'none' }}>{p.grandTotal != null ? num(p.grandTotal) : '—'}</td>
+            </tr>
+          </tfoot>
+        )}
+      </table>
+      {p && !p.additive && <div style={{ fontSize: 12, color: '#777', marginTop: 6 }}>Esta métrica no se puede sumar entre columnas: los totales por columna no se muestran.</div>}
+      {p && p.truncatedSeries > 0 && <div style={{ fontSize: 12, color: '#777', marginTop: 6 }}>Se muestran las {p.series.length} columnas principales; {p.truncatedSeries} más quedaron fuera.</div>}
     </div>
   );
 };

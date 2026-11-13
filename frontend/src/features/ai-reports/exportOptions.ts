@@ -3,16 +3,68 @@
  * Sin dependencias pesadas: lo importa la página y también el generador de PDF/Excel.
  */
 
+/** Tabla cruzada (dos agrupaciones): filas × columnas. */
+export interface PivotData {
+  rowLabel: string;
+  columnLabel: string;
+  series: string[];
+  rows: { label: string; cells: number[]; total: number }[];
+  columnTotals: number[] | null;
+  grandTotal: number | null;
+  truncatedSeries: number;
+  additive: boolean;
+}
+
+export interface ReportInsight { type: string; text: string }
+
 export interface ReportResult {
   question: string;
-  engine: 'LLM' | 'REGLAS';
-  spec: { title: string; metric: string; dimension: string; chart: string; filters: Record<string, unknown>; limit: number };
-  columns: [string, string];
+  engine: 'LLM' | 'LLM_LOCAL' | 'IA_LOCAL' | 'REGLAS';
+  spec: { title: string; metric: string; dimension: string; dimension2?: string; chart: string; filters: Record<string, unknown>; limit: number };
+  /** Encabezados de la tabla (con dos agrupaciones: fila, una columna por valor y "Total"). */
+  columns: string[];
+  metricLabel?: string;
   rows: { label: string; value: number }[];
+  pivot?: PivotData;
   total: number;
   narrative: string;
+  insights?: ReportInsight[];
   branchName: string | null;
   generatedAt: string;
+}
+
+export type ExportFormat = 'pdf' | 'excel' | 'csv';
+
+export const EXPORT_FORMAT_LABELS: Record<ExportFormat, string> = {
+  pdf: 'PDF (documento para imprimir)',
+  excel: 'Excel (.xlsx, hoja de cálculo)',
+  csv: 'CSV (datos simples)',
+};
+
+/** Tabla lista para exportar: la primera columna es texto y las demás son numéricas. */
+export interface ExportTable {
+  columns: string[];
+  rows: (string | number)[][];
+  /** Fila de totales (null en una celda = no se puede sumar). */
+  totals?: (string | number | null)[];
+}
+
+/** Documento genérico que entienden los exportadores: sirve para reportes con IA y para la pantalla Reportes. */
+export interface ExportDoc {
+  title: string;
+  generatedAt: string;
+  /** Filas de la tabla "Filtro / contexto". */
+  context: [string, string][];
+  narrative?: string;
+  /** Resultado único (KPI). */
+  kpi?: { label: string; value: number };
+  table?: ExportTable;
+  /** Gráfico simple (no se dibuja en tablas cruzadas). */
+  chart?: { kind: 'bar' | 'line'; rows: { label: string; value: number }[] };
+  /** Nombre base del archivo, sin extensión. */
+  fileName: string;
+  /** Texto del origen del análisis (p. ej. "Intérprete local"). */
+  origin?: string;
 }
 
 /** Qué secciones incluye la exportación. */
@@ -44,6 +96,8 @@ export const EXPORT_OPTION_LABELS: Record<keyof ExportOptions, string> = {
 export interface ExportMeta {
   companyName?: string;
   userName?: string;
+  /** Color principal de la empresa (#RRGGBB): cabeceras, títulos y gráficos de los archivos. */
+  color?: string;
 }
 
 const STORAGE_KEY = 'reporteIA.exportOptions';

@@ -1,4 +1,6 @@
 /** Gráficos SVG livianos (sin dependencias) para reportes generativos. */
+import type { PivotData } from './exportOptions';
+
 interface Row { label: string; value: number }
 
 const fmt = (n: number) => n.toLocaleString('es-BO', { maximumFractionDigits: 2 });
@@ -60,5 +62,49 @@ export const Sparkline = ({ history, forecast }: { history: number[]; forecast: 
       <path d={hist} fill="none" style={{ stroke: COLOR }} strokeWidth="2" />
       <path d={fc} fill="none" style={{ stroke: ACCENT }} strokeWidth="2" strokeDasharray="4 3" />
     </svg>
+  );
+};
+
+/**
+ * Tabla cruzada como barras: apiladas cuando la métrica se puede sumar (cada segmento es una columna) y
+ * agrupadas (una barra fina por columna) cuando no (p. ej. ticket promedio).
+ */
+export const PivotChart = ({ pivot, colors }: { pivot: PivotData; colors: string[] }) => {
+  const stacked = pivot.additive;
+  const max = Math.max(...(stacked ? pivot.rows.map((r) => r.total) : pivot.rows.flatMap((r) => r.cells)), 1);
+  const color = (i: number) => colors[i % colors.length];
+  return (
+    <div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px', marginBottom: 10, fontSize: 12 }}>
+        {pivot.series.map((name, i) => (
+          <span key={name} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ width: 11, height: 11, borderRadius: 3, background: color(i), display: 'inline-block' }} />{name}
+          </span>
+        ))}
+      </div>
+      <div style={{ display: 'grid', gap: stacked ? 8 : 12 }}>
+        {pivot.rows.map((row) => (
+          <div key={row.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(90px, 26%) 1fr auto', alignItems: stacked ? 'center' : 'start', gap: 8, fontSize: 13 }}>
+            <span title={row.label} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.label}</span>
+            {stacked ? (
+              <div style={{ display: 'flex', background: 'var(--chart-track, #EEEAE1)', borderRadius: 4, height: 20, overflow: 'hidden' }}>
+                {row.cells.map((v, i) => v > 0 && (
+                  <div key={i} title={`${pivot.series[i]}: ${fmt(v)}`} style={{ width: `${(v / max) * 100}%`, background: color(i) }} />
+                ))}
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: 3 }}>
+                {row.cells.map((v, i) => (
+                  <div key={i} title={`${pivot.series[i]}: ${fmt(v)}`} style={{ background: 'var(--chart-track, #EEEAE1)', borderRadius: 3, height: 8 }}>
+                    <div style={{ width: `${(v / max) * 100}%`, height: '100%', borderRadius: 3, background: color(i) }} />
+                  </div>
+                ))}
+              </div>
+            )}
+            <span style={{ fontVariantNumeric: 'tabular-nums', minWidth: 60, textAlign: 'right' }}>{fmt(row.total)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 };

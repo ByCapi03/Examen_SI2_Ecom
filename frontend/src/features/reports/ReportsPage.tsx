@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingCart, Package, Boxes, CalendarCheck, Download, Sparkles, Wallet, Receipt, Hash, AlertTriangle } from 'lucide-react';
+import { ShoppingCart, Package, Boxes, CalendarCheck, Sparkles, Wallet, Receipt, Hash, AlertTriangle } from 'lucide-react';
 import { api } from '../../api/axios';
 import { useAuth } from '../auth/AuthContext';
 import { useSettings } from '../../config/SettingsContext';
 import { usePlan } from '../saas/PlanContext';
 import {
-  DashStyles, PageHeader, PlanBadge, PlanGate, Card, KpiCard, AreaChart, DonutChart, HBarChart, ColumnChart, StackedBars, Skeleton, Empty, downloadCsv,
+  DashStyles, PageHeader, PlanBadge, PlanGate, Card, KpiCard, AreaChart, DonutChart, HBarChart, ColumnChart, StackedBars, Skeleton, Empty,
 } from '../../components/dashboard/ui';
+import { CompanyThemeScope, useCompanyColor } from '../../components/dashboard/CompanyThemeScope';
+import { ExportControl } from '../../components/dashboard/ExportControl';
+import { loadExportOptions, type ExportDoc, type ExportFormat, type ExportTable } from '../ai-reports/exportOptions';
 
 type Tab = 'sales' | 'products' | 'inventory' | 'reservations';
 
@@ -16,16 +19,18 @@ export const ReportsPage = () => {
   return (
     <div className="dz-page">
       <DashStyles />
-      <PageHeader title={t('rep.title')} subtitle={t('rep.subtitle')} badge={<PlanBadge />} />
-      <PlanGate feature="reports" title="Reportes del negocio" bullets={[
-        'Reporte de ventas por día y por método de pago',
-        'Ranking de productos por unidades e ingresos',
-        'Inventario por sucursal y alertas de stock bajo',
-        'Estado de reservas por sucursal',
-        'Filtros por fecha, sucursal y canal + exportación a CSV',
-      ]}>
-        <ReportsContent />
-      </PlanGate>
+      <CompanyThemeScope>
+        <PageHeader title={t('rep.title')} subtitle={t('rep.subtitle')} badge={<PlanBadge />} />
+        <PlanGate feature="reports" title="Reportes del negocio" bullets={[
+          'Reporte de ventas por día y por método de pago',
+          'Ranking de productos por unidades e ingresos',
+          'Inventario por sucursal y alertas de stock bajo',
+          'Estado de reservas por sucursal',
+          'Filtros por fecha, sucursal y canal + descarga en PDF, Excel o CSV',
+        ]}>
+          <ReportsContent />
+        </PlanGate>
+      </CompanyThemeScope>
     </div>
   );
 };
@@ -33,7 +38,9 @@ export const ReportsPage = () => {
 const ReportsContent = () => {
   const { user } = useAuth();
   const { t, money, num } = useSettings();
-  const { can } = usePlan();
+  const { can, tenant } = usePlan();
+  const brand = useCompanyColor();
+  const [exporting, setExporting] = useState(false);
   const isAdmin = !!user?.roles?.includes('ADMIN');
 
   const [tab, setTab] = useState<Tab>('sales');
@@ -64,13 +71,60 @@ const ReportsContent = () => {
 
   const moneyC = (v: number) => money(v, { compact: true });
 
-  const exportCsv = () => {
-    if (!data) return;
+  /** Documento exportable de la pestaña actual: los mismos datos que se ven en pantalla, con totales. */
+  const buildDoc = (): ExportDoc | null => {
+    if (!data) return null;
     const stamp = new Date().toISOString().slice(0, 10);
-    if (tab === 'sales') downloadCsv(`ventas-${stamp}.csv`, ['Fecha', 'Ventas', 'Monto (Bs)'], data.salesByDay.map((d: any) => [d.date, d.salesCount, d.totalAmount]));
-    if (tab === 'products') downloadCsv(`productos-${stamp}.csv`, ['Producto', 'Unidades', 'Ingresos (Bs)'], data.map((p: any) => [p.productName, p.unitsSold, p.revenue]));
-    if (tab === 'inventory') downloadCsv(`inventario-${stamp}.csv`, ['Sucursal', 'Stock', 'Reservado', 'Disponible'], data.availabilityByBranch.map((b: any) => [b.branchName, b.totalStock, b.totalReserved, b.totalAvailable]));
-    if (tab === 'reservations') downloadCsv(`reservas-${stamp}.csv`, ['Sucursal', 'Total', 'Activas', 'Atendidas', 'Canceladas'], data.byBranch.map((b: any) => [b.branchName, b.total, b.pending, b.attended, b.cancelled]));
+    const sum = (rows: (string | number)[][], c: number) => rows.reduce((a, r) => a + Number(r[c] ?? 0), 0);
+    const branchName = f.branchId ? branches.find((b) => String(b.id) === f.branchId)?.name ?? `#${f.branchId}` : 'Todas las autorizadas';
+    const context: [string, string][] = [
+      ['Empresa', tenant?.name || '—'],
+      ['Período', f.from || f.to ? `${f.from || 'inicio'} a ${f.to || 'hoy'}` : 'Todo el período'],
+      ['Sucursal', branchName],
+    ];
+    if (tab === 'sales') {
+      if (f.channel) context.push(['Canal', f.channel]);
+      if (f.paymentMethod) context.push(['Método de pago', f.paymentMethod]);
+    }
+    if (user?.name) context.push(['Generado por', user.name]);
+
+    let title = '';
+    let table: ExportTable;
+    if (tab === 'sales') {
+      title = 'Reporte de ventas';
+      context.push(['Total vendido', money(data.totalSalesAmount)], ['N° de ventas', num(data.salesCount)], ['Ticket promedio', money(data.averageTicket)], ['Unidades vendidas', num(data.unitsSold)]);
+      const rows = data.salesByDay.map((d: any) => [d.date, Number(d.salesCount), Number(d.totalAmount), d.salesCount ? Math.round((Number(d.totalAmount) / Number(d.salesCount)) * 100) / 100 : 0]);
+      table = { columns: ['Fecha', 'Ventas', 'Monto (Bs)', 'Ticket promedio (Bs)'], rows, totals: ['Total', sum(rows, 1), sum(rows, 2), sum(rows, 1) ? Math.round((sum(rows, 2) / sum(rows, 1)) * 100) / 100 : 0] };
+    } else if (tab === 'products') {
+      title = 'Reporte de productos';
+      const rows = data.map((p: any) => [p.productName, Number(p.unitsSold), Number(p.revenue)]);
+      table = { columns: ['Producto', 'Unidades', 'Ingresos (Bs)'], rows, totals: ['Total', sum(rows, 1), sum(rows, 2)] };
+    } else if (tab === 'inventory') {
+      title = 'Reporte de inventario';
+      const rows = data.availabilityByBranch.map((b: any) => [b.branchName, Number(b.totalStock), Number(b.totalReserved), Number(b.totalAvailable)]);
+      table = { columns: ['Sucursal', 'Stock', 'Reservado', 'Disponible'], rows, totals: ['Total', sum(rows, 1), sum(rows, 2), sum(rows, 3)] };
+    } else {
+      title = 'Reporte de reservas';
+      const rows = data.byBranch.map((b: any) => [b.branchName, Number(b.total), Number(b.pending), Number(b.attended), Number(b.cancelled)]);
+      table = { columns: ['Sucursal', 'Total', 'Activas', 'Atendidas', 'Canceladas'], rows, totals: ['Total', sum(rows, 1), sum(rows, 2), sum(rows, 3), sum(rows, 4)] };
+    }
+    context.unshift(['Reporte', title]);
+    return { title, generatedAt: new Date().toISOString(), context, table, fileName: `${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${stamp}` };
+  };
+
+  const exportTab = async (format: ExportFormat) => {
+    const doc = buildDoc();
+    if (!doc) return;
+    setExporting(true);
+    setError(null);
+    try {
+      const { exportDocument } = await import('../ai-reports/exportReport');
+      await exportDocument(doc, format, loadExportOptions(), { companyName: tenant?.name, userName: user?.name, color: brand.color });
+    } catch {
+      setError('No se pudo generar el archivo. Inténtalo de nuevo.');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
@@ -89,7 +143,7 @@ const ReportsContent = () => {
             <button key={x.key} className={`dz-tab${tab === x.key ? ' on' : ''}`} onClick={() => setTab(x.key)}>{x.icon}{x.label}</button>
           ))}
         </div>
-        <button className="dz-btn ghost" onClick={exportCsv} disabled={!data}><Download size={15} /> {t('rep.export')}</button>
+        <ExportControl onExport={(fm) => void exportTab(fm)} disabled={!data} busy={exporting} />
       </div>
 
       {/* Filtros */}
