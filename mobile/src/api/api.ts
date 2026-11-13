@@ -8,6 +8,10 @@ type AccessHandler = (kind: 'SUSPENDED' | 'EXPIRED') => void;
 let accessHandler: AccessHandler | null = null;
 export const setAccessHandler = (fn: AccessHandler | null) => { accessHandler = fn; };
 
+/** Sesión vencida o de otro servidor (401 "Token inválido o expirado"): la app cierra la sesión y vuelve al login. */
+let unauthorizedHandler: (() => void) | null = null;
+export const setUnauthorizedHandler = (fn: (() => void) | null) => { unauthorizedHandler = fn; };
+
 export const api = axios.create({
   baseURL: API_URL,
   headers: {
@@ -42,6 +46,7 @@ api.interceptors.response.use(
     const message = String(error.response?.data?.message ?? '');
     if (status === 403 && (/suspendid/i.test(message) || error.response?.data?.code === 'TENANT_SUSPENDED')) accessHandler?.('SUSPENDED');
     else if (status === 402) accessHandler?.('EXPIRED');
+    else if (status === 401 && /token inv[aá]lido|expirado/i.test(message) && error.config?.headers?.Authorization) unauthorizedHandler?.();
     console.log({
       url: error.config?.url,
       method: error.config?.method,

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { secureStorage } from '../storage/secureStorage';
 import { User } from '../types';
+import { setUnauthorizedHandler } from '../api/api';
 
 interface AuthContextType {
   user: User | null;
@@ -57,6 +58,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Failed to delete session from SecureStore', e);
     }
   };
+
+  // Si el servidor responde "Token inválido o expirado", se cierra la sesión guardada (evita quedar con un token viejo)
+  useEffect(() => {
+    setUnauthorizedHandler(() => { void logout(); });
+    return () => setUnauthorizedHandler(null);
+  }, []);
 
   return (
     <AuthContext.Provider
