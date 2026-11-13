@@ -11,6 +11,7 @@ import { AppNavigator } from './src/navigation/AppNavigator';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import { usePushNotifications } from './src/hooks/usePushNotifications';
 import { useAutoSync } from './src/sync/useOfflineSync';
+import { navigationRef } from './src/navigation/navigationRef';
 
 /** Registra el dispositivo para push solo cuando hay sesión (el token se guarda por usuario). */
 function PushRegistrar() {
@@ -60,7 +61,7 @@ export default function App() {
           <CartProvider>
             <PushRegistrar />
             <AccessWatcher />
-            <NavigationContainer>
+            <NavigationContainer ref={navigationRef}>
               <AppNavigator />
               <StatusBar style="dark" />
             </NavigationContainer>

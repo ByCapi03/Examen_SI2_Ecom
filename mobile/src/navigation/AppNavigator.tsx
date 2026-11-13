@@ -42,6 +42,8 @@ const TryOnScreen = (props: any) => {
   return <Screen {...props} />;
 };
 
+import { NotificationsScreen } from '../screens/notifications/NotificationsScreen';
+
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export const AppNavigator = () => {
@@ -63,6 +65,12 @@ export const AppNavigator = () => {
         name="MainTabs"
         component={ClientDrawer}
         options={{ headerShown: false }}
+      />
+
+      <Stack.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{ title: 'Notificaciones' }}
       />
 
       <Stack.Screen

@@ -4,6 +4,11 @@ import type * as NotificationsType from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { api } from '../api/api';
+import { notificationEvents } from '../notifications/notificationEvents';
+import { navigationRef } from '../navigation/navigationRef';
+
+/** Canal de Android con sonido. Un canal ya creado no se puede modificar, por eso tiene un id nuevo. */
+export const ALERT_CHANNEL = 'alertas';
 
 // Expo Go (SDK 53+) ya no soporta notificaciones push: se omiten ahí y funcionan en una compilación propia.
 const IS_EXPO_GO = Constants.executionEnvironment === 'storeClient';
@@ -13,10 +18,11 @@ const Notifications: typeof NotificationsType = IS_EXPO_GO ? (null as any) : req
 if (!IS_EXPO_GO) {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
-      shouldShowAlert: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
       shouldPlaySound: true,
       shouldSetBadge: true,
-    } as any),
+    }),
   });
 }
 
@@ -46,10 +52,18 @@ export function usePushNotifications(enabled: boolean = true) {
 
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
       setNotification(notification);
+      notificationEvents.emit();
     });
 
     responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log(response);
+      // Al tocar el aviso: la reserva del cliente se abre directo; el resto va a la lista de notificaciones.
+      const data: any = response.notification.request.content.data ?? {};
+      if (!navigationRef.isReady()) return;
+      if (data.reservationId && data.route === '/reservations') {
+        navigationRef.navigate('ReservationDetail', { reservationId: Number(data.reservationId) });
+      } else {
+        navigationRef.navigate('Notifications');
+      }
     });
 
     return () => {
@@ -72,11 +86,14 @@ async function registerForPushNotificationsAsync() {
   let token;
 
   if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
+    await Notifications.setNotificationChannelAsync(ALERT_CHANNEL, {
+      name: 'Alertas de la tienda',
       importance: Notifications.AndroidImportance.MAX,
+      sound: 'default',
+      enableVibrate: true,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FF231F7C',
+      lightColor: '#C9904A',
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
     });
   }
 

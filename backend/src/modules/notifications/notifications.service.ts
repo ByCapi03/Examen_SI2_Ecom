@@ -221,6 +221,12 @@ export class NotificationsService implements OnModuleInit {
             body: payload.message,
           },
           data: payload.data || {},
+          // Sonido y prioridad alta: el canal "alertas" lo crea la app móvil al iniciar sesión
+          android: {
+            priority: 'high' as const,
+            notification: { channelId: 'alertas', sound: 'default', defaultVibrateTimings: true },
+          },
+          apns: { payload: { aps: { sound: 'default' } } },
         };
 
         const response = await messaging.sendEachForMulticast(message);
@@ -257,7 +263,7 @@ export class NotificationsService implements OnModuleInit {
         const messages = expoTokens.map(token => ({
           to: token,
           sound: 'default',
-          channelId: 'default',
+          channelId: 'alertas',
           priority: 'high',
           title: payload.title,
           body: payload.message,

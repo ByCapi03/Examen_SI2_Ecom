@@ -163,6 +163,7 @@ export type ClientDrawerParamList = {
 
 export type RootStackParamList = {
   MainTabs: undefined;
+  Notifications: undefined;
   ProductDetail: { productId: number };
   CreateReservation: {
     productId: number;

@@ -14,6 +14,7 @@ import { PurchasesScreen } from '../screens/purchases/PurchasesScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { CartScreen } from '../screens/store/CartScreen';
 import { PosScreen } from '../screens/pos/PosScreen';
+import { NotificationBell } from '../components/NotificationBell';
 
 const Drawer = createDrawerNavigator<ClientDrawerParamList>();
 
@@ -73,6 +74,7 @@ export const ClientDrawer = () => {
         headerTitleStyle: { ...typography.h3, color: colors.primary },
         headerTitleAlign: 'left',
         headerShadowVisible: false,
+        headerRight: user ? () => <NotificationBell /> : undefined,
         drawerActiveBackgroundColor: colors.gold + '20', // gold with opacity
         drawerActiveTintColor: colors.primaryDark,
         drawerInactiveTintColor: colors.primary,

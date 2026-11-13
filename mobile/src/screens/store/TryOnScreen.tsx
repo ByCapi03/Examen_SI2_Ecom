@@ -36,6 +36,9 @@ export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
   const [productConfig, setProductConfig] = useState<any>(null);
 
   const [overlayStyles, setOverlayStyles] = useState<any>({});
+  const [hud, setHud] = useState('Buscando a la persona…');
+  const hudRef = useRef('');
+  const [imageError, setImageError] = useState(false);
 
   const detectorRef = useRef<poseDetection.PoseDetector | null>(null);
   const isDetecting = useRef(false);
@@ -153,8 +156,10 @@ export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
 
     const leftShoulder = findKP('left_shoulder');
     const rightShoulder = findKP('right_shoulder');
-    const leftHip = findKP('left_hip');
-    const rightHip = findKP('right_hip');
+    const leftHipRaw = findKP('left_hip');
+    const rightHipRaw = findKP('right_hip');
+    const leftHip = leftHipRaw;
+    const rightHip = rightHipRaw;
     const leftKnee = findKP('left_knee');
     const rightKnee = findKP('right_knee');
     const leftAnkle = findKP('left_ankle');
@@ -186,11 +191,18 @@ export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
 
     const newStyles: any = {};
 
+    const shouldersVisible = !!(leftShoulder?.score && leftShoulder.score > 0.35 && rightShoulder?.score && rightShoulder.score > 0.35);
+    const hipsVisible = !!(leftHipRaw?.score && leftHipRaw.score > 0.35 && rightHipRaw?.score && rightHipRaw.score > 0.35);
+    const hudNext = `${shouldersVisible ? '✓' : '✗'} hombros · ${hipsVisible ? '✓' : '✗'} caderas`;
+    if (hudRef.current !== hudNext) { hudRef.current = hudNext; setHud(hudNext); }
+
     if (arType === 'TOP') {
-      if (leftShoulder?.score && leftShoulder.score > 0.35 && 
-          rightShoulder?.score && rightShoulder.score > 0.35 &&
-          leftHip?.score && leftHip.score > 0.35 && 
-          rightHip?.score && rightHip.score > 0.35) {
+      if (shouldersVisible) {
+        // Con la cámara frontal de cerca casi nunca se ven las caderas: si faltan se estiman bajo los hombros.
+        const estShoulderW = Math.abs(leftShoulder!.x - rightShoulder!.x);
+        const estimateHip = (sh: any) => ({ x: sh.x, y: sh.y + estShoulderW * 1.6, score: 1 });
+        const leftHip = hipsVisible ? leftHipRaw! : estimateHip(leftShoulder);
+        const rightHip = hipsVisible ? rightHipRaw! : estimateHip(rightShoulder);
         
         const shoulderWidth = Math.abs(toScreenX(leftShoulder.x) - toScreenX(rightShoulder.x));
         const centerX = toScreenX((leftShoulder.x + rightShoulder.x) / 2);
@@ -408,6 +420,7 @@ export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
           source={{ uri: productConfig.product.arTorsoUrl }} 
           style={overlayStyles.torso}
           resizeMode="contain"
+          onError={() => setImageError(true)}
         />
       )}
       {overlayStyles.leftSleeve && productConfig.product?.arLeftSleeveUrl && (
@@ -415,6 +428,7 @@ export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
           source={{ uri: productConfig.product.arLeftSleeveUrl }} 
           style={overlayStyles.leftSleeve}
           resizeMode="contain"
+          onError={() => setImageError(true)}
         />
       )}
       {overlayStyles.rightSleeve && productConfig.product?.arRightSleeveUrl && (
@@ -422,6 +436,7 @@ export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
           source={{ uri: productConfig.product.arRightSleeveUrl }} 
           style={overlayStyles.rightSleeve}
           resizeMode="contain"
+          onError={() => setImageError(true)}
         />
       )}
       {overlayStyles.rigid && productConfig.product?.arImageUrl && (
@@ -429,8 +444,18 @@ export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
           source={{ uri: productConfig.product.arImageUrl }} 
           style={overlayStyles.rigid}
           resizeMode="contain"
+          onError={() => setImageError(true)}
         />
       )}
+
+      <SafeAreaView style={styles.hudBox} edges={['top']} pointerEvents="none">
+        <Text style={styles.hudText}>{hud}</Text>
+        {!(productConfig.product?.arTorsoUrl || productConfig.product?.arImageUrl) ? (
+          <Text style={styles.hudWarn}>Este producto no tiene imagen para el vestidor: súbela en el panel web (Productos, imagen AR).</Text>
+        ) : null}
+        {imageError ? <Text style={styles.hudWarn}>No se pudo descargar la imagen de la prenda.</Text> : null}
+        {shouldersHint(hud) ? <Text style={styles.hudWarn}>Aléjate un poco para que se vean tus hombros.</Text> : null}
+      </SafeAreaView>
 
       <SafeAreaView style={styles.overlayControls} edges={['bottom']}>
         <Pressable style={styles.closeBtn} onPress={() => navigation.goBack()}>
@@ -444,7 +469,12 @@ export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
   );
 };
 
+const shouldersHint = (hud: string) => hud.startsWith('✗');
+
 const styles = StyleSheet.create({
+  hudBox: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center', gap: 4, paddingTop: 8 },
+  hudText: { color: '#fff', backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, fontSize: 12, overflow: 'hidden' },
+  hudWarn: { color: '#fff', backgroundColor: 'rgba(185,28,28,0.85)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, fontSize: 12, textAlign: 'center', marginHorizontal: 16, overflow: 'hidden' },
   container: { flex: 1, backgroundColor: 'black' },
   centerContainer: {
     flex: 1,
