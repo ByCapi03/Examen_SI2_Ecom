@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import * as jwt from 'jsonwebtoken';
 import { tenantStorage, TenantStore } from './tenant-context';
 import { isTenantActive } from './tenant-status';
+import { originOf } from '../public-url';
 
 /**
  * Abre un contexto ALS por petición y, si viene la cabecera X-Tenant-Slug,
@@ -16,7 +17,7 @@ export class TenantContextMiddleware implements NestMiddleware {
   constructor(private readonly dataSource: DataSource) {}
 
   async use(req: any, _res: any, next: () => void) {
-    const store: TenantStore = {};
+    const store: TenantStore = { origin: originOf(req.headers) };
     const slug = String(req.headers['x-tenant-slug'] || '').trim().toLowerCase();
     if (slug) {
       store.publicSlug = slug;

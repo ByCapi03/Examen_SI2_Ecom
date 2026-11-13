@@ -1,8 +1,9 @@
 import axios, { type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 import { cacheGet, cacheSet } from '../offline/db';
+import { API_URL } from '../config/apiUrl';
 
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000'
+  baseURL: API_URL
 });
 
 /**

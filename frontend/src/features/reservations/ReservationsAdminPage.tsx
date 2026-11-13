@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { api } from '../../api/axios';
 import { useAuth } from '../auth/AuthContext';
 import { io } from 'socket.io-client';
+import { API_URL } from '../../config/apiUrl';
 
 export const ReservationsAdminPage = () => {
   const { user } = useAuth();
@@ -30,7 +31,7 @@ export const ReservationsAdminPage = () => {
     const handleNewReservation = () => fetchReservations();
     window.addEventListener('RESERVATION_CREATED', handleNewReservation);
     
-    const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:3000');
+    const socket = io(API_URL);
     
     const token = localStorage.getItem('token');
     if (token) {

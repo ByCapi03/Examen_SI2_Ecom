@@ -11,6 +11,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import Stripe from 'stripe';
 import { Plan } from './plan.entity';
+import { currentPublicWebUrl } from '../../common/tenancy/tenant-context';
 import { TenantsService } from './tenants.service';
 
 @Injectable()
@@ -64,7 +65,7 @@ export class BillingService {
 
     const amount = TenantsService.price(plan, cycle);
     const [tn] = await this.dataSource.query('SELECT name, slug FROM tenants WHERE id = $1', [tenantId]);
-    const base = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const base = currentPublicWebUrl();
     const metadata = { type: 'PLAN', tenantId: String(tenantId), planCode: plan.code, billingCycle: cycle };
     const session = await this.stripe.checkout.sessions.create({
       mode: 'payment',

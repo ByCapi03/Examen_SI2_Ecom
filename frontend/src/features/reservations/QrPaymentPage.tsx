@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { API_URL } from '../../config/apiUrl';
 
 export const QrPaymentPage: React.FC = () => {
   console.log('[QR PAGE COMPONENT RENDER] Iniciando...');
@@ -10,7 +11,6 @@ export const QrPaymentPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
   useEffect(() => {
     let isMounted = true;

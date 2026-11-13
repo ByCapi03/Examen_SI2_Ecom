@@ -7,6 +7,7 @@
  */
 import { AsyncLocalStorage } from 'async_hooks';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { resolvePublicWebUrl } from '../public-url';
 
 export interface TenantStore {
   /** Tenant autenticado (JWT). Tiene prioridad absoluta. */
@@ -18,6 +19,8 @@ export interface TenantStore {
   /** La empresa del token está suspendida (rutas públicas con sesión). */
   suspended?: boolean;
   userId?: number;
+  /** Origen del navegador que hizo la petición (para armar enlaces y QR accesibles desde el celular). */
+  origin?: string;
 }
 
 export const tenantStorage = new AsyncLocalStorage<TenantStore>();
@@ -58,4 +61,13 @@ export function setAuthenticatedTenant(tenantId: number | undefined, userId?: nu
     store.tenantId = tenantId ? Number(tenantId) : undefined;
     store.userId = userId;
   }
+}
+
+/** Dirección pública del frontend para QR y enlaces (ver common/public-url.ts). */
+export function currentPublicWebUrl(): string {
+  return resolvePublicWebUrl({
+    explicit: process.env.QR_PUBLIC_WEB_URL,
+    frontendUrl: process.env.FRONTEND_URL,
+    origin: tenantStorage.getStore()?.origin,
+  });
 }

@@ -9,8 +9,8 @@ const { Client } = require('pg');
 const API = process.env.API_URL || 'http://localhost:3000';
 let ok = 0, fail = 0;
 const check = (id, name, cond, extra = '') => { cond ? ok++ : fail++; console.log(`  ${cond ? '✔' : '✘'} ${id} ${name} ${cond ? '' : extra}`); };
-async function call(method, p, token, body) {
-  const h = { 'content-type': 'application/json' };
+async function call(method, p, token, body, extraHeaders) {
+  const h = { 'content-type': 'application/json', ...(extraHeaders || {}) };
   if (token) h.authorization = `Bearer ${token}`;
   const res = await fetch(API + p, { method, headers: h, body: body ? JSON.stringify(body) : undefined });
   let data = null; try { data = await res.json(); } catch { /* vacío */ }
@@ -41,6 +41,13 @@ const login = async (email) => (await call('POST', '/auth/login', null, { email,
     let r = await call('POST', '/pos/sales', tok, { paymentMethod: 'QR', items: [{ variantId: p.variantId, quantity: 2 }] });
     const sale = r.data;
     check('Q03', 'Cobrar con QR crea la venta PENDIENTE con su código QR', r.status === 201 && sale?.status === 'PENDIENTE' && /\/qr-payment\//.test(sale?.qr?.confirmationUrl || '') && /^data:image\/png/.test(sale?.qr?.qrImage || ''), JSON.stringify(r.data)?.slice(0, 200));
+    // La dirección del QR sale del origen desde el que se abrió el POS (p. ej. la IP de la laptop), salvo que la fije el entorno
+    const lan = 'http://192.168.0.77:5173';
+    const fixed = (process.env.QR_PUBLIC_WEB_URL || (/localhost|127\.0\.0\.1/.test(process.env.FRONTEND_URL || 'localhost') ? '' : process.env.FRONTEND_URL) || '').replace(/\/+$/, '');
+    const rLan = await call('POST', '/pos/sales', tok, { paymentMethod: 'QR', items: [{ variantId: p.variantId, quantity: 1 }] }, { origin: lan });
+    const urlLan = rLan.data?.qr?.confirmationUrl || '';
+    check('Q03b', 'El QR usa la dirección desde la que se abrió el POS (o la del entorno si está fijada)', rLan.status === 201 && urlLan.startsWith((fixed || lan) + '/qr-payment/'), urlLan.slice(0, 80));
+    if (rLan.data?.id) await call('POST', `/pos/sales/${rLan.data.id}/cancel-qr`, tok);
     const token = (sale?.qr?.confirmationUrl || '').split('/qr-payment/')[1];
     const mid = await inv(p.variantId, branchId);
     check('Q04', 'El stock queda RESERVADO (no descontado) mientras no se paga', mid.reserved === base.reserved + 2 && mid.stock === base.stock);

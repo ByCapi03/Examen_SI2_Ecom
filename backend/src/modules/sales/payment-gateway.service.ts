@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import Stripe from 'stripe';
 import { DataSource } from 'typeorm';
-import { getEffectiveTenantId } from '../../common/tenancy/tenant-context';
+import { currentPublicWebUrl, getEffectiveTenantId } from '../../common/tenancy/tenant-context';
 
 @Injectable()
 export class PaymentGatewayService {
@@ -46,7 +46,7 @@ export class PaymentGatewayService {
 
   async createCheckoutSession(amount: number, metadata: any) {
     const amountInCents = Math.round(amount * 100);
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = currentPublicWebUrl();
     const [tenant] = await this.dataSource.query('SELECT slug, name FROM tenants WHERE id = $1', [getEffectiveTenantId()]);
     const storeUrl = tenant?.slug ? `${frontendUrl}/t/${tenant.slug}` : frontendUrl;
     
