@@ -89,7 +89,6 @@ async function registerForPushNotificationsAsync() {
     await Notifications.setNotificationChannelAsync(ALERT_CHANNEL, {
       name: 'Alertas de la tienda',
       importance: Notifications.AndroidImportance.MAX,
-      sound: 'default',
       enableVibrate: true,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#C9904A',
