@@ -17,6 +17,7 @@
  *   node scripts/seed-synthetic.js                       # empresa 1, 12 meses, 80 clientes
  *   node scripts/seed-synthetic.js --tenant=mi-empresa --months=18 --clients=120 --seed=7
  *   node scripts/seed-synthetic.js --tenant=mi-empresa --sales=3000        # cantidad exacta de ventas sintéticas
+ *   node scripts/seed-synthetic.js --tenant=mi-empresa --sales=3000 --append   # AGREGA ventas sin borrar lo existente
  *   node scripts/seed-synthetic.js --tenant=mi-empresa --clean   # elimina lo generado
  */
 const fs = require('fs');
@@ -135,10 +136,12 @@ async function main() {
   }
 
   const existing = await one(`SELECT COUNT(*)::int AS n FROM clients WHERE "tenantId" = $1 AND email LIKE $2`, [T, `%${DOMAIN}`]);
-  if (existing.n > 0) {
-    console.error(`Ya hay ${existing.n} clientes sintéticos en esta empresa. Ejecute primero con --clean para regenerar.`);
+  const APPEND = !!args.append && existing.n > 0;
+  if (existing.n > 0 && !APPEND) {
+    console.error(`Ya hay ${existing.n} clientes sintéticos en esta empresa. Use --append para AGREGAR más ventas sin borrar nada, o --clean para regenerar todo.`);
     process.exit(1);
   }
+  if (APPEND && !TARGET_SALES) { console.error('Con --append indique la cantidad: --sales=3000'); process.exit(1); }
 
   await q('BEGIN');
   try {
@@ -154,10 +157,11 @@ async function main() {
 
     // ------------------------------------------------- usuario responsable
     const hash = await bcrypt.hash(`syn-${SEED}-${T}`, 10);
-    const synUser = await one(`INSERT INTO users ("tenantId", name, email, "passwordHash", active, "mustChangePassword", "emailVerified", "createdAt", "branchId")
+    const prevUser = APPEND ? await one(`SELECT id FROM users WHERE "tenantId" = $1 AND email = $2`, [T, synUserEmail]) : null;
+    const synUser = prevUser ?? await one(`INSERT INTO users ("tenantId", name, email, "passwordHash", active, "mustChangePassword", "emailVerified", "createdAt", "branchId")
       VALUES ($1, 'Usuario sintético', $2, $3, false, false, true, now(), $4) RETURNING id`, [T, synUserEmail, hash, branches[0]]);
     const cajero = await one(`SELECT id FROM roles WHERE name = 'CAJERO' LIMIT 1`);
-    if (cajero) await q(`INSERT INTO user_roles ("userId", "roleId", active, "assignedAt") VALUES ($1, $2, true, now())`, [synUser.id, cajero.id]);
+    if (cajero && !prevUser) await q(`INSERT INTO user_roles ("userId", "roleId", active, "assignedAt") VALUES ($1, $2, true, now())`, [synUser.id, cajero.id]);
 
     // ------------------------------------------------------------ catálogo
     const sizes = (await q(`SELECT id FROM sizes WHERE "tenantId" = $1 AND active = true ORDER BY id LIMIT 4`, [T])).rows;
@@ -216,14 +220,16 @@ async function main() {
     }
 
     // ------------------------------------------------------------- clientes
-    const clients = [];
+    let clients = [];
     const counts = ARCHETYPES.map((a) => Math.max(1, Math.round(a.share * N_CLIENTS)));
-    ARCHETYPES.forEach((a, ai) => {
+    if (!APPEND) ARCHETYPES.forEach((a, ai) => {
       for (let i = 0; i < counts[ai]; i++) {
         const [from, to] = a.window(D);
         clients.push({ arch: a, from: Math.max(0, from), to: Math.min(D - 1, to), branch: pick(branches) });
       }
     });
+    // --append: se reutilizan los clientes sintéticos que ya existen y solo se agregan ventas
+    const existingClients = APPEND ? (await q(`SELECT id FROM clients WHERE "tenantId" = $1 AND email LIKE $2`, [T, `%${DOMAIN}`])).rows.map((r) => r.id) : [];
     for (let i = 0; i < clients.length; i++) {
       const c = clients[i];
       const row = await one(`INSERT INTO clients ("tenantId", name, "lastName", email, active, "registrationDate")
@@ -269,7 +275,11 @@ async function main() {
         const dayW = days.map((d) => { const dt = new Date(start.getTime() + d * 86400000); return seasonal(dt) * dowFactor[dt.getDay()] * (1 + 0.0008 * d); });
         for (let k = sales.length; k < TARGET_SALES; k++) {
           const day = weightedPick(days, dayW);
-          addSale(day, null, pick(branches), 'POS', makeBasket(day, 1.8));
+          if (APPEND && existingClients.length && rnd() < 0.45) {
+            addSale(day, pick(existingClients), pick(branches), weightedPick(['POS', 'WEB', 'MOVIL'], [40, 40, 20]), makeBasket(day, 2.2));
+          } else {
+            addSale(day, null, pick(branches), 'POS', makeBasket(day, 1.8));
+          }
         }
         sales.sort((a, b) => a.date - b.date);
       }
