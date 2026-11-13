@@ -28,4 +28,8 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   console.warn("ServiceWorker no está disponible. Firebase Messaging deshabilitado.");
 }
 
+/** Messaging listo para usar (espera a comprobar soporte del navegador). Devuelve null si no hay soporte. */
+export const getMessagingAsync = () =>
+  isSupported().then((ok) => (ok ? getMessaging(app) : null)).catch(() => null);
+
 export { messaging, getToken, onMessage, firebaseConfig };

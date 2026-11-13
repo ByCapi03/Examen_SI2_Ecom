@@ -217,6 +217,10 @@ export class ReservationsService implements OnModuleInit {
 
       await queryRunner.commitTransaction();
 
+      // Aviso push a los encargados de la sucursal: se hace después del commit y sin bloquear la respuesta
+      const createdClientName = `${client.name} ${client.lastName}`;
+      this.notificationsService.notifyReservationCreated(createReservationDto.branchId, { id: savedReservation.id }, createdClientName).catch(e => console.error(e));
+
       return {
         reservationId: savedReservation.id,
         saleId: savedSale.id,
@@ -482,7 +486,6 @@ export class ReservationsService implements OnModuleInit {
         await queryRunner.commitTransaction();
 
         const clientName = `${reservation.client.name} ${reservation.client.lastName}`;
-        this.notificationsService.notifyReservationCreated(reservation.branchId, reservation, clientName).catch(e => console.error(e));
         this.notificationsService.notifyReservationPaid(
           reservation.branchId, 
           reservation, 

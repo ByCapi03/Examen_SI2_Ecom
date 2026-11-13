@@ -92,8 +92,13 @@ async function registerForPushNotificationsAsync() {
       return { token: undefined, status: finalStatus };
     }
     try {
-      const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
-      token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+      if (Platform.OS === 'android') {
+        // Token FCM nativo: lo envía el backend con Firebase (usa google-services.json), sin depender de EAS.
+        token = (await Notifications.getDevicePushTokenAsync()).data;
+      } else {
+        const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+        token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+      }
       console.log(token);
     } catch (e) {
       console.log(e);
