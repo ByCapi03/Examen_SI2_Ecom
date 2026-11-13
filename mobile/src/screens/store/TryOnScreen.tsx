@@ -111,6 +111,41 @@ export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
     };
   }, [variantId]);
 
+  // En algunos teléfonos Android la imagen del tensor llega girada respecto a la pantalla y la IA no reconoce a la
+  // persona (confianza ~0.1). Si tras varios cuadros no hay hombros claros se prueba otro giro y se conserva el que funcione.
+  const ROTATIONS = [0, 90, 270, 180];
+  const rotIdx = useRef(0);
+  const badFrames = useRef(0);
+  const goodFrames = useRef(0);
+  const rotLocked = useRef(false);
+
+  const rotateTensor = (t: tf.Tensor3D, deg: number): tf.Tensor3D => {
+    if (deg === 0) return t;
+    return tf.tidy(() => {
+      if (deg === 90) return tf.reverse(tf.transpose(t, [1, 0, 2]), 1) as tf.Tensor3D; // horario
+      if (deg === 270) return tf.reverse(tf.transpose(t, [1, 0, 2]), 0) as tf.Tensor3D; // antihorario
+      return tf.reverse(t, [0, 1]) as tf.Tensor3D;
+    });
+  };
+
+  /** Devuelve un punto detectado en la imagen girada a las coordenadas del tensor original, ya espejado (cámara frontal). */
+  const mapKeypoint = (kp: any, deg: number, W: number, H: number) => {
+    let x = kp.x;
+    let y = kp.y;
+    if (deg === 90) { x = kp.y; y = H - 1 - kp.x; }
+    else if (deg === 270) { x = W - 1 - kp.y; y = kp.x; }
+    else if (deg === 180) { x = W - 1 - kp.x; y = H - 1 - kp.y; }
+    return { ...kp, x: W - x, y };
+  };
+
+  const nextRotation = () => {
+    rotIdx.current = (rotIdx.current + 1) % ROTATIONS.length;
+    badFrames.current = 0;
+    goodFrames.current = 0;
+    previousKeypoints.current = {};
+    detectorRef.current?.reset?.();
+  };
+
   const handleCameraStream = (images: IterableIterator<tf.Tensor3D>) => {
     const loop = async () => {
       if (unmounted.current) return;
@@ -118,22 +153,38 @@ export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
         requestAnimationFrameId.current = requestAnimationFrame(loop);
         return;
       }
-      
+
       const imageTensor = images.next().value;
       if (!imageTensor) {
         requestAnimationFrameId.current = requestAnimationFrame(loop);
         return;
       }
 
+      let rotated: tf.Tensor3D | null = null;
       try {
         isDetecting.current = true;
         if (detectorRef.current) {
-          const poses = await detectorRef.current.estimatePoses(imageTensor as any, {
-            flipHorizontal: true, // front camera
-          });
-          
+          const deg = ROTATIONS[rotIdx.current];
+          const [H, W] = imageTensor.shape;
+          rotated = rotateTensor(imageTensor, deg);
+          const poses = await detectorRef.current.estimatePoses(rotated as any);
+
           if (poses && poses.length > 0) {
-            updateOverlay(poses[0]);
+            const mapped = { ...poses[0], keypoints: poses[0].keypoints.map((k) => mapKeypoint(k, deg, W, H)) };
+            const byName = (n: string) => mapped.keypoints.find((k) => k.name === n)?.score ?? 0;
+            const shoulderScore = Math.min(byName('left_shoulder'), byName('right_shoulder'));
+
+            if (shoulderScore >= 0.35) {
+              goodFrames.current += 1;
+              badFrames.current = 0;
+              if (goodFrames.current >= 3) rotLocked.current = true;
+            } else if (shoulderScore < 0.3) {
+              goodFrames.current = 0;
+              badFrames.current += 1;
+              // Sin giro fijado: tras 8 cuadros malos se prueba el siguiente. Con giro fijado: tras ~4 s sin verte se reintenta.
+              if (badFrames.current >= (rotLocked.current ? 60 : 8)) { rotLocked.current = false; nextRotation(); }
+            }
+            updateOverlay(mapped as any);
           } else {
             setOverlayStyles({});
           }
@@ -141,6 +192,7 @@ export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
       } catch (err) {
         // ignore occasional tensor errors
       } finally {
+        if (rotated && rotated !== imageTensor) tf.dispose(rotated);
         tf.dispose(imageTensor);
         isDetecting.current = false;
         requestAnimationFrameId.current = requestAnimationFrame(loop);
@@ -214,7 +266,7 @@ export const TryOnScreen: React.FC<Props> = ({ route, navigation }) => {
     const shouldersVisible = !!(leftShoulder?.score && leftShoulder.score > SHOULDER_MIN && rightShoulder?.score && rightShoulder.score > SHOULDER_MIN);
     const hipsVisible = !!(leftHipRaw?.score && leftHipRaw.score > HIP_MIN && rightHipRaw?.score && rightHipRaw.score > HIP_MIN);
     const sc = (k: any) => (k?.score ?? 0).toFixed(2);
-    const hudNext = `${shouldersVisible ? '✓' : '✗'} hombros (${sc(leftShoulder)}/${sc(rightShoulder)}) · ${hipsVisible ? '✓' : '✗'} caderas`;
+    const hudNext = `${shouldersVisible ? '✓' : '✗'} hombros (${sc(leftShoulder)}/${sc(rightShoulder)}) · ${hipsVisible ? '✓' : '✗'} caderas · giro ${ROTATIONS[rotIdx.current]}°${rotLocked.current ? ' fijo' : ''}`;
     if (hudRef.current !== hudNext) { hudRef.current = hudNext; setHud(hudNext); }
 
     if (arType === 'TOP') {
