@@ -79,6 +79,7 @@ sudo -u "$RUN_USER" bash -c "cd '$APP/backend' && (npm ci --include=dev --no-aud
 log "Compilando web (tarda varios minutos en un t3.micro)"
 install -m 600 -o "$RUN_USER" -g "$RUN_USER" "$ETC/frontend.env" "$APP/frontend/.env.production.local"
 sudo -u "$RUN_USER" bash -c "cd '$APP/frontend' && (npm ci --no-audit --no-fund --loglevel=error || npm install --no-audit --no-fund --loglevel=error) && NODE_OPTIONS=--max-old-space-size=1536 npm run build"
+mkdir -p "$(dirname "$WEB_ROOT")"
 rm -rf "$WEB_ROOT.new" && cp -r "$APP/frontend/dist" "$WEB_ROOT.new"
 rm -rf "$WEB_ROOT.old"; [ -d "$WEB_ROOT" ] && mv "$WEB_ROOT" "$WEB_ROOT.old"; mv "$WEB_ROOT.new" "$WEB_ROOT"
 rm -rf "$WEB_ROOT.old"
