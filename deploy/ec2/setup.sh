@@ -57,6 +57,8 @@ if ! command -v caddy >/dev/null; then
 fi
 
 # 3. Código (copia del servidor: se alinea siempre con la rama remota)
+# La carpeta es del usuario $RUN_USER; sin esto git (como root) la rechaza por "dubious ownership".
+git config --global --get-all safe.directory 2>/dev/null | grep -qx "$APP" || git config --global --add safe.directory "$APP"
 if [ -d "$APP/.git" ]; then
   log "Actualizando código ($BRANCH)"
   git -C "$APP" fetch --depth 50 origin "$BRANCH"
