@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 
 export interface User {
@@ -43,6 +43,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem('user', JSON.stringify(newUser));
     setUser(newUser);
   };
+
+  // La sesión vive en localStorage y es compartida por todas las pestañas. Si en otra pestaña
+  // se inicia o se cierra sesión (p. ej. el cliente en la tienda /t/<slug>), esta pestaña se
+  // actualiza; si no, seguiría mostrando el panel del usuario anterior mientras el API recibe
+  // el token del nuevo (y respondería 403 "No tienes acceso").
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== null && e.key !== 'token' && e.key !== 'user') return;
+      setAccessToken(localStorage.getItem('token'));
+      setUser(JSON.parse(localStorage.getItem('user') || 'null'));
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   const isAuthenticated = !!accessToken;
 
