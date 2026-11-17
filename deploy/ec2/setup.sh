@@ -16,6 +16,11 @@
 #
 # Instalar o ACTUALIZAR (trae lo último de la rama y recompila): sudo bash setup.sh
 # Es idempotente: se puede ejecutar las veces que haga falta.
+#
+# ESTADO (17/11/2026): probado en un t3.micro con Ubuntu 26.04. La instalación termina, la web
+# se publica con HTTPS válido y /t/luna carga, pero la API respondía 502 (el servicio
+# atemporal-api no quedaba arriba) y no se llegó a ver la causa. Si lo retoman, empiecen por:
+#   sudo journalctl -u atemporal-api -n 50 --no-pager
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
